@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: trading-agent
+  main:
+    banner-mode: off
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: always
+    serialization:
+      write-dates-as-timestamps: false
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+    include-exception: false
+
+trading:
+  environment: ${TRADING_ENVIRONMENT:DEMO}
+  operational-state: ${TRADING_OPERATIONAL_STATE:OBSERVATION}
+  broker:
+    enabled: ${TRADING_BROKER_ENABLED:false}
+    base-url: ${TRADING_BROKER_BASE_URL:}

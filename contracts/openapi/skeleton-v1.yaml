@@ -1,0 +1,303 @@
+openapi: 3.0.3
+info:
+  title: Trading agent skeleton API
+  version: 0.1.0
+  description: >
+    Read-only surface of the OBSERVATION skeleton. There is no broker client,
+    no order placement, and no path to ACTIVE. Any method other than GET or HEAD
+    returns 403 OBSERVATION_MUTATIONS_DISABLED.
+servers:
+  - url: http://127.0.0.1:8080
+paths:
+  /health/live:
+    get:
+      operationId: live
+      responses:
+        "200":
+          description: Process is up
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [UP]
+  /health/ready-trading:
+    get:
+      operationId: readyTrading
+      responses:
+        "503":
+          description: Trading workers are not ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DownProbe"
+  /health/ready-admin:
+    get:
+      operationId: readyAdmin
+      responses:
+        "503":
+          description: Admin readiness is down because the datastore is not wired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DownProbe"
+  /api/v1/system/status:
+    get:
+      operationId: systemStatus
+      responses:
+        "200":
+          description: Observation status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemStatusEnvelope"
+  /api/v1/evidence-gate:
+    get:
+      operationId: evidenceGate
+      responses:
+        "200":
+          description: Evidence rows, all unverified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceEnvelope"
+  /api/dashboard/v1/session:
+    get:
+      operationId: dashboardSession
+      responses:
+        "200":
+          description: Unauthenticated local session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionEnvelope"
+  /api/dashboard/v1/overview:
+    get:
+      operationId: dashboardOverview
+      responses:
+        "200":
+          description: Empty portfolio snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OverviewEnvelope"
+components:
+  schemas:
+    DownProbe:
+      type: object
+      required: [status, reason]
+      properties:
+        status:
+          type: string
+          enum: [DOWN]
+        operational_state:
+          type: string
+        reason:
+          type: string
+    Meta:
+      type: object
+      required: [api_version, schema_version, environment, consistency, freshness]
+      properties:
+        api_version:
+          type: string
+        schema_version:
+          type: string
+        request_id:
+          type: string
+        generated_at:
+          type: string
+          format: date-time
+        server_time:
+          type: string
+          format: date-time
+        environment:
+          type: string
+          enum: [DEMO]
+        base_currency:
+          type: string
+          nullable: true
+        consistency:
+          type: string
+        as_of:
+          type: string
+          nullable: true
+        reconciled_at:
+          type: string
+          nullable: true
+        freshness:
+          type: object
+          properties:
+            status:
+              type: string
+            age_ms:
+              type: integer
+              nullable: true
+            stale_after_ms:
+              type: integer
+              nullable: true
+    Warning:
+      type: object
+      required: [code, detail]
+      properties:
+        code:
+          type: string
+        detail:
+          type: string
+    SystemStatusEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [operational_state, trading_enabled, broker_dispatch, active_transition_allowed, strategy_action]
+          properties:
+            operational_state:
+              type: string
+              enum: [OBSERVATION]
+            environment:
+              type: string
+              enum: [DEMO]
+            trading_enabled:
+              type: boolean
+              enum: [false]
+            broker_dispatch:
+              type: string
+              enum: [disabled]
+            active_transition_allowed:
+              type: boolean
+              enum: [false]
+            strategy_action:
+              type: string
+              enum: [NO-TRADE]
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    EvidenceEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [allows_active, rows]
+          properties:
+            allows_active:
+              type: boolean
+              enum: [false]
+            rows:
+              type: array
+              items:
+                type: object
+                required: [control_id, status]
+                properties:
+                  control_id:
+                    type: string
+                  scope:
+                    type: string
+                  owner_role:
+                    type: string
+                  status:
+                    type: string
+                    enum: [UNVERIFIED]
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    SessionEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [authenticated, capabilities]
+          properties:
+            authenticated:
+              type: boolean
+            role:
+              type: string
+              nullable: true
+            environment:
+              type: string
+              enum: [DEMO]
+            capabilities:
+              type: object
+              properties:
+                view:
+                  type: boolean
+                acknowledge_alert:
+                  type: boolean
+                kill_switch:
+                  type: boolean
+                reset:
+                  type: boolean
+                configure:
+                  type: boolean
+                place_order:
+                  type: boolean
+                  enum: [false]
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    OverviewEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [operational_state, trading_enabled]
+          properties:
+            operational_state:
+              type: string
+              enum: [OBSERVATION]
+            trading_enabled:
+              type: boolean
+              enum: [false]
+            equity:
+              nullable: true
+            broker_cash:
+              nullable: true
+            assigned_budget:
+              nullable: true
+            available_cash:
+              nullable: true
+            reserved_cash:
+              nullable: true
+            position_count:
+              type: integer
+              nullable: true
+            unknown_order_count:
+              type: integer
+              nullable: true
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    Problem:
+      type: object
+      required: [status, code]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+          enum: [OBSERVATION_MUTATIONS_DISABLED]
+        retryable:
+          type: boolean
