@@ -22,6 +22,8 @@ data class PortfolioSnapshot(
     val configurationVersionId: String,
     val configurationVersionNumber: Long,
     val ledgerStatus: String,
+    val journalEntryCount: Int,
+    val journalBalanced: Boolean,
 )
 
 class DashboardReadModel(
@@ -57,6 +59,8 @@ class DashboardReadModel(
             configurationVersionId = configuration.versionId.toString(),
             configurationVersionNumber = configuration.versionNumber,
             ledgerStatus = quote.status,
+            journalEntryCount = ledger.journalEntryCount(),
+            journalBalanced = ledger.journalBalanced(),
         )
     }
 }

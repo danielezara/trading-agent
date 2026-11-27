@@ -29,7 +29,10 @@ class OperationalStateService(
         since = clock(),
         reason = "Avvio in OBSERVATION: gate non verificato e broker assente.",
         generation = 1,
-        permissions = OBSERVATION_PERMISSIONS,
+        permissions = OperationalStateMachine.permissions(
+            state = OperationalState.OBSERVATION,
+            brokerFresh = false,
+        ),
     )
 
     fun current(): OperationalState = snapshot.state
@@ -48,15 +51,5 @@ class OperationalStateService(
             )
         }
         return snapshot.state
-    }
-
-    companion object {
-        val OBSERVATION_PERMISSIONS = OperationalPermissions(
-            newEntries = false,
-            localExits = false,
-            cancel = false,
-            reconcilePermitted = true,
-            reconcileWired = false,
-        )
     }
 }

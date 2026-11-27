@@ -57,6 +57,8 @@ class DashboardController(
                 configurationVersionId = snapshot.configurationVersionId,
                 configurationVersionNumber = snapshot.configurationVersionNumber,
                 ledgerStatus = snapshot.ledgerStatus,
+                journalEntryCount = snapshot.journalEntryCount,
+                journalBalanced = snapshot.journalBalanced,
             ),
             meta = ApiMeta(schemaVersion = "portfolio-snapshot/1"),
             warnings = listOf(
@@ -100,4 +102,6 @@ data class OverviewData(
     val configurationVersionId: String,
     val configurationVersionNumber: Long,
     val ledgerStatus: String,
+    val journalEntryCount: Int,
+    val journalBalanced: Boolean,
 )

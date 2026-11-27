@@ -1,6 +1,7 @@
 package com.tradingagent.api
 
 import org.junit.jupiter.api.Test
+import org.hamcrest.Matchers.contains
 import org.hamcrest.Matchers.nullValue
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -42,6 +43,9 @@ class ApiSkeletonTest(
             .andExpect(jsonPath("$.data.broker_dispatch").value("disabled"))
             .andExpect(jsonPath("$.data.active_transition_allowed").value(false))
             .andExpect(jsonPath("$.data.strategy_action").value("NO-TRADE"))
+            .andExpect(jsonPath("$.data.strategy_reason").value("CAPABILITY_UNVERIFIED"))
+            .andExpect(jsonPath("$.data.ingestion_enabled").value(false))
+            .andExpect(jsonPath("$.data.ingestion_source").value("classpath-fixture"))
             .andExpect(jsonPath("$.meta.environment").value("DEMO"))
 
         mockMvc.perform(get("/api/v1/evidence-gate"))
@@ -61,6 +65,8 @@ class ApiSkeletonTest(
             .andExpect(jsonPath("$.data.assigned_budget").value(nullValue()))
             .andExpect(jsonPath("$.data.available_cash").value(nullValue()))
             .andExpect(jsonPath("$.data.ledger_status").value("UNOBSERVED"))
+            .andExpect(jsonPath("$.data.journal_entry_count").value(0))
+            .andExpect(jsonPath("$.data.journal_balanced").value(true))
             .andExpect(jsonPath("$.data.configuration_version_number").value(1))
             .andExpect(jsonPath("$.meta.environment").value("DEMO"))
             .andExpect(jsonPath("$.meta.base_currency").value(nullValue()))
@@ -87,6 +93,18 @@ class ApiSkeletonTest(
             .andExpect(jsonPath("$.data.actions.local_exits").value(false))
             .andExpect(jsonPath("$.data.actions.cancel").value(false))
             .andExpect(jsonPath("$.data.actions.reconcile_wired").value(false))
+
+        mockMvc.perform(get("/api/v1/data-health"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.source").value("classpath-fixture"))
+            .andExpect(jsonPath("$.data.network").value(false))
+            .andExpect(jsonPath("$.data.channels[?(@.channel == 'prices')].status", contains("CONFLICT")))
+            .andExpect(jsonPath("$.data.channels[?(@.channel == 'orders')].status", contains("NOT_WIRED")))
+
+        mockMvc.perform(get("/api/v1/decisions/latest"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.action").value("NO-TRADE"))
+            .andExpect(jsonPath("$.data.reason_codes[0]").value("CAPABILITY_UNVERIFIED"))
     }
 
     @Test

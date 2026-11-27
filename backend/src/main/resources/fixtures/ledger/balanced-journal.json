@@ -1,0 +1,20 @@
+{
+  "currency": "EUR",
+  "note": "Synthetic classroom fixture. It is not a broker balance and the live quote does not load it.",
+  "entries": [
+    {
+      "id": "fixture-opening",
+      "lines": [
+        { "account": "BROKER_CASH", "minor_units": 100000 },
+        { "account": "EQUITY", "minor_units": -100000 }
+      ]
+    },
+    {
+      "id": "fixture-reserve",
+      "lines": [
+        { "account": "RESERVED_CASH", "minor_units": 25000 },
+        { "account": "BROKER_CASH", "minor_units": -25000 }
+      ]
+    }
+  ]
+}

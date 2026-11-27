@@ -59,8 +59,14 @@ data class CashQuote(
     }
 }
 
-class Ledger {
+class Ledger(
+    private val journal: Journal = Journal(),
+) {
     fun availableCash(): Money? = quote(CashInputs()).money(null)
+
+    fun journalEntryCount(): Int = journal.entryCount()
+
+    fun journalBalanced(): Boolean = journal.isBalanced()
 
     fun quote(inputs: CashInputs): CashQuote {
         val complete = inputs.currency != null &&

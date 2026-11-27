@@ -13,6 +13,8 @@ const overview = {
     reserved_cash: null,
     cash_buffer: null,
     ledger_status: "UNOBSERVED",
+    journal_entry_count: 0,
+    journal_balanced: true,
     configuration_version_id: "11111111-1111-1111-1111-111111111111",
     configuration_version_number: 1,
   },
@@ -58,9 +60,38 @@ const operational = {
   warnings: [],
 };
 
+const decision = {
+  data: {
+    action: "NO-TRADE",
+    reason_codes: ["CAPABILITY_UNVERIFIED", "DATA_MISSING"],
+    summary: "NO-TRADE. Motivi: CAPABILITY_UNVERIFIED, DATA_MISSING.",
+    input_hash: "b".repeat(64),
+    evaluated_at: "2026-11-27T00:00:30Z",
+  },
+  meta: { environment: "DEMO", base_currency: null },
+  warnings: [],
+};
+
+const health = {
+  data: {
+    source: "classpath-fixture",
+    network: false,
+    connector_version: "fixture-1",
+    quarantined_count: 1,
+    channels: [
+      { channel: "orders", source: "not-wired", accepted_count: 0, rejected_count: 0, duplicate_count: 0, stale: false, conflict: false, quality_millis: 0, status: "NOT_WIRED" },
+      { channel: "prices", source: "fixture-market-data", accepted_count: 2, rejected_count: 1, duplicate_count: 1, stale: false, conflict: true, quality_millis: 0, status: "CONFLICT" },
+    ],
+  },
+  meta: { environment: "DEMO", base_currency: null },
+  warnings: [],
+};
+
 function jsonFor(path: string) {
   if (path.includes("overview")) return overview;
   if (path.includes("configurations")) return configuration;
+  if (path.includes("decisions")) return decision;
+  if (path.includes("data-health")) return health;
   return operational;
 }
 
@@ -88,6 +119,8 @@ describe("dashboard skeleton", () => {
     expect(await screen.findByTestId("operational-state")).toHaveTextContent("OBSERVATION");
     expect(screen.getByRole("heading", { name: "Panoramica" })).toBeInTheDocument();
     expect(screen.getAllByText("non disponibile").length).toBeGreaterThan(0);
+    expect(await screen.findByTestId("decision")).toHaveTextContent("NO-TRADE");
+    expect(screen.getByTestId("decision")).toHaveTextContent("CAPABILITY_UNVERIFIED");
     expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
   });
 
@@ -105,10 +138,21 @@ describe("dashboard skeleton", () => {
     expect(screen.getByText(/non crea ordini/i)).toBeInTheDocument();
   });
 
+  it("shows fixture channels without a network call", async () => {
+    renderAt("/dati");
+    expect(await screen.findByRole("heading", { name: "Dati e agente" })).toBeInTheDocument();
+    expect(screen.getByText("prices")).toBeInTheDocument();
+    expect(screen.getByText("CONFLICT")).toBeInTheDocument();
+    expect(screen.getByText("NOT_WIRED")).toBeInTheDocument();
+    expect(screen.getByText(/Rete: no/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
+  });
+
   it("has no order action on the portfolio route", async () => {
     renderAt("/portafoglio");
     expect(screen.getByRole("heading", { name: "Portafoglio" })).toBeInTheDocument();
     expect(await screen.findByText(/Stato ledger: UNOBSERVED/)).toBeInTheDocument();
+    expect(screen.getByText(/Registrazioni: 0/)).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });

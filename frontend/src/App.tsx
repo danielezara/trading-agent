@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { getJson } from "./api/client";
 import { assertSkeletonApiBase } from "./api/policy";
-import type { Configuration, Envelope, Money, OperationalState, Overview } from "./api/types";
+import type { Configuration, DataHealth, Decision, Envelope, Money, OperationalState, Overview } from "./api/types";
 import "./styles.css";
 
 const NAV = [
@@ -21,6 +21,8 @@ type DashboardData = {
   overview: Overview;
   configuration: Configuration;
   operational: OperationalState;
+  decision: Decision;
+  health: DataHealth;
 };
 
 type LoadState =
@@ -77,7 +79,7 @@ function DashboardShell() {
           <Route path="/portafoglio" element={<PortfolioPage loaded={loaded} />} />
           <Route path="/performance" element={<Page title="Performance" />} />
           <Route path="/attivita" element={<Page title="Attività" />} />
-          <Route path="/dati" element={<Page title="Dati e agente" />} />
+          <Route path="/dati" element={<DataPage loaded={loaded} />} />
           <Route path="/alert" element={<Page title="Alert" />} />
           <Route path="/audit" element={<Page title="Audit" />} />
           <Route path="/chat" element={<ChatPage />} />
@@ -96,7 +98,9 @@ function useDashboardData(): LoadState {
       getJson<Envelope<Overview>>("/api/dashboard/v1/overview"),
       getJson<Envelope<Configuration>>("/api/v1/configurations/active"),
       getJson<Envelope<OperationalState>>("/api/v1/operational-state"),
-    ]).then(([overview, configuration, operational]) => {
+      getJson<Envelope<Decision>>("/api/v1/decisions/latest"),
+      getJson<Envelope<DataHealth>>("/api/v1/data-health"),
+    ]).then(([overview, configuration, operational, decision, health]) => {
       if (!cancelled) {
         setLoaded({
           status: "ready",
@@ -104,6 +108,8 @@ function useDashboardData(): LoadState {
             overview: overview.data,
             configuration: configuration.data,
             operational: operational.data,
+            decision: decision.data,
+            health: health.data,
           },
         });
       }
@@ -126,6 +132,9 @@ function OverviewPage({ loaded }: { loaded: LoadState }) {
         <h1>Panoramica</h1>
         <p>Lettura locale di stato, configurazione e budget. Nessun ordine e nessuna chiamata al broker.</p>
         <LoadNotice loaded={loaded} />
+        {loaded.status === "ready" ? (
+          <p data-testid="decision">{`Decisione: ${loaded.data.decision.action} · ${loaded.data.decision.reason_codes[0]}`}</p>
+        ) : null}
       </section>
       <AmountGrid loaded={loaded} />
     </>
@@ -137,8 +146,14 @@ function PortfolioPage({ loaded }: { loaded: LoadState }) {
     <section className="panel">
       <h1>Portafoglio</h1>
       <p>Il ledger espone solo il budget osservabile. I valori assenti restano non disponibili.</p>
+      <p>Disponibile = min(cassa broker, budget − posizioni esterne) − riservato − buffer.</p>
       <LoadNotice loaded={loaded} />
-      {loaded.status === "ready" ? <p>{`Stato ledger: ${loaded.data.overview.ledger_status}`}</p> : null}
+      {loaded.status === "ready" ? (
+        <>
+          <p>{`Stato ledger: ${loaded.data.overview.ledger_status}`}</p>
+          <p>{`Registrazioni: ${loaded.data.overview.journal_entry_count}. Giornale bilanciato: ${loaded.data.overview.journal_balanced ? "sì" : "no"}.`}</p>
+        </>
+      ) : null}
     </section>
   );
 }
@@ -210,6 +225,43 @@ function LoadNotice({ loaded }: { loaded: LoadState }) {
     return <p role="alert">{loaded.message}</p>;
   }
   return null;
+}
+
+function DataPage({ loaded }: { loaded: LoadState }) {
+  return (
+    <section className="panel">
+      <h1>Dati e agente</h1>
+      <p>I canali arrivano da una fixture locale. Nessuna rete e nessuna chiamata al broker.</p>
+      <LoadNotice loaded={loaded} />
+      {loaded.status === "ready" ? <ChannelTable health={loaded.data.health} /> : null}
+    </section>
+  );
+}
+
+function ChannelTable({ health }: { health: DataHealth }) {
+  return (
+    <table className="data-table">
+      <caption>{`Fonte ${health.source}. Rete: ${health.network ? "sì" : "no"}.`}</caption>
+      <thead>
+        <tr>
+          <th>Canale</th>
+          <th>Stato</th>
+          <th>Qualità</th>
+          <th>Accettati</th>
+        </tr>
+      </thead>
+      <tbody>
+        {health.channels.map((channel) => (
+          <tr key={channel.channel}>
+            <td>{channel.channel}</td>
+            <td>{channel.status}</td>
+            <td>{channel.quality_millis}</td>
+            <td>{channel.accepted_count}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 }
 
 function Page({ title }: { title: string }) {

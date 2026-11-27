@@ -18,8 +18,38 @@ export type Overview = {
   reserved_cash: Money;
   cash_buffer: Money;
   ledger_status: string;
+  journal_entry_count: number;
+  journal_balanced: boolean;
   configuration_version_id: string;
   configuration_version_number: number;
+};
+
+export type Decision = {
+  action: string;
+  reason_codes: string[];
+  summary: string;
+  input_hash: string;
+  evaluated_at: string;
+};
+
+export type DataChannel = {
+  channel: string;
+  source: string;
+  accepted_count: number;
+  rejected_count: number;
+  duplicate_count: number;
+  stale: boolean;
+  conflict: boolean;
+  quality_millis: number;
+  status: string;
+};
+
+export type DataHealth = {
+  source: string;
+  network: boolean;
+  connector_version: string;
+  quarantined_count: number;
+  channels: DataChannel[];
 };
 
 export type Budget = {

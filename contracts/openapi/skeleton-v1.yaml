@@ -84,6 +84,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OperationalStateEnvelope"
+  /api/v1/data-health:
+    get:
+      operationId: dataHealth
+      responses:
+        "200":
+          description: Classpath fixture channel health, with no network
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataHealthEnvelope"
+  /api/v1/decisions/latest:
+    get:
+      operationId: latestDecision
+      responses:
+        "200":
+          description: Deterministic NO-TRADE decision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DecisionEnvelope"
   /api/v1/evidence-gate:
     get:
       operationId: evidenceGate
@@ -303,6 +323,14 @@ components:
             strategy_action:
               type: string
               enum: [NO-TRADE]
+            strategy_reason:
+              type: string
+            ingestion_enabled:
+              type: boolean
+              enum: [false]
+            ingestion_source:
+              type: string
+              enum: [classpath-fixture]
         meta:
           $ref: "#/components/schemas/Meta"
         warnings:
@@ -409,6 +437,12 @@ components:
             unknown_order_count:
               type: integer
               nullable: true
+            ledger_status:
+              type: string
+            journal_entry_count:
+              type: integer
+            journal_balanced:
+              type: boolean
         meta:
           $ref: "#/components/schemas/Meta"
         warnings:
@@ -432,3 +466,75 @@ components:
           enum: [OBSERVATION_MUTATIONS_DISABLED]
         retryable:
           type: boolean
+    DataHealthEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [source, network, channels]
+          properties:
+            source:
+              type: string
+              enum: [classpath-fixture]
+            network:
+              type: boolean
+              enum: [false]
+            connector_version:
+              type: string
+            quarantined_count:
+              type: integer
+            channels:
+              type: array
+              items:
+                type: object
+                required: [channel, status, quality_millis, accepted_count]
+                properties:
+                  channel:
+                    type: string
+                  source:
+                    type: string
+                  status:
+                    type: string
+                  quality_millis:
+                    type: integer
+                  accepted_count:
+                    type: integer
+                  stale:
+                    type: boolean
+                  conflict:
+                    type: boolean
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    DecisionEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [action, reason_codes, input_hash]
+          properties:
+            action:
+              type: string
+              enum: [NO-TRADE]
+            reason_codes:
+              type: array
+              items:
+                type: string
+            summary:
+              type: string
+            input_hash:
+              type: string
+            evaluated_at:
+              type: string
+              format: date-time
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"

@@ -55,6 +55,10 @@ enum class EvidenceStatus {
     EXPIRED,
 }
 
+object QualityScale {
+    const val THRESHOLD_MILLIS = 850
+}
+
 data class Money(
     val minorUnits: Long,
     val currency: String,
