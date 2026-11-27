@@ -23,6 +23,7 @@ data class JournalEntry(
 class Journal {
     private val entries = mutableListOf<JournalEntry>()
     private val balances = linkedMapOf<JournalAccount, Long>()
+    private val posted = mutableSetOf<JournalAccount>()
 
     fun post(entry: JournalEntry) {
         require(entry.id.isNotBlank()) { "entry id is required" }
@@ -33,6 +34,7 @@ class Journal {
         entry.lines.forEach { line ->
             val current = balances[line.account] ?: 0L
             balances[line.account] = Math.addExact(current, line.minorUnits)
+            posted += line.account
         }
         entries += entry
     }
@@ -40,6 +42,8 @@ class Journal {
     fun entryCount(): Int = entries.size
 
     fun balance(account: JournalAccount): Long = balances[account] ?: 0L
+
+    fun isPosted(account: JournalAccount): Boolean = posted.contains(account)
 
     fun isBalanced(): Boolean {
         val sum = JournalAccount.values().fold(0L) { acc, account ->

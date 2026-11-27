@@ -11,7 +11,10 @@ import com.tradingagent.modules.strategy.ObservationSignal
 import com.tradingagent.modules.ingestion.ChannelHealth
 import com.tradingagent.modules.ingestion.IngestionAssessment
 import com.tradingagent.modules.ingestion.IngestionPipeline
+import com.tradingagent.kernel.OperationalState
+import com.tradingagent.modules.ledger.Ledger
 import com.tradingagent.modules.operational.OperationalStateService
+import com.tradingagent.modules.reconciliation.Reconciliation
 import com.tradingagent.modules.reconciliation.ReconciliationJob
 import com.tradingagent.modules.scheduler.DurableScheduler
 import java.time.LocalDate
@@ -31,6 +34,7 @@ class SystemStatusController(
     private val decisionCycle: DecisionCycle,
     private val ingestionPipeline: IngestionPipeline,
     private val reconciliationJob: ReconciliationJob,
+    private val ledger: Ledger,
     private val durableScheduler: DurableScheduler,
     private val auditLog: AuditLog,
     private val capabilityProbe: CapabilityProbe,
@@ -145,6 +149,41 @@ class SystemStatusController(
             ),
             meta = ApiMeta(schemaVersion = "operational-state/1"),
             warnings = emptyList(),
+        )
+    }
+
+    @GetMapping("/reconciliation")
+    fun reconciliation(): ApiEnvelope<ReconciliationData> {
+        val state = operationalStateService.current()
+        val probe = capabilityProbe.current()
+        val configuration = configurationService.active()
+        val report = reconciliationJob.record(
+            Reconciliation.compare(
+                broker = if (probe.connected) {
+                    brokerBooks(probe.positions, probe.brokerCash, probe.orders, probe.executions)
+                } else {
+                    null
+                },
+                ledger = ledger.book(),
+                state = state,
+            ),
+            occurredAt = Instant.now(),
+            configVersionId = configuration.versionId.toString(),
+            configContentSha256 = configuration.contentSha256,
+        )
+        check(operationalStateService.current() == OperationalState.OBSERVATION) {
+            "la riconciliazione non può lasciare OBSERVATION"
+        }
+        check(!report.orderSent && !report.brokerCalled) { "la riconciliazione non invia ordini" }
+        return ApiEnvelope(
+            data = reconciliationData(report),
+            meta = ApiMeta(schemaVersion = "reconciliation/1"),
+            warnings = listOf(
+                ApiWarning(
+                    code = "READ_ONLY",
+                    detail = "Il confronto è in sola lettura. Una differenza non invia ordini e non esce da OBSERVATION.",
+                ),
+            ),
         )
     }
 

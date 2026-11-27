@@ -5,18 +5,25 @@ import com.tradingagent.modules.identity.AccessModel
 import com.tradingagent.modules.identity.Role
 import com.tradingagent.modules.brokerread.ObservedOrder
 import com.tradingagent.modules.brokerread.ObservedPosition
+import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.ledger.Ledger
 import com.tradingagent.modules.readmodel.DashboardReadModel
+import com.tradingagent.modules.reconciliation.Reconciliation
+import com.tradingagent.modules.reconciliation.ReconciliationJob
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import java.time.Instant
 
 @RestController
 @RequestMapping("/api/dashboard/v1")
 class DashboardController(
     private val readModel: DashboardReadModel,
     private val accessModel: AccessModel,
+    private val ledger: Ledger,
+    private val reconciliationJob: ReconciliationJob,
+    private val configurationService: ConfigurationService,
 ) {
     @GetMapping("/session")
     fun session(): ApiEnvelope<SessionData> = ApiEnvelope(
@@ -46,6 +53,24 @@ class DashboardController(
     fun overview(response: HttpServletResponse): ApiEnvelope<OverviewData> {
         response.setHeader("Cache-Control", "no-store")
         val snapshot = readModel.portfolio()
+        val configuration = configurationService.active()
+        val report = reconciliationJob.record(
+            Reconciliation.compare(
+                broker = if (snapshot.brokerConnected) {
+                    brokerBooks(snapshot.positions, snapshot.brokerCash, snapshot.orders, snapshot.executions)
+                } else {
+                    null
+                },
+                ledger = ledger.book(),
+                state = snapshot.operationalState,
+            ),
+            occurredAt = Instant.now(),
+            configVersionId = configuration.versionId.toString(),
+            configContentSha256 = configuration.contentSha256,
+        )
+        check(report.operationalState == snapshot.operationalState && !report.orderSent && !report.brokerCalled) {
+            "la lettura non può lasciare OBSERVATION né inviare un ordine"
+        }
         return ApiEnvelope(
             data = OverviewData(
                 operationalState = snapshot.operationalState.wire,
@@ -72,6 +97,7 @@ class DashboardController(
                 positions = snapshot.positions?.map { position -> positionData(position) },
                 orders = snapshot.orders?.map { order -> orderData(order) },
                 executions = snapshot.executions?.map { order -> orderData(order) },
+                reconciliation = reconciliationData(report),
             ),
             meta = ApiMeta(schemaVersion = "portfolio-snapshot/1"),
             warnings = buildList {
@@ -135,6 +161,7 @@ data class OverviewData(
     val positions: List<PositionData>?,
     val orders: List<OrderData>?,
     val executions: List<OrderData>?,
+    val reconciliation: ReconciliationData,
 )
 
 data class PositionData(

@@ -87,8 +87,25 @@ class ApiSkeletonTest(
             .andExpect(jsonPath("$.data.journal_entry_count").value(0))
             .andExpect(jsonPath("$.data.journal_balanced").value(true))
             .andExpect(jsonPath("$.data.configuration_version_number").value(1))
+            .andExpect(jsonPath("$.data.reconciliation.status").value("UNAVAILABLE"))
+            .andExpect(jsonPath("$.data.reconciliation.order_sent").value(false))
+            .andExpect(jsonPath("$.data.reconciliation.broker_called").value(false))
+            .andExpect(jsonPath("$.data.reconciliation.operational_state").value("OBSERVATION"))
             .andExpect(jsonPath("$.meta.environment").value("DEMO"))
             .andExpect(jsonPath("$.meta.base_currency").value(nullValue()))
+
+        mockMvc.perform(get("/api/v1/reconciliation"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.status").value("UNAVAILABLE"))
+            .andExpect(jsonPath("$.data.order_sent").value(false))
+            .andExpect(jsonPath("$.data.broker_called").value(false))
+            .andExpect(jsonPath("$.data.operational_state").value("OBSERVATION"))
+            .andExpect(jsonPath("$.warnings[0].code").value("READ_ONLY"))
+
+        mockMvc.perform(get("/api/v1/operational-state"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.state").value("OBSERVATION"))
+            .andExpect(jsonPath("$.data.actions.reconcile_wired").value(false))
     }
 
     @Test

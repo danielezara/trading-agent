@@ -24,6 +24,12 @@ const overview = {
     executions: null,
     configuration_version_id: "11111111-1111-1111-1111-111111111111",
     configuration_version_number: 1,
+    reconciliation: {
+      status: "UNAVAILABLE",
+      classes: [],
+      order_sent: false,
+      operational_state: "OBSERVATION",
+    },
   },
   meta: { environment: "DEMO", base_currency: null },
   warnings: [],
@@ -384,6 +390,9 @@ describe("dashboard skeleton", () => {
     renderAt("/portafoglio");
     expect(screen.getByRole("heading", { name: "Portafoglio" })).toBeInTheDocument();
     expect(await screen.findByText(/Stato ledger: UNOBSERVED/)).toBeInTheDocument();
+    expect(screen.getByTestId("reconciliation")).toHaveTextContent("Riconciliazione non disponibile");
+    expect(screen.getByTestId("reconciliation")).toHaveTextContent("Nessun ordine");
+    expect(screen.getByTestId("reconciliation")).toHaveTextContent("OBSERVATION");
     expect(screen.getByText(/Registrazioni: 0/)).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });

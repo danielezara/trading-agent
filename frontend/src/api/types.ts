@@ -45,6 +45,12 @@ export type Overview = {
   executions: DemoOrder[] | null;
   configuration_version_id: string;
   configuration_version_number: number;
+  reconciliation?: {
+    status: string;
+    classes: string[];
+    order_sent: boolean;
+    operational_state: string;
+  };
 };
 
 export type Decision = {

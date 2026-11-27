@@ -121,6 +121,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DecisionEnvelope"
+  /api/v1/reconciliation:
+    get:
+      operationId: reconciliation
+      responses:
+        "200":
+          description: Read-only comparison of the Demo portfolio read and the local ledger
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReconciliationEnvelope"
   /api/v1/audit:
     get:
       operationId: auditChain
@@ -563,12 +573,53 @@ components:
               description: Open executions and close orders already present on the portfolio read. Empty when the account has none.
               items:
                 $ref: "#/components/schemas/DemoOrder"
+            reconciliation:
+              $ref: "#/components/schemas/ReconciliationReport"
         meta:
           $ref: "#/components/schemas/Meta"
         warnings:
           type: array
           items:
             $ref: "#/components/schemas/Warning"
+    ReconciliationEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          $ref: "#/components/schemas/ReconciliationReport"
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    ReconciliationReport:
+      type: object
+      required: [status, classes, order_sent, broker_called, operational_state]
+      properties:
+        status:
+          type: string
+          enum: [MATCH, MISMATCH, UNAVAILABLE]
+        classes:
+          type: array
+          items:
+            type: string
+            enum: [position, cash, order]
+        position_diff_count:
+          type: integer
+        cash_diff_minor:
+          type: integer
+          format: int64
+          nullable: true
+        order_sent:
+          type: boolean
+          enum: [false]
+        broker_called:
+          type: boolean
+          enum: [false]
+        operational_state:
+          type: string
+          enum: [OBSERVATION]
     DemoOrder:
       type: object
       required: [order_id]

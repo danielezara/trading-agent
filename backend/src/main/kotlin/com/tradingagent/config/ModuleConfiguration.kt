@@ -68,7 +68,7 @@ class ModuleConfiguration {
 
     @Bean fun disabledBrokerExecutor() = DisabledBrokerExecutor()
 
-    @Bean fun reconciliationJob() = ReconciliationJob()
+    @Bean fun reconciliationJob(auditLog: AuditLog) = ReconciliationJob(auditLog)
 
     @Bean fun operationalStateService() = OperationalStateService()
 

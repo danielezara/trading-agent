@@ -84,6 +84,23 @@ data class CashInputs(
     }
 }
 
+data class LedgerPosition(
+    val instrumentId: String,
+    val quantity: String?,
+)
+
+data class LedgerBook(
+    val positions: List<LedgerPosition>,
+    val cashMinor: Long?,
+    val cashCurrency: String?,
+    val orderIds: List<String>,
+    val executionIds: List<String>,
+) {
+    companion object {
+        fun empty(): LedgerBook = LedgerBook(emptyList(), null, null, emptyList(), emptyList())
+    }
+}
+
 data class CashQuote(
     val currency: String?,
     val availableMinor: Long?,
@@ -115,6 +132,14 @@ class Ledger(
     fun journalEntryCount(): Int = journal.entryCount()
 
     fun journalBalanced(): Boolean = journal.isBalanced()
+
+    fun book(): LedgerBook = LedgerBook(
+        positions = emptyList(),
+        cashMinor = if (journal.isPosted(JournalAccount.BROKER_CASH)) journal.balance(JournalAccount.BROKER_CASH) else null,
+        cashCurrency = null,
+        orderIds = emptyList(),
+        executionIds = emptyList(),
+    )
 
     fun quote(inputs: CashInputs): CashQuote {
         val base = inputs.currency?.uppercase()

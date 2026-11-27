@@ -287,9 +287,25 @@ function PortfolioPage({ loaded }: { loaded: LoadState }) {
         <>
           <p>{`Stato ledger: ${loaded.data.overview.ledger_status}`}</p>
           <p>{`Registrazioni: ${loaded.data.overview.journal_entry_count}. Giornale bilanciato: ${loaded.data.overview.journal_balanced ? "sì" : "no"}.`}</p>
+          <ReconciliationLine report={loaded.data.overview.reconciliation} />
         </>
       ) : null}
     </section>
+  );
+}
+
+function ReconciliationLine({ report }: { report: Overview["reconciliation"] }) {
+  if (!report || report.status === "UNAVAILABLE") {
+    return <p data-testid="reconciliation">Riconciliazione non disponibile. Nessun ordine. Lo stato resta OBSERVATION.</p>;
+  }
+  if (report.status === "MATCH") {
+    return <p data-testid="reconciliation">Riconciliazione: i conti coincidono. Nessun ordine. Lo stato resta OBSERVATION.</p>;
+  }
+  const classes = report.classes.length === 0 ? "non classificata" : report.classes.join(", ");
+  return (
+    <p data-testid="reconciliation">
+      {`Riconciliazione: differenza ${classes}. Nessun ordine. Lo stato resta OBSERVATION.`}
+    </p>
   );
 }
 
