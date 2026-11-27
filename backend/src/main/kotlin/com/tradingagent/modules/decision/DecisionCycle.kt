@@ -17,6 +17,8 @@ import com.tradingagent.modules.risk.DispatchPreconditions
 import com.tradingagent.modules.risk.PolicyGate
 import com.tradingagent.modules.risk.PolicyVerdict
 import com.tradingagent.modules.strategy.ChannelObservation
+import com.tradingagent.modules.strategy.ClosedBarInput
+import com.tradingagent.modules.strategy.ClosedBarPolicy
 import com.tradingagent.modules.strategy.DecisionInput
 import com.tradingagent.modules.strategy.StrategyEngine
 import com.tradingagent.modules.strategy.StrategyOutcome
@@ -70,6 +72,27 @@ class DecisionCycle(
                 fx = fx,
             ),
         )
+        val rule = ClosedBarPolicy.decide(
+            ClosedBarInput(
+                now = at,
+                instrumentId = null,
+                priceSource = ClosedBarPolicy.PRICE_SOURCE,
+                bars = emptyList(),
+                position = null,
+                assetClass = "unknown",
+                leverage = configuration.parameters.economic.allowlistLeverage,
+                investedMinor = 0,
+                sectorInvestedMinor = null,
+                lossMinor = 0,
+                openPositions = 0,
+                lastExitAt = null,
+                economic = configuration.parameters.economic,
+                technical = configuration.parameters.technical,
+            ),
+        )
+        check(!rule.orderable && rule.action == "NO-TRADE") {
+            "senza barre chiuse il ciclo non può proporre un ingresso"
+        }
         val outcome = strategyEngine.evaluate(
             DecisionInput(
                 operationalState = operationalStateService.current(),

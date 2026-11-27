@@ -267,6 +267,33 @@ components:
               type: boolean
             source_path:
               type: string
+            risk_per_trade_bps:
+              type: integer
+              nullable: true
+            aggregate_risk_bps:
+              type: integer
+              nullable: true
+            instrument_exposure_bps:
+              type: integer
+              nullable: true
+            sector_exposure_bps:
+              type: integer
+              nullable: true
+            min_cash_bps:
+              type: integer
+              nullable: true
+            cooldown_seconds:
+              type: integer
+              nullable: true
+            max_holding_count:
+              type: integer
+              nullable: true
+            entry_rule:
+              type: string
+            price_source:
+              type: string
+            decision_bar_seconds:
+              type: integer
     OperationalStateEnvelope:
       type: object
       required: [data, meta, warnings]
@@ -514,6 +541,21 @@ components:
               nullable: true
             broker_cash:
               nullable: true
+            cash_balances:
+              type: array
+              nullable: true
+              description: Native eToro cash. Each row is accountType plus equityDetails.available in that account's currency. Cash may use balance when available is absent. displayBalance, displayCurrency and the ECB rate are not copied. A currency that is not in the payload is not added.
+              items:
+                type: object
+                required: [account_type, minor_units, currency]
+                properties:
+                  account_type:
+                    type: string
+                    enum: [Cash, Trading]
+                  minor_units:
+                    type: integer
+                  currency:
+                    type: string
             assigned_budget:
               nullable: true
             available_cash:

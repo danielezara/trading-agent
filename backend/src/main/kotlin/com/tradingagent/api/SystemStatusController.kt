@@ -3,6 +3,7 @@ package com.tradingagent.api
 import com.tradingagent.modules.audit.AuditLog
 import com.tradingagent.modules.brokerread.CapabilityProbe
 import com.tradingagent.modules.configuration.ConfigurationService
+import com.tradingagent.modules.strategy.ClosedBarPolicy
 import com.tradingagent.modules.configuration.ConfigurationVersion
 import com.tradingagent.modules.configuration.EvidenceGate
 import com.tradingagent.modules.decision.DecisionCycle
@@ -341,6 +342,16 @@ class SystemStatusController(
             benchmarkReturnBasis = version.parameters.economic.benchmarkReturnBasis,
             technicalCalibratable = version.parameters.technical.calibratable,
             sourcePath = version.parameters.sourcePath,
+            riskPerTradeBps = version.parameters.economic.riskPerTradeBps,
+            aggregateRiskBps = version.parameters.economic.aggregateRiskBps,
+            instrumentExposureBps = version.parameters.economic.instrumentExposureBps,
+            sectorExposureBps = version.parameters.economic.sectorExposureBps,
+            minCashBps = version.parameters.economic.minCashBps,
+            cooldownSeconds = version.parameters.economic.cooldownSeconds,
+            maxHoldingCount = version.parameters.economic.maxHoldingCount,
+            entryRule = ClosedBarPolicy.RULE_ID,
+            priceSource = ClosedBarPolicy.PRICE_SOURCE,
+            decisionBarSeconds = version.parameters.technical.decisionBarSeconds,
         ),
     )
 }
@@ -388,6 +399,16 @@ data class EconomicViewData(
     val benchmarkReturnBasis: String?,
     val technicalCalibratable: Boolean,
     val sourcePath: String,
+    val riskPerTradeBps: Int?,
+    val aggregateRiskBps: Int?,
+    val instrumentExposureBps: Int?,
+    val sectorExposureBps: Int?,
+    val minCashBps: Int?,
+    val cooldownSeconds: Int?,
+    val maxHoldingCount: Int?,
+    val entryRule: String,
+    val priceSource: String,
+    val decisionBarSeconds: Long,
 )
 
 data class BudgetData(

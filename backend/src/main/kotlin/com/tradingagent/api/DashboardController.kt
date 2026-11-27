@@ -3,6 +3,7 @@ package com.tradingagent.api
 import com.tradingagent.kernel.Money
 import com.tradingagent.modules.identity.AccessModel
 import com.tradingagent.modules.identity.Role
+import com.tradingagent.modules.brokerread.BrokerCashBalance
 import com.tradingagent.modules.brokerread.DisplayQuote
 import com.tradingagent.modules.brokerread.ObservedOrder
 import com.tradingagent.modules.brokerread.ObservedPosition
@@ -105,6 +106,7 @@ class DashboardController(
                 orders = snapshot.orders?.map { order -> orderData(order) },
                 executions = snapshot.executions?.map { order -> orderData(order) },
                 closedTrades = snapshot.closedTrades?.map { trade -> closedTradeData(trade) },
+                cashBalances = snapshot.cashBalances,
                 reconciliation = reconciliationData(report),
             ),
             meta = ApiMeta(schemaVersion = "portfolio-snapshot/1"),
@@ -119,7 +121,7 @@ class DashboardController(
                     add(
                         ApiWarning(
                             code = "FX_UNAVAILABLE",
-                            detail = "Cassa broker e budget sono in valute diverse. Il riferimento BCE manca o è stale, quindi il disponibile resta assente.",
+                            detail = "La cassa mostrata resta quella nativa eToro. Il disponibile in EUR non è una conversione del saldo.",
                         ),
                     )
                 }
@@ -174,6 +176,7 @@ data class OverviewData(
     val orders: List<OrderData>?,
     val executions: List<OrderData>?,
     val closedTrades: List<ClosedTradeData>?,
+    val cashBalances: List<BrokerCashBalance>?,
     val reconciliation: ReconciliationData,
 )
 

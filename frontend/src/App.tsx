@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { getJson } from "./api/client";
 import { assertSkeletonApiBase } from "./api/policy";
-import type { AuditChain, ChatTurn, ClosedTrade, Configuration, DataChannel, DataHealth, Decision, Envelope, Money, OperationalState, Overview } from "./api/types";
+import type { AuditChain, CashBalance, ChatTurn, ClosedTrade, Configuration, DataChannel, DataHealth, Decision, Envelope, Money, OperationalState, Overview } from "./api/types";
 import "./styles.css";
 
 const NAV = [
@@ -296,12 +296,6 @@ function OverviewPage({ loaded }: { loaded: LoadState }) {
             {loaded.data.decision.signal ? (
               <p data-testid="signal">{`Segnale ${loaded.data.decision.signal.signal_id.slice(0, 12)} · direzione ${loaded.data.decision.signal.direction} · eseguibile: no`}</p>
             ) : null}
-            {loaded.data.overview.ledger_status === "FX_UNAVAILABLE" ? (
-              <p data-testid="cash-alignment">{`Disponibile non calcolato: cassa ${loaded.data.overview.broker_cash?.currency ?? "non osservata"}, budget ${loaded.data.overview.assigned_budget?.currency ?? "non osservato"}. Il riferimento BCE manca o è stale.`}</p>
-            ) : null}
-            {loaded.data.overview.fx_status === "APPLIED" && loaded.data.overview.fx_source ? (
-              <p data-testid="fx-reference">{`Cambio ${loaded.data.overview.fx_source} ${loaded.data.overview.fx_version ?? ""} · ${loaded.data.overview.fx_observed_at ?? ""} · haircut ${loaded.data.overview.fx_haircut_bps ?? ""} bps`}</p>
-            ) : null}
             <PositionsTable positions={loaded.data.overview.positions} />
             <ActivityTable
               rows={loaded.data.overview.orders}
@@ -322,7 +316,7 @@ function OverviewPage({ loaded }: { loaded: LoadState }) {
               <div><dt>Piattaforma</dt><dd>Demo eToro</dd></div>
               <div><dt>Connessa</dt><dd>{loaded.data.overview.broker_connected ? "sì" : "no"}</dd></div>
               <div><dt>Conto</dt><dd>{loaded.data.overview.account_label || DEMO_ACCOUNT_FALLBACK}</dd></div>
-              <div><dt>Cassa broker</dt><dd>{cashAmount(loaded.data.overview.broker_cash)}</dd></div>
+              <CashRows balances={loaded.data.overview.cash_balances} />
               <div><dt>Ultimo probe</dt><dd>{loaded.data.overview.last_probe_at ?? "non disponibile"}</dd></div>
             </dl>
           </>
@@ -338,7 +332,7 @@ function PortfolioPage({ loaded }: { loaded: LoadState }) {
     <section className="panel">
       <h1>Portafoglio</h1>
       <p>Il ledger espone solo il budget osservabile. I valori assenti restano non disponibili.</p>
-      <p>Disponibile = min(cassa broker, budget − posizioni esterne) − riservato − buffer. Se la cassa e il budget sono in valute diverse e non c’è un cambio configurato, il disponibile resta non disponibile.</p>
+      <p>La cassa mostrata è l’importo nativo che eToro riporta, nella valuta di ciascun conto.</p>
       <LoadNotice loaded={loaded} />
       {loaded.status === "ready" ? (
         <>
@@ -392,28 +386,59 @@ function ConfigurationDetails({ configuration }: { configuration: Configuration 
       <div><dt>Direzione</dt><dd>{configuration.economic.allowlist_direction ?? "non disponibile"}</dd></div>
       <div><dt>Leva</dt><dd>{configuration.economic.leverage ?? "non disponibile"}</dd></div>
       <div><dt>Benchmark</dt><dd>{benchmarkLabel(configuration.economic.benchmark_name, configuration.economic.benchmark_return_basis)}</dd></div>
+      <div><dt>Regola</dt><dd>{configuration.economic.entry_rule ?? "non disponibile"}</dd></div>
+      <div><dt>Prezzi</dt><dd>{configuration.economic.price_source ?? "non disponibile"}</dd></div>
+      <div><dt>Barra chiusa</dt><dd>{configuration.economic.decision_bar_seconds != null ? `${configuration.economic.decision_bar_seconds} s` : "non disponibile"}</dd></div>
+      <div><dt>Rischio per trade</dt><dd>{configuration.economic.risk_per_trade_bps != null ? `${configuration.economic.risk_per_trade_bps} bps` : "non disponibile"}</dd></div>
+      <div><dt>Cap strumento</dt><dd>{configuration.economic.instrument_exposure_bps != null ? `${configuration.economic.instrument_exposure_bps} bps` : "non disponibile"}</dd></div>
+      <div><dt>Cassa minima</dt><dd>{configuration.economic.min_cash_bps != null ? `${configuration.economic.min_cash_bps} bps` : "non disponibile"}</dd></div>
+      <div><dt>Tenuta massima</dt><dd>{configuration.economic.max_holding_count != null ? `${configuration.economic.max_holding_count} barre` : "non disponibile"}</dd></div>
       <div><dt>Soglie tecniche</dt><dd>{configuration.economic.technical_calibratable ? "calibrabili" : "non disponibile"}</dd></div>
       <div><dt>File</dt><dd><code>{configuration.economic.source_path}</code></dd></div>
     </dl>
   );
 }
 
+function CashRows({ balances }: { balances: CashBalance[] | null | undefined }) {
+  if (!balances || balances.length === 0) {
+    return (
+      <div>
+        <dt>Cassa</dt>
+        <dd>non disponibile</dd>
+      </div>
+    );
+  }
+  return (
+    <>
+      {balances.map((row) => (
+        <div key={`${row.account_type}-${row.currency}`}>
+          <dt>{`Cassa ${row.account_type}`}</dt>
+          <dd>{cashAmount({ minor_units: row.minor_units, currency: row.currency })}</dd>
+        </div>
+      ))}
+    </>
+  );
+}
+
 function AmountGrid({ loaded }: { loaded: LoadState }) {
   const overview = loaded.status === "ready" ? loaded.data.overview : null;
-  const fields = [
+  const cash = overview?.cash_balances ?? [];
+  const cashFields: Array<[string, Money]> = cash.length === 0
+    ? [["Cassa", null]]
+    : cash.map((row) => [`Cassa ${row.account_type}`, { minor_units: row.minor_units, currency: row.currency }]);
+  const fields: Array<[string, Money]> = [
     ["Equity", overview?.equity ?? null],
-    ["Cash broker", overview?.broker_cash ?? null],
+    ...cashFields,
     ["Budget assegnato", overview?.assigned_budget ?? null],
-    ["Disponibile", overview?.available_cash ?? null],
     ["Cash riservato", overview?.reserved_cash ?? null],
     ["Cash buffer", overview?.cash_buffer ?? null],
-  ] as const;
+  ];
   return (
     <section className="kpi-grid" aria-label="Indicatori di budget">
       {fields.map(([label, value]) => (
         <article className="kpi" key={label}>
           <span>{label}</span>
-          <strong>{formatMoney(value)}</strong>
+          <strong>{label.startsWith("Cassa") ? cashAmount(value) : formatMoney(value)}</strong>
         </article>
       ))}
     </section>

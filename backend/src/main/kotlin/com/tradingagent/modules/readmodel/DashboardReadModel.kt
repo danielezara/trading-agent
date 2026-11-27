@@ -3,7 +3,9 @@ package com.tradingagent.modules.readmodel
 import com.tradingagent.kernel.Money
 import com.tradingagent.kernel.OperationalState
 import java.time.Instant
+import com.tradingagent.modules.brokerread.BrokerCashBalance
 import com.tradingagent.modules.brokerread.CapabilityProbe
+import com.tradingagent.modules.brokerread.CashBalanceRead
 import com.tradingagent.modules.brokerread.ClosedTrade
 import com.tradingagent.modules.brokerread.EuroFxRead
 import com.tradingagent.modules.ledger.FxQuote
@@ -50,6 +52,7 @@ data class PortfolioSnapshot(
     val executions: List<ObservedOrder>?,
     val closedTrades: List<ClosedTrade>?,
     val fx: FxQuote?,
+    val cashBalances: List<BrokerCashBalance>?,
 )
 
 class DashboardReadModel(
@@ -62,6 +65,7 @@ class DashboardReadModel(
     private val instrumentClasses: InstrumentClassRead = InstrumentClassRead { null },
     private val closedTrades: ClosedTradeRead = ClosedTradeRead { null },
     private val euroFx: EuroFxRead = EuroFxRead { _, _, _ -> null },
+    private val cashBalances: CashBalanceRead = CashBalanceRead { null },
     private val clock: () -> Instant = Instant::now,
 ) {
     fun portfolio(): PortfolioSnapshot {
@@ -92,7 +96,7 @@ class DashboardReadModel(
             equity = observed.equity,
             brokerCash = observed.brokerCash ?: quote.money(quote.brokerCashMinor),
             assignedBudget = quote.money(quote.assignedBudgetMinor),
-            availableCash = quote.money(quote.availableMinor),
+            availableCash = null,
             reservedCash = quote.money(quote.reservedCashMinor),
             cashBuffer = quote.money(quote.cashBufferMinor),
             externalHoldings = quote.money(quote.externalHoldingsMinor),
@@ -122,6 +126,7 @@ class DashboardReadModel(
             executions = observed.executions,
             closedTrades = if (observed.connected) closedTrades.read(observed.observedAt ?: clock()) else null,
             fx = if (quote.fxStatus == Ledger.FX_APPLIED) fx else null,
+            cashBalances = if (observed.connected) cashBalances.read() else null,
         )
     }
 }

@@ -62,6 +62,13 @@ const configuration = {
       benchmark_return_basis: "total_return",
       technical_calibratable: true,
       source_path: "config/observation-v1.yaml",
+      risk_per_trade_bps: 50,
+      instrument_exposure_bps: 1500,
+      min_cash_bps: 2000,
+      entry_rule: "closed-bar-trend/1",
+      price_source: "etoro",
+      decision_bar_seconds: 300,
+      max_holding_count: 390,
     },
   },
   meta: { environment: "DEMO", base_currency: null },
@@ -215,7 +222,7 @@ describe("dashboard skeleton", () => {
     expect(screen.getByTestId("positions")).toHaveTextContent("Posizioni non disponibili");
     expect(screen.getByTestId("orders")).toHaveTextContent("Ordini non disponibili");
     expect(screen.getByTestId("executions")).toHaveTextContent("Esecuzioni non disponibili");
-    expect(screen.getByTestId("account-card")).toHaveTextContent("Cassa broker");
+    expect(screen.getByTestId("account-card")).toHaveTextContent("Cassa");
     expect(screen.getByTestId("account-card")).toHaveTextContent("non disponibile");
     expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
   });
@@ -227,8 +234,12 @@ describe("dashboard skeleton", () => {
         ...overview.data,
         broker_connected: true,
         broker_cash: { minor_units: 28035, currency: "USD" },
+        cash_balances: [
+          { account_type: "Cash", minor_units: 204244, currency: "EUR" },
+          { account_type: "Trading", minor_units: 66505, currency: "USD" },
+        ],
         assigned_budget: { minor_units: 50000, currency: "EUR" },
-        available_cash: null,
+        available_cash: { minor_units: 25288, currency: "EUR" },
         ledger_status: "FX_UNAVAILABLE",
         fx_status: "UNCONFIGURED",
         account_label: "demo.user",
@@ -289,7 +300,12 @@ describe("dashboard skeleton", () => {
     expect(card).toHaveTextContent("Demo eToro");
     expect(card).toHaveTextContent("sì");
     expect(card).toHaveTextContent("demo.user");
-    expect(card).toHaveTextContent("280,35 USD");
+    expect(card).toHaveTextContent("Cassa Cash");
+    expect(card).toHaveTextContent("2.042,44 EUR");
+    expect(card).toHaveTextContent("Cassa Trading");
+    expect(card).toHaveTextContent("665,05 USD");
+    expect(card).not.toHaveTextContent("280,35 USD");
+    expect(card).not.toHaveTextContent("252,88 EUR");
     const positions = screen.getByTestId("positions");
     expect(positions).toHaveTextContent("1002");
     expect(positions).toHaveTextContent("0.049485");
@@ -312,8 +328,8 @@ describe("dashboard skeleton", () => {
     expect(closed).toHaveTextContent("-2.5");
     expect(closed).toHaveTextContent("2026-11-01T12:00:00Z");
     expect(screen.getAllByTestId("closed-profit").map((cell) => cell.textContent)).toEqual(["-2.5", ""]);
-    expect(screen.getByTestId("cash-alignment")).toHaveTextContent("cassa USD, budget EUR");
-    expect(screen.getByTestId("cash-alignment")).toHaveTextContent("Il riferimento BCE manca o è stale");
+    expect(screen.queryByTestId("cash-alignment")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("fx-reference")).not.toBeInTheDocument();
     expect(screen.getByText("50000 EUR")).toBeInTheDocument();
     expect(card).not.toHaveTextContent("Conto Demo delle chiavi");
   });
@@ -349,6 +365,13 @@ describe("dashboard skeleton", () => {
     expect(screen.getByText("10%, block")).toBeInTheDocument();
     expect(screen.getByText("days")).toBeInTheDocument();
     expect(screen.getByText("MSCI World total_return")).toBeInTheDocument();
+    expect(screen.getByText("closed-bar-trend/1")).toBeInTheDocument();
+    expect(screen.getByText("etoro")).toBeInTheDocument();
+    expect(screen.getByText("300 s")).toBeInTheDocument();
+    expect(screen.getByText("50 bps")).toBeInTheDocument();
+    expect(screen.getByText("1500 bps")).toBeInTheDocument();
+    expect(screen.getByText("2000 bps")).toBeInTheDocument();
+    expect(screen.getByText("390 barre")).toBeInTheDocument();
     expect(screen.getByText("config/observation-v1.yaml")).toBeInTheDocument();
   });
 

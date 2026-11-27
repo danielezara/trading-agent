@@ -8,6 +8,12 @@ export type Envelope<T> = {
 
 export type Money = { minor_units: number; currency: string } | null;
 
+export type CashBalance = {
+  account_type: string;
+  minor_units: number;
+  currency: string;
+};
+
 export type DemoPosition = {
   instrument_id: string;
   quantity: string | null;
@@ -43,6 +49,7 @@ export type Overview = {
   trading_enabled: boolean;
   equity: Money;
   broker_cash: Money;
+  cash_balances?: CashBalance[] | null;
   assigned_budget: Money;
   available_cash: Money;
   reserved_cash: Money;
@@ -179,6 +186,13 @@ export type EconomicView = {
   benchmark_return_basis: string | null;
   technical_calibratable: boolean;
   source_path: string;
+  risk_per_trade_bps?: number | null;
+  instrument_exposure_bps?: number | null;
+  min_cash_bps?: number | null;
+  entry_rule?: string | null;
+  price_source?: string | null;
+  decision_bar_seconds?: number | null;
+  max_holding_count?: number | null;
 };
 
 export type Configuration = {

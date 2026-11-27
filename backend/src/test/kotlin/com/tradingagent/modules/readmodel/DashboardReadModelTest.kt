@@ -2,7 +2,9 @@ package com.tradingagent.modules.readmodel
 
 import com.tradingagent.kernel.EvidenceStatus
 import com.tradingagent.kernel.OperationalState
+import com.tradingagent.modules.brokerread.BrokerCashBalance
 import com.tradingagent.modules.brokerread.CapabilityProbe
+import com.tradingagent.modules.brokerread.CashBalanceRead
 import com.tradingagent.modules.brokerread.EcbEuroFx
 import com.tradingagent.modules.brokerread.ClosedTrade
 import com.tradingagent.modules.brokerread.ClosedTradeRead
@@ -193,8 +195,8 @@ class DashboardReadModelTest {
         assertEquals("2026-11-26", fresh.fx?.version)
         assertEquals(100, fresh.fx?.haircutBps)
         assertEquals(Instant.parse("2026-11-26T15:00:00Z"), fresh.fx?.observedAt)
-        assertEquals("EUR", fresh.availableCash?.currency)
-        assertEquals(25_288L, fresh.availableCash?.minorUnits)
+        assertNull(fresh.availableCash)
+        assertNull(fresh.cashBalances)
         assertEquals(OperationalState.OBSERVATION, fresh.operationalState)
         assertFalse(fresh.tradingEnabled)
 
@@ -207,6 +209,30 @@ class DashboardReadModelTest {
         assertNull(stale.availableCash)
         assertNull(stale.fx)
         assertEquals(Ledger.STATUS_FX_UNAVAILABLE, stale.ledgerStatus)
+    }
+
+    @Test
+    fun `shown cash is the native etoro list and not a converted balance`() {
+        val snapshot = model(
+            """{"clientPortfolio":{"credit":280.35,"accountCurrencyId":1,"positions":[]}}""",
+            PositionQuoteRead { emptyMap() },
+            cashBalances = CashBalanceRead {
+                listOf(
+                    BrokerCashBalance("Cash", 204_244L, "EUR"),
+                    BrokerCashBalance("Trading", 66_505L, "USD"),
+                )
+            },
+        ).portfolio()
+        assertEquals("EUR", snapshot.cashBalances?.get(0)?.currency)
+        assertEquals(204_244L, snapshot.cashBalances?.get(0)?.minorUnits)
+        assertEquals("Cash", snapshot.cashBalances?.get(0)?.accountType)
+        assertEquals("USD", snapshot.cashBalances?.get(1)?.currency)
+        assertEquals(66_505L, snapshot.cashBalances?.get(1)?.minorUnits)
+        assertEquals(2, snapshot.cashBalances?.size)
+        assertNull(snapshot.availableCash)
+        assertEquals("USD", snapshot.brokerCash?.currency)
+        assertFalse(snapshot.tradingEnabled)
+        assertEquals(OperationalState.OBSERVATION, snapshot.operationalState)
     }
 
     @Test
@@ -231,6 +257,7 @@ class DashboardReadModelTest {
         closedTrades: ClosedTradeRead = ClosedTradeRead { null },
         classes: InstrumentClassRead = InstrumentClassRead { null },
         euroFx: com.tradingagent.modules.brokerread.EuroFxRead = com.tradingagent.modules.brokerread.EuroFxRead { _, _, _ -> null },
+        cashBalances: CashBalanceRead = CashBalanceRead { null },
         clock: () -> Instant = { Instant.parse("2026-11-27T00:00:00Z") },
     ) = DashboardReadModel(
         operationalStateService = OperationalStateService(clock = { Instant.parse("2026-11-27T00:00:00Z") }),
@@ -251,6 +278,7 @@ class DashboardReadModelTest {
         instrumentClasses = classes,
         closedTrades = closedTrades,
         euroFx = euroFx,
+        cashBalances = cashBalances,
         clock = clock,
     )
 }

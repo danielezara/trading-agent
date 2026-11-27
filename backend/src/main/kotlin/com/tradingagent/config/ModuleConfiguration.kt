@@ -2,6 +2,8 @@ package com.tradingagent.config
 
 import com.tradingagent.modules.audit.AuditLog
 import com.tradingagent.modules.brokerread.CapabilityProbe
+import com.tradingagent.modules.brokerread.CashBalanceRead
+import com.tradingagent.modules.brokerread.DemoCashBalanceRead
 import com.tradingagent.modules.brokerread.DemoKeyMaterial
 import com.tradingagent.modules.brokerread.DemoInstrumentNameRead
 import com.tradingagent.modules.brokerread.DemoMarketRatesLookup
@@ -181,6 +183,13 @@ class ModuleConfiguration {
         instrumentClassRead,
         closedTradeRead,
         euroFxRead(),
+        cashBalanceRead(),
+    )
+
+    @Bean
+    fun cashBalanceRead(): CashBalanceRead = DemoCashBalanceRead(
+        keys = { DemoKeyMaterial.fromEnvironment(System.getenv()) },
+        transport = JdkHttpGet(),
     )
 
     @Bean

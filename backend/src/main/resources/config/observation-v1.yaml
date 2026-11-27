@@ -3,7 +3,7 @@
 # millis = millesimi di 1 (1000 = 1.00). Le soglie tecniche sono calibrabili.
 schema: trading-parameters/1
 author: daniele
-reason: "Budget 500 EUR. Perdita massima 10% del budget, poi blocco. Orizzonte in giorni. Allowlist large-cap e ETF, solo long, leva 1. Benchmark MSCI World total return. Capability e licenze non verificate. Cambio EUR/USD dal riferimento giornaliero BCE, haircut 100 bps."
+reason: "Budget 500 EUR. Perdita massima 10% del budget, poi blocco. Orizzonte in giorni. Allowlist large-cap e ETF, solo long, leva 1. Benchmark MSCI World total return. Ingresso e uscita closed-bar-trend/1 sui prezzi eToro, solo barre da 5 minuti già chiuse: ingresso dopo 2 chiusure consecutive al rialzo, uscita dopo 2 chiusure al ribasso oppure stop a 2×ATR oppure 390 barre. Size = minimo tra rischio 0,50% del budget, cap 15% per strumento e budget residuo dopo il 20% di cassa. Capability e licenze non verificate. La cassa mostrata è quella nativa eToro, senza conversione."
 economic:
   base_currency: EUR
   currency_scale: 2
@@ -20,18 +20,26 @@ economic:
   benchmark:
     name: MSCI World
     return_basis: total_return
-  cash_buffer_minor: null
-  max_positions: null
+  # 100 EUR, il 20% del budget, restano non investiti.
+  cash_buffer_minor: 10000
+  max_positions: 8
   max_drawdown_bps: null
-  risk_per_trade_bps: null
-  aggregate_risk_bps: null
-  instrument_exposure_bps: null
-  sector_exposure_bps: null
-  min_cash_bps: null
-  # 100 bps: il riferimento BCE non è un prezzo eseguibile. La cassa USD convertita è ridotta dell'1% prima del disponibile.
+  # 0,50% di 500 EUR = 2,50 EUR di rischio per nuovo ingresso.
+  risk_per_trade_bps: 50
+  # 2% del budget = 10 EUR di rischio aperto complessivo.
+  aggregate_risk_bps: 200
+  # 15% del budget = 75 EUR per strumento.
+  instrument_exposure_bps: 1500
+  # 30% del budget = 150 EUR per settore.
+  sector_exposure_bps: 3000
+  # 20% del budget resta cassa.
+  min_cash_bps: 2000
+  # Il riferimento BCE non modifica la cassa mostrata.
   fx_haircut_bps: 100
-  cooldown_seconds: null
-  max_holding_count: null
+  # Una barra da 5 minuti prima di un nuovo ingresso.
+  cooldown_seconds: 300
+  # 390 barre chiuse da 5 minuti: cinque sessioni da 6,5 ore.
+  max_holding_count: 390
 technical:
   calibratable: true
   tie_break: instrument_id
