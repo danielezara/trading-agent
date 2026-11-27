@@ -438,6 +438,8 @@ describe("dashboard skeleton", () => {
             quote_price: "1.25",
             quote_time: "2026-11-27T09:30:00Z",
             display_name: "Apple",
+            asset_class: "stock",
+            allowlist: "inside",
           },
           {
             instrument_id: "100032",
@@ -446,6 +448,8 @@ describe("dashboard skeleton", () => {
             quote_price: null,
             quote_time: null,
             display_name: null,
+            asset_class: "other",
+            allowlist: "outside",
           },
         ],
       },
@@ -472,6 +476,8 @@ describe("dashboard skeleton", () => {
     const names = screen.getAllByTestId("instrument-name");
     expect(names[0]).toHaveTextContent("Apple");
     expect(names[1].textContent).toBe("");
+    expect(screen.getAllByTestId("asset-class").map((cell) => cell.textContent)).toEqual(["azione", "altro"]);
+    expect(screen.getAllByTestId("allowlist").map((cell) => cell.textContent)).toEqual(["dentro", "fuori"]);
     expect(screen.getByTestId("positions")).toHaveTextContent("100032");
     expect(screen.getByTestId("positions")).toHaveTextContent("6270");
     expect(screen.getByTestId("positions")).toHaveTextContent("100032");

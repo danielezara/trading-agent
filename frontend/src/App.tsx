@@ -148,6 +148,8 @@ function PositionsTable({ positions }: { positions: Overview["positions"] | unde
           <th>Valore</th>
           <th>Quotazione</th>
           <th>Ora</th>
+          <th>Tipo</th>
+          <th>Allowlist</th>
         </tr>
       </thead>
       <tbody>
@@ -159,11 +161,42 @@ function PositionsTable({ positions }: { positions: Overview["positions"] | unde
             <td>{cashAmount(position.value)}</td>
             <td data-testid="quote-price">{position.quote_price ?? ""}</td>
             <td data-testid="quote-time">{position.quote_time ?? ""}</td>
+            <td data-testid="asset-class">{assetClassLabel(position.asset_class)}</td>
+            <td data-testid="allowlist">{allowlistLabel(position.allowlist)}</td>
           </tr>
         ))}
       </tbody>
     </table>
   );
+}
+
+function assetClassLabel(value: string | null | undefined): string {
+  if (value === "stock") {
+    return "azione";
+  }
+  if (value === "etf") {
+    return "ETF";
+  }
+  if (value === "other") {
+    return "altro";
+  }
+  if (value === "unknown") {
+    return "sconosciuto";
+  }
+  return "";
+}
+
+function allowlistLabel(value: string | null | undefined): string {
+  if (value === "inside") {
+    return "dentro";
+  }
+  if (value === "outside") {
+    return "fuori";
+  }
+  if (value === "unknown") {
+    return "sconosciuto";
+  }
+  return "";
 }
 
 function ClosedTrades({ rows }: { rows: ClosedTrade[] | null | undefined }) {

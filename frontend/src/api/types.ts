@@ -15,6 +15,8 @@ export type DemoPosition = {
   quote_price?: string | null;
   quote_time?: string | null;
   display_name?: string | null;
+  asset_class?: "stock" | "etf" | "other" | "unknown" | null;
+  allowlist?: "inside" | "outside" | "unknown" | null;
 };
 
 export type ClosedTrade = {

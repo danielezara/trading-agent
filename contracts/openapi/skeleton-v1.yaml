@@ -573,6 +573,16 @@ components:
                     type: string
                     nullable: true
                     description: Official instrumentDisplayName from the instruments GET. Null when that read has no name. The instrument id is never replaced by an invented name.
+                  asset_class:
+                    type: string
+                    nullable: true
+                    enum: [stock, etf, other, unknown]
+                    description: Official instrument type. Stocks and ETF are those exact descriptions. Any other description is other. Missing type is unknown, not guessed.
+                  allowlist:
+                    type: string
+                    nullable: true
+                    enum: [inside, outside, unknown]
+                    description: inside for official Stocks or ETF. outside for any other official type. unknown when the type is missing. No order is sent.
             orders:
               type: array
               nullable: true

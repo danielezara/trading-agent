@@ -7,6 +7,8 @@ import com.tradingagent.modules.brokerread.DemoInstrumentNameRead
 import com.tradingagent.modules.brokerread.DemoMarketRatesLookup
 import com.tradingagent.modules.brokerread.ClosedTradeRead
 import com.tradingagent.modules.brokerread.DemoClosedTradeRead
+import com.tradingagent.modules.brokerread.DemoInstrumentClassRead
+import com.tradingagent.modules.brokerread.InstrumentClassRead
 import com.tradingagent.modules.brokerread.DemoPositionQuotes
 import com.tradingagent.modules.brokerread.InstrumentNameRead
 import com.tradingagent.modules.brokerread.JdkHttpGet
@@ -133,6 +135,12 @@ class ModuleConfiguration {
     }
 
     @Bean
+    fun instrumentClassRead(): InstrumentClassRead = DemoInstrumentClassRead(
+        keys = { DemoKeyMaterial.fromEnvironment(System.getenv()) },
+        transport = JdkHttpGet(),
+    )
+
+    @Bean
     fun instrumentNameRead(): InstrumentNameRead = DemoInstrumentNameRead(
         keys = { DemoKeyMaterial.fromEnvironment(System.getenv()) },
         transport = JdkHttpGet(),
@@ -159,6 +167,7 @@ class ModuleConfiguration {
         positionQuoteRead: PositionQuoteRead,
         instrumentNameRead: InstrumentNameRead,
         closedTradeRead: ClosedTradeRead,
+        instrumentClassRead: InstrumentClassRead,
     ) = DashboardReadModel(
         operationalStateService,
         ledger,
@@ -166,6 +175,7 @@ class ModuleConfiguration {
         capabilityProbe,
         positionQuoteRead,
         instrumentNameRead,
+        instrumentClassRead,
         closedTradeRead,
     )
 

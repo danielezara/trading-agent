@@ -9,6 +9,8 @@ import com.tradingagent.modules.brokerread.DemoKeyMaterial
 import com.tradingagent.modules.brokerread.DisplayQuote
 import com.tradingagent.modules.brokerread.HttpGet
 import com.tradingagent.modules.brokerread.InboundHttp
+import com.tradingagent.modules.brokerread.InstrumentClassRead
+import com.tradingagent.modules.brokerread.InstrumentClassification
 import com.tradingagent.modules.brokerread.InstrumentNameRead
 import com.tradingagent.modules.brokerread.PositionQuoteRead
 import com.tradingagent.modules.configuration.ConfigurationService
@@ -154,6 +156,22 @@ class DashboardReadModelTest {
     }
 
     @Test
+    fun `an official stock stays inside and a missing type stays unknown`() {
+        val snapshot = model(
+            """{"clientPortfolio":{"credit":10,"accountCurrencyId":1,"positions":[{"instrumentID":6270,"units":1,"amount":1},{"instrumentID":100032,"units":1,"amount":1}]}}""",
+            PositionQuoteRead { emptyMap() },
+            classes = InstrumentClassRead {
+                mapOf("6270" to InstrumentClassification("stock", "inside"))
+            },
+        ).portfolio()
+        assertEquals("stock", snapshot.instrumentClasses?.get("6270")?.assetClass)
+        assertEquals("inside", snapshot.instrumentClasses?.get("6270")?.allowlist)
+        assertNull(snapshot.instrumentClasses?.get("100032"))
+        assertEquals(OperationalState.OBSERVATION, snapshot.operationalState)
+        assertFalse(snapshot.tradingEnabled)
+    }
+
+    @Test
     fun `quotes are not requested when there are no positions`() {
         var calls = 0
         val snapshot = model(
@@ -173,6 +191,7 @@ class DashboardReadModelTest {
         quotes: PositionQuoteRead,
         names: InstrumentNameRead = InstrumentNameRead { null },
         closedTrades: ClosedTradeRead = ClosedTradeRead { null },
+        classes: InstrumentClassRead = InstrumentClassRead { null },
     ) = DashboardReadModel(
         operationalStateService = OperationalStateService(clock = { Instant.parse("2026-11-27T00:00:00Z") }),
         ledger = Ledger(),
@@ -189,6 +208,7 @@ class DashboardReadModelTest {
         ),
         positionQuotes = quotes,
         instrumentNames = names,
+        instrumentClasses = classes,
         closedTrades = closedTrades,
     )
 }

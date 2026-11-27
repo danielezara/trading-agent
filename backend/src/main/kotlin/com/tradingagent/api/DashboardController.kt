@@ -96,7 +96,7 @@ class DashboardController(
                 probeErrorClass = snapshot.probeErrorClass,
                 accountLabel = snapshot.accountLabel,
                 positions = snapshot.positions?.map { position ->
-                    positionData(position, snapshot.quotes, snapshot.instrumentNames)
+                    positionData(position, snapshot.quotes, snapshot.instrumentNames, snapshot.instrumentClasses)
                 },
                 orders = snapshot.orders?.map { order -> orderData(order) },
                 executions = snapshot.executions?.map { order -> orderData(order) },
@@ -176,6 +176,8 @@ data class PositionData(
     val quotePrice: String?,
     val quoteTime: Instant?,
     val displayName: String?,
+    val assetClass: String?,
+    val allowlist: String?,
 )
 
 data class ClosedTradeData(
@@ -200,6 +202,7 @@ private fun positionData(
     position: ObservedPosition,
     quotes: Map<String, DisplayQuote>?,
     names: Map<String, String>?,
+    classes: Map<String, com.tradingagent.modules.brokerread.InstrumentClassification>?,
 ) = PositionData(
     instrumentId = position.instrumentId,
     quantity = position.quantity,
@@ -207,6 +210,10 @@ private fun positionData(
     quotePrice = quotes?.get(position.instrumentId)?.price?.toPlainString(),
     quoteTime = quotes?.get(position.instrumentId)?.quotedAt,
     displayName = names?.get(position.instrumentId)?.takeIf { it.isNotBlank() },
+    assetClass = classes?.get(position.instrumentId)?.assetClass
+        ?: classes?.let { com.tradingagent.modules.brokerread.InstrumentClassification.ASSET_UNKNOWN },
+    allowlist = classes?.get(position.instrumentId)?.allowlist
+        ?: classes?.let { com.tradingagent.modules.brokerread.InstrumentClassification.ALLOW_UNKNOWN },
 )
 
 private fun closedTradeData(trade: com.tradingagent.modules.brokerread.ClosedTrade) = ClosedTradeData(

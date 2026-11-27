@@ -7,6 +7,8 @@ import com.tradingagent.modules.brokerread.CapabilityProbe
 import com.tradingagent.modules.brokerread.ClosedTrade
 import com.tradingagent.modules.brokerread.ClosedTradeRead
 import com.tradingagent.modules.brokerread.DisplayQuote
+import com.tradingagent.modules.brokerread.InstrumentClassRead
+import com.tradingagent.modules.brokerread.InstrumentClassification
 import com.tradingagent.modules.brokerread.InstrumentNameRead
 import com.tradingagent.modules.brokerread.ObservedOrder
 import com.tradingagent.modules.brokerread.ObservedPosition
@@ -41,6 +43,7 @@ data class PortfolioSnapshot(
     val positions: List<ObservedPosition>?,
     val quotes: Map<String, DisplayQuote>?,
     val instrumentNames: Map<String, String>?,
+    val instrumentClasses: Map<String, InstrumentClassification>?,
     val orders: List<ObservedOrder>?,
     val executions: List<ObservedOrder>?,
     val closedTrades: List<ClosedTrade>?,
@@ -53,6 +56,7 @@ class DashboardReadModel(
     private val capabilityProbe: CapabilityProbe = CapabilityProbe.offline(),
     private val positionQuotes: PositionQuoteRead = PositionQuoteRead { null },
     private val instrumentNames: InstrumentNameRead = InstrumentNameRead { null },
+    private val instrumentClasses: InstrumentClassRead = InstrumentClassRead { null },
     private val closedTrades: ClosedTradeRead = ClosedTradeRead { null },
 ) {
     fun portfolio(): PortfolioSnapshot {
@@ -99,6 +103,9 @@ class DashboardReadModel(
             },
             instrumentNames = observed.positions?.takeIf { it.isNotEmpty() }?.let { rows ->
                 instrumentNames.read(rows.map { it.instrumentId })
+            },
+            instrumentClasses = observed.positions?.takeIf { it.isNotEmpty() }?.let { rows ->
+                instrumentClasses.read(rows.map { it.instrumentId })
             },
             orders = observed.orders,
             executions = observed.executions,
