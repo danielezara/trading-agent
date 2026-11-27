@@ -37,7 +37,8 @@ object DemoClosedBars {
     const val CANDLE_COUNT: Int = 30
     const val BAR_SECONDS: Long = 300
     private const val PRICE_SCALE: Int = 8
-    private const val PREFIX: String = "https://public-api.etoro.com/api/v1/market-data/instruments/"
+    private const val CANDLES: String =
+        "https://public-api.etoro.com/api/v1/market-data/instruments/%s/history/candles/desc/FiveMinutes/30"
     private val mapper: ObjectMapper = ObjectMapper()
         .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
     private val instrumentId = Regex("[1-9][0-9]{0,9}")
@@ -74,7 +75,7 @@ object DemoClosedBars {
 
     fun candlesUri(id: String): URI {
         require(validId(id)) { "instrument id is not a positive integer" }
-        val uri = URI.create("$PREFIX$id/history/candles/desc/$INTERVAL/$CANDLE_COUNT")
+        val uri = URI.create(CANDLES.format(id))
         require(uri.scheme == "https") { "candles require https" }
         require(uri.host == "public-api.etoro.com") { "candles host is fixed" }
         require(uri.path == "/api/v1/market-data/instruments/$id/history/candles/desc/$INTERVAL/$CANDLE_COUNT") {
