@@ -3,6 +3,8 @@ package com.tradingagent.modules.readmodel
 import com.tradingagent.kernel.EvidenceStatus
 import com.tradingagent.kernel.OperationalState
 import com.tradingagent.modules.brokerread.CapabilityProbe
+import com.tradingagent.modules.brokerread.ClosedTrade
+import com.tradingagent.modules.brokerread.ClosedTradeRead
 import com.tradingagent.modules.brokerread.DemoKeyMaterial
 import com.tradingagent.modules.brokerread.DisplayQuote
 import com.tradingagent.modules.brokerread.HttpGet
@@ -135,6 +137,23 @@ class DashboardReadModelTest {
     }
 
     @Test
+    fun `closed demo history is read with the connected portfolio and stays in observation`() {
+        var seen: Instant? = null
+        val snapshot = model(
+            """{"clientPortfolio":{"credit":10,"accountCurrencyId":1,"positions":[]}}""",
+            PositionQuoteRead { emptyMap() },
+            closedTrades = ClosedTradeRead { now ->
+                seen = now
+                listOf(ClosedTrade("7", "1002", "BUY", "1.5", "-2.5", "2026-11-01T12:00:00Z"))
+            },
+        ).portfolio()
+        assertEquals(Instant.parse("2026-11-27T00:00:00Z"), seen)
+        assertEquals("-2.5", snapshot.closedTrades?.single()?.netProfit)
+        assertEquals(OperationalState.OBSERVATION, snapshot.operationalState)
+        assertFalse(snapshot.tradingEnabled)
+    }
+
+    @Test
     fun `quotes are not requested when there are no positions`() {
         var calls = 0
         val snapshot = model(
@@ -153,6 +172,7 @@ class DashboardReadModelTest {
         body: String,
         quotes: PositionQuoteRead,
         names: InstrumentNameRead = InstrumentNameRead { null },
+        closedTrades: ClosedTradeRead = ClosedTradeRead { null },
     ) = DashboardReadModel(
         operationalStateService = OperationalStateService(clock = { Instant.parse("2026-11-27T00:00:00Z") }),
         ledger = Ledger(),
@@ -169,5 +189,6 @@ class DashboardReadModelTest {
         ),
         positionQuotes = quotes,
         instrumentNames = names,
+        closedTrades = closedTrades,
     )
 }

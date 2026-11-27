@@ -100,6 +100,7 @@ class DashboardController(
                 },
                 orders = snapshot.orders?.map { order -> orderData(order) },
                 executions = snapshot.executions?.map { order -> orderData(order) },
+                closedTrades = snapshot.closedTrades?.map { trade -> closedTradeData(trade) },
                 reconciliation = reconciliationData(report),
             ),
             meta = ApiMeta(schemaVersion = "portfolio-snapshot/1"),
@@ -164,6 +165,7 @@ data class OverviewData(
     val positions: List<PositionData>?,
     val orders: List<OrderData>?,
     val executions: List<OrderData>?,
+    val closedTrades: List<ClosedTradeData>?,
     val reconciliation: ReconciliationData,
 )
 
@@ -174,6 +176,15 @@ data class PositionData(
     val quotePrice: String?,
     val quoteTime: Instant?,
     val displayName: String?,
+)
+
+data class ClosedTradeData(
+    val positionId: String,
+    val instrumentId: String?,
+    val side: String?,
+    val quantity: String?,
+    val netProfit: String?,
+    val closedAt: String?,
 )
 
 data class OrderData(
@@ -196,6 +207,15 @@ private fun positionData(
     quotePrice = quotes?.get(position.instrumentId)?.price?.toPlainString(),
     quoteTime = quotes?.get(position.instrumentId)?.quotedAt,
     displayName = names?.get(position.instrumentId)?.takeIf { it.isNotBlank() },
+)
+
+private fun closedTradeData(trade: com.tradingagent.modules.brokerread.ClosedTrade) = ClosedTradeData(
+    positionId = trade.positionId,
+    instrumentId = trade.instrumentId,
+    side = trade.side,
+    quantity = trade.quantity,
+    netProfit = trade.netProfit,
+    closedAt = trade.closedAt,
 )
 
 private fun orderData(order: ObservedOrder) = OrderData(

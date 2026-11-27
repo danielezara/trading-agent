@@ -17,6 +17,15 @@ export type DemoPosition = {
   display_name?: string | null;
 };
 
+export type ClosedTrade = {
+  position_id: string;
+  instrument_id: string | null;
+  side: "BUY" | "SELL" | null;
+  quantity: string | null;
+  net_profit: string | null;
+  closed_at: string | null;
+};
+
 export type DemoOrder = {
   order_id: string;
   instrument_id: string | null;
@@ -46,6 +55,7 @@ export type Overview = {
   positions: DemoPosition[] | null;
   orders: DemoOrder[] | null;
   executions: DemoOrder[] | null;
+  closed_trades?: ClosedTrade[] | null;
   configuration_version_id: string;
   configuration_version_number: number;
   reconciliation?: {

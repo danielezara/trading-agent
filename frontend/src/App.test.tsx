@@ -255,6 +255,24 @@ describe("dashboard skeleton", () => {
             opened_at: "2024-06-07T09:00:00Z",
           },
         ],
+        closed_trades: [
+          {
+            position_id: "7",
+            instrument_id: "1002",
+            side: "BUY",
+            quantity: "1.5",
+            net_profit: "-2.5",
+            closed_at: "2026-11-01T12:00:00Z",
+          },
+          {
+            position_id: "8",
+            instrument_id: null,
+            side: null,
+            quantity: null,
+            net_profit: null,
+            closed_at: null,
+          },
+        ],
       },
     };
     vi.stubGlobal("fetch", (input: string) => Promise.resolve({
@@ -287,6 +305,13 @@ describe("dashboard skeleton", () => {
     expect(executions).toHaveTextContent("88");
     expect(executions).toHaveTextContent("0.049485");
     expect(executions).toHaveTextContent("non disponibile");
+    const closed = screen.getByTestId("closed-trades");
+    expect(closed).toHaveTextContent("7");
+    expect(closed).toHaveTextContent("1002");
+    expect(closed).toHaveTextContent("acquisto");
+    expect(closed).toHaveTextContent("-2.5");
+    expect(closed).toHaveTextContent("2026-11-01T12:00:00Z");
+    expect(screen.getAllByTestId("closed-profit").map((cell) => cell.textContent)).toEqual(["-2.5", ""]);
     expect(screen.getByTestId("cash-alignment")).toHaveTextContent("cassa USD, budget EUR");
     expect(screen.getByTestId("cash-alignment")).toHaveTextContent("Nessun cambio configurato");
     expect(screen.getByText("50000 EUR")).toBeInTheDocument();
@@ -296,7 +321,7 @@ describe("dashboard skeleton", () => {
   it("shows an empty demo position list when the read has none", async () => {
     const empty = {
       ...overview,
-      data: { ...overview.data, broker_connected: true, positions: [], orders: [], executions: [] },
+      data: { ...overview.data, broker_connected: true, positions: [], orders: [], executions: [], closed_trades: [] },
     };
     vi.stubGlobal("fetch", (input: string) => Promise.resolve({
       ok: true,
@@ -311,6 +336,7 @@ describe("dashboard skeleton", () => {
     expect(await screen.findByTestId("positions")).toHaveTextContent("Nessuna posizione");
     expect(screen.getByTestId("orders")).toHaveTextContent("Nessun ordine Demo");
     expect(screen.getByTestId("executions")).toHaveTextContent("Nessuna esecuzione Demo");
+    expect(screen.getByTestId("closed-trades")).toHaveTextContent("Nessuna chiusura Demo");
     expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
   });
 

@@ -4,6 +4,8 @@ import com.tradingagent.kernel.Money
 import com.tradingagent.kernel.OperationalState
 import java.time.Instant
 import com.tradingagent.modules.brokerread.CapabilityProbe
+import com.tradingagent.modules.brokerread.ClosedTrade
+import com.tradingagent.modules.brokerread.ClosedTradeRead
 import com.tradingagent.modules.brokerread.DisplayQuote
 import com.tradingagent.modules.brokerread.InstrumentNameRead
 import com.tradingagent.modules.brokerread.ObservedOrder
@@ -41,6 +43,7 @@ data class PortfolioSnapshot(
     val instrumentNames: Map<String, String>?,
     val orders: List<ObservedOrder>?,
     val executions: List<ObservedOrder>?,
+    val closedTrades: List<ClosedTrade>?,
 )
 
 class DashboardReadModel(
@@ -50,6 +53,7 @@ class DashboardReadModel(
     private val capabilityProbe: CapabilityProbe = CapabilityProbe.offline(),
     private val positionQuotes: PositionQuoteRead = PositionQuoteRead { null },
     private val instrumentNames: InstrumentNameRead = InstrumentNameRead { null },
+    private val closedTrades: ClosedTradeRead = ClosedTradeRead { null },
 ) {
     fun portfolio(): PortfolioSnapshot {
         val configuration = configurationService.active()
@@ -98,6 +102,7 @@ class DashboardReadModel(
             },
             orders = observed.orders,
             executions = observed.executions,
+            closedTrades = if (observed.connected) closedTrades.read(observed.observedAt ?: Instant.now()) else null,
         )
     }
 }

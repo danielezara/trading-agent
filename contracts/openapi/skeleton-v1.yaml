@@ -585,6 +585,12 @@ components:
               description: Open executions and close orders already present on the portfolio read. Empty when the account has none.
               items:
                 $ref: "#/components/schemas/DemoOrder"
+            closed_trades:
+              type: array
+              nullable: true
+              description: One page of closed Demo trades from the documented demo history GET. Empty when that page has none. Null when the read was not attempted or failed. A missing net profit is null, not zero.
+              items:
+                $ref: "#/components/schemas/ClosedTrade"
             reconciliation:
               $ref: "#/components/schemas/ReconciliationReport"
         meta:
@@ -632,6 +638,30 @@ components:
         operational_state:
           type: string
           enum: [OBSERVATION]
+    ClosedTrade:
+      type: object
+      required: [position_id]
+      properties:
+        position_id:
+          type: string
+        instrument_id:
+          type: string
+          nullable: true
+        side:
+          type: string
+          nullable: true
+          enum: [BUY, SELL]
+        quantity:
+          type: string
+          nullable: true
+        net_profit:
+          type: string
+          nullable: true
+          description: Net profit decimal from the history row. Null when absent. A missing profit is not zero.
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
     DemoOrder:
       type: object
       required: [order_id]

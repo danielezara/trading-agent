@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { getJson } from "./api/client";
 import { assertSkeletonApiBase } from "./api/policy";
-import type { AuditChain, ChatTurn, Configuration, DataChannel, DataHealth, Decision, Envelope, Money, OperationalState, Overview } from "./api/types";
+import type { AuditChain, ChatTurn, ClosedTrade, Configuration, DataChannel, DataHealth, Decision, Envelope, Money, OperationalState, Overview } from "./api/types";
 import "./styles.css";
 
 const NAV = [
@@ -166,6 +166,42 @@ function PositionsTable({ positions }: { positions: Overview["positions"] | unde
   );
 }
 
+function ClosedTrades({ rows }: { rows: ClosedTrade[] | null | undefined }) {
+  if (rows == null) {
+    return <p data-testid="closed-trades">Storico chiusure non disponibile</p>;
+  }
+  if (rows.length === 0) {
+    return <p data-testid="closed-trades">Nessuna chiusura Demo</p>;
+  }
+  return (
+    <table className="data-table" data-testid="closed-trades">
+      <caption>Storico chiusure Demo</caption>
+      <thead>
+        <tr>
+          <th>Posizione</th>
+          <th>Strumento</th>
+          <th>Lato</th>
+          <th>Quantità</th>
+          <th>Risultato</th>
+          <th>Chiusura</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.position_id}>
+            <td>{row.position_id}</td>
+            <td>{row.instrument_id ?? ""}</td>
+            <td>{sideLabel(row.side)}</td>
+            <td>{row.quantity ?? ""}</td>
+            <td data-testid="closed-profit">{row.net_profit ?? ""}</td>
+            <td>{row.closed_at ?? ""}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function sideLabel(side: string | null | undefined): string {
   if (side === "BUY") {
     return "acquisto";
@@ -267,6 +303,7 @@ function OverviewPage({ loaded }: { loaded: LoadState }) {
               unavailable="Esecuzioni non disponibili"
               testId="executions"
             />
+            <ClosedTrades rows={loaded.data.overview.closed_trades} />
             <dl className="facts" data-testid="account-card">
               <div><dt>Piattaforma</dt><dd>Demo eToro</dd></div>
               <div><dt>Connessa</dt><dd>{loaded.data.overview.broker_connected ? "sì" : "no"}</dd></div>

@@ -20,6 +20,7 @@ allowed_broker_url() {
   local base="${1%%\?*}"
   case "$base" in
     https://public-api.etoro.com/api/v1/trading/info/demo/portfolio|\
+    https://public-api.etoro.com/api/v1/trading/info/trade/demo/history|\
     https://public-api.etoro.com/api/v1/market-data/instruments/rates|\
     https://public-api.etoro.com/api/v1/market-data/instruments)
       return 0
