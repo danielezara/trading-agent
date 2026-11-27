@@ -1,13 +1,21 @@
-import { displayAccount, formatCash, readDemoOverview, type CashMovement, type ClosedTrade, type DemoPosition } from "../lib/demo-read";
+import { BotPortfolio } from "./bot-portfolio";
+import { displayAccount, formatCash, readDemoOverview, readProgramBook, type CashMovement, type ClosedTrade } from "../lib/demo-read";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 export default async function Page() {
-  const overview = await readDemoOverview({
-    env: process.env,
-    fetchImpl: fetch,
-  });
+  const [overview, book] = await Promise.all([
+    readDemoOverview({
+      env: process.env,
+      fetchImpl: fetch,
+      quotes: false,
+    }),
+    readProgramBook({
+      env: process.env,
+      fetchImpl: fetch,
+    }),
+  ]);
   const rows = [
     ["Piattaforma", overview.platform],
     ["Connessa", overview.connected ? "sì" : "no"],
@@ -15,13 +23,14 @@ export default async function Page() {
     ["Cassa broker", formatCash(overview.brokerCash)],
     ["Ultimo probe", overview.lastProbeAt ?? "non disponibile"],
     ["Stato", overview.operationalState],
-    ["Ordini", "nessuno"],
+    ["Invii da questa pagina", "no"],
   ];
   return (
     <main>
       <p className="product">Agente trading</p>
       <h1>Panoramica</h1>
-      <p>Lettura Demo sul server. Nessun ordine.</p>
+      <p>Lettura Demo sul server. Nessun ordine in questa pagina.</p>
+      <BotPortfolio initial={book} />
       <dl>
         {rows.map(([label, value]) => (
           <div key={label}>
@@ -30,7 +39,6 @@ export default async function Page() {
           </div>
         ))}
       </dl>
-      <Positions positions={overview.positions} />
       <Movements rows={overview.cashMovements} />
       <History rows={overview.closedTrades} />
       {overview.probeErrorClass ? <p>Errore: {overview.probeErrorClass}</p> : null}
@@ -106,38 +114,3 @@ function History({ rows }: { rows: ClosedTrade[] | null }) {
   );
 }
 
-function Positions({ positions }: { positions: DemoPosition[] | null }) {
-  if (positions == null) {
-    return <p>Posizioni non disponibili</p>;
-  }
-  if (positions.length === 0) {
-    return <p>Nessuna posizione</p>;
-  }
-  return (
-    <table>
-      <caption>Posizioni Demo</caption>
-      <thead>
-        <tr>
-          <th>Strumento</th>
-          <th>Nome</th>
-          <th>Quantità</th>
-          <th>Valore</th>
-          <th>Quotazione</th>
-          <th>Ora</th>
-        </tr>
-      </thead>
-      <tbody>
-        {positions.map((position, index) => (
-          <tr key={`${position.instrumentId}-${index}`}>
-            <td>{position.instrumentId}</td>
-            <td>{position.displayName ?? ""}</td>
-            <td>{position.quantity ?? "non disponibile"}</td>
-            <td>{formatCash(position.value)}</td>
-            <td>{position.quotePrice ?? ""}</td>
-            <td>{position.quoteTime ?? ""}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}

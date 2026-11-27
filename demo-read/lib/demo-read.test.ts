@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { DEMO_ACCOUNT_FALLBACK, DEMO_PORTFOLIO_URL, formatCash, readDemoOverview } from "./demo-read.ts";
+import { DEMO_ACCOUNT_FALLBACK, DEMO_PORTFOLIO_URL, formatCash, readDemoOverview, readProgramBook } from "./demo-read.ts";
+import { changeBps, formatBps, parseBenchmarkId, parseReferenceClose, selectProgramPositions, tick } from "./program-book.ts";
 
 const keys = {
   ETORO_DEMO_API_KEY: "test-api",
@@ -191,17 +192,25 @@ describe("demo read", () => {
 
   it("ships no browser secret prefix and no order method", () => {
     const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+    const bot = readFileSync(new URL("../app/bot-portfolio.tsx", import.meta.url), "utf8");
     const route = readFileSync(new URL("../app/api/overview/route.ts", import.meta.url), "utf8");
-    const source = `${page}\n${route}\n${readFileSync(new URL("./demo-read.ts", import.meta.url), "utf8")}`;
+    const botRoute = readFileSync(new URL("../app/api/bot-portfolio/route.ts", import.meta.url), "utf8");
+    const source = `${page}\n${bot}\n${route}\n${botRoute}\n${readFileSync(new URL("./demo-read.ts", import.meta.url), "utf8")}\n${readFileSync(new URL("./program-book.ts", import.meta.url), "utf8")}`;
     assert.equal(source.includes("VITE_"), false);
     assert.equal(source.includes("NEXT_PUBLIC_"), false);
+    assert.equal(source.includes("ETORO_DEMO_API_KEY="), false);
     assert.equal(/\bPOST\b/.test(route), false);
+    assert.equal(/\bPOST\b/.test(botRoute), false);
+    assert.equal(source.includes("market-open-orders"), false);
     assert.match(route, /export async function GET/);
+    assert.match(botRoute, /export async function GET/);
     assert.equal(page.includes("use client"), false);
     assert.equal(page.includes("fetchCache = \"force-no-store\""), true);
     assert.equal(route.includes("fetchCache = \"force-no-store\""), true);
-    assert.equal(page.includes("Posizioni Demo"), true);
-    assert.equal(page.includes("Nessuna posizione"), true);
+    assert.equal(bot.includes("Portafoglio bot"), true);
+    assert.equal(bot.includes("Nessuna posizione del programma"), true);
+    assert.equal(bot.includes("Confronto non disponibile"), true);
+    assert.equal(page.includes("Posizioni Demo"), false);
     assert.equal(page.includes("Storico operazioni vuoto"), true);
     assert.equal(page.includes("Registro movimenti"), true);
   });
@@ -260,6 +269,69 @@ describe("demo read", () => {
         postedAt: "2026-05-03T10:16:12Z",
       },
     ]);
+  });
+
+  it("keeps only the program order and leaves a missing quote or benchmark blank", async () => {
+    const calls: string[] = [];
+    const book = await readProgramBook({
+      env: keys,
+      now: () => new Date("2026-11-27T16:00:00Z"),
+      fetchImpl: async (url, init) => {
+        calls.push(url);
+        assert.equal(init.method, "GET");
+        assert.equal(url.includes("/real"), false);
+        assert.equal(url.includes("market-open"), false);
+        if (url === DEMO_PORTFOLIO_URL) {
+          return json(200, {
+            clientPortfolio: {
+              credit: 10,
+              accountCurrencyId: 1,
+              positions: [
+                { instrumentID: 1002, orderID: 1, units: 1, amount: 50, initialAmountInDollars: 50, openRate: 10, openDateTime: "2026-11-27T15:13:27.72Z" },
+                { instrumentID: 1001, orderID: 397030666, units: 0.229735, amount: 82.08, initialAmountInDollars: 82.08, openRate: 357.27, openDateTime: "2026-11-27T15:13:27.72Z" },
+              ],
+            },
+          });
+        }
+        if (url.startsWith("https://public-api.etoro.com/api/v1/balances")) {
+          return json(200, { balances: [{ currency: "EUR", displayCurrency: "USD", exchangeRate: 1.09352 }] });
+        }
+        if (url.includes("internalSymbolFull=SWDA.L")) {
+          return json(200, { items: [{ internalSymbolFull: "SWDA.L", instrumentId: 3040, internalInstrumentId: 3040, isHiddenFromClient: false, internalInstrumentDisplayName: "iShares Core MSCI World UCITS ETF" }] });
+        }
+        if (url.startsWith("https://public-api.etoro.com/api/v1/market-data/instruments/rates")) {
+          assert.equal(url.includes("1002"), false);
+          assert.equal(url.includes("1001"), true);
+          assert.equal(url.includes("3040"), true);
+          return json(200, { rates: [{ instrumentID: 1001, bid: 358.12, date: "2026-11-27T15:59:00Z" }, { instrumentID: 3040, bid: 110.5, date: "2026-11-27T15:59:00Z" }] });
+        }
+        if (url.includes("/history/candles/")) {
+          assert.equal(url.includes("/3040/"), true);
+          return json(200, { interval: "FiveMinutes", candles: [{ candles: [{ fromDate: "2026-11-27T15:05:00Z", close: 110 }] }] });
+        }
+        return json(200, { instrumentDisplayDatas: [{ instrumentID: 1001, instrumentDisplayName: "Apple" }] });
+      },
+    });
+    assert.equal(book.connected, true);
+    assert.equal(book.positions?.length, 1);
+    assert.equal(book.positions?.[0]?.symbol, "AAPL");
+    assert.equal(book.positions?.[0]?.orderId, "397030666");
+    assert.equal(book.positions?.[0]?.sinceOpen, "up");
+    assert.equal(book.positions?.[0]?.bid, "358.12");
+    assert.notEqual(book.valueEurMinor, null);
+    assert.equal(book.benchmark.resolved, true);
+    assert.equal(book.benchmark.instrumentId, "3040");
+    assert.equal(book.benchmark.referencePrice, "110");
+    assert.equal(book.benchmark.sinceReference, "up");
+    assert.equal(calls.some((url) => url.includes("1002")), false);
+
+    const hidden = parseBenchmarkId(JSON.stringify({ items: [{ internalSymbolFull: "SWDA.L", instrumentId: 3040, internalInstrumentId: 9, isHiddenFromClient: false }] }), "SWDA.L");
+    assert.equal(hidden, null);
+    assert.equal(selectProgramPositions(JSON.stringify({ clientPortfolio: { positions: [{ instrumentID: 1005, orderID: 9 }] } }))?.length, 0);
+    assert.equal(parseReferenceClose(JSON.stringify({ interval: "FiveMinutes", candles: [] }), null), null);
+    assert.equal(tick("10", null), null);
+    assert.equal(changeBps("110", "110.5"), 45);
+    assert.equal(formatBps(null), "non disponibile");
   });
 });
 

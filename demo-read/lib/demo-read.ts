@@ -1,3 +1,19 @@
+import {
+  BENCHMARK_SYMBOL,
+  BUDGET_EUR_MINOR,
+  type BenchmarkQuote,
+  type ProgramBook,
+  buildPosition,
+  changeBps,
+  missingBenchmark,
+  parseBenchmarkId,
+  parseEurUsdRate,
+  parseReferenceClose,
+  selectProgramPositions,
+  summarize,
+  tick,
+} from "./program-book.ts";
+
 export const DEMO_PORTFOLIO_URL = "https://public-api.etoro.com/api/v1/trading/info/demo/portfolio";
 export const DEMO_RATES_URL = "https://public-api.etoro.com/api/v1/market-data/instruments/rates";
 export const DEMO_INSTRUMENTS_URL = "https://public-api.etoro.com/api/v1/market-data/instruments";
@@ -64,6 +80,7 @@ type ReadOptions = {
   fetchImpl: FetchLike;
   now?: () => Date;
   sleep?: (ms: number) => Promise<void>;
+  quotes?: boolean;
 };
 
 export async function readDemoOverview(options: ReadOptions): Promise<DemoOverview> {
@@ -76,7 +93,9 @@ export async function readDemoOverview(options: ReadOptions): Promise<DemoOvervi
   const outcome = await readOnce(options.fetchImpl, apiKey, userKey, options.sleep ?? defaultSleep);
   if (outcome.kind === "pass") {
     const sleep = options.sleep ?? defaultSleep;
-    const positions = await enrichPositions(outcome.positions, options.fetchImpl, apiKey, userKey, sleep);
+    const positions = options.quotes === false
+      ? outcome.positions
+      : await enrichPositions(outcome.positions, options.fetchImpl, apiKey, userKey, sleep);
     const cashMovements = await readCashMovements(options.fetchImpl, apiKey, userKey, sleep);
     const closedTrades = await readClosedTrades(options.fetchImpl, apiKey, userKey, sleep, now());
     return view(true, outcome.accountLabel, outcome.brokerCash, positions, cashMovements, closedTrades, now(), null);
@@ -592,6 +611,129 @@ function signedMinor(value: unknown): number | null {
   }
   const cents = Math.trunc(numeric * 100);
   return Number.isSafeInteger(cents) ? cents : null;
+}
+
+const SEARCH_URL = "https://public-api.etoro.com/api/v1/market-data/search";
+const CANDLES_URL = "https://public-api.etoro.com/api/v1/market-data/instruments/%s/history/candles/desc/FiveMinutes/100";
+
+export async function readProgramBook(options: ReadOptions): Promise<ProgramBook> {
+  const now = options.now ?? (() => new Date());
+  const apiKey = options.env.ETORO_DEMO_API_KEY?.trim() ?? "";
+  const userKey = options.env.ETORO_DEMO_USER_KEY?.trim() ?? "";
+  if (!apiKey || !userKey) {
+    return closedBook(now(), "KEYS_MISSING");
+  }
+  const sleep = options.sleep ?? defaultSleep;
+  const portfolio = await readBody(options.fetchImpl, DEMO_PORTFOLIO_URL, apiKey, userKey, sleep);
+  if (portfolio === null) {
+    return closedBook(now(), "PORTFOLIO");
+  }
+  const selected = selectProgramPositions(portfolio);
+  if (selected === null) {
+    return closedBook(now(), "RESPONSE_INVALID");
+  }
+  const balances = await readBody(options.fetchImpl, DEMO_BALANCES_URL, apiKey, userKey, sleep);
+  const eurUsdRate = balances === null ? null : parseEurUsdRate(balances);
+  const search = await readBody(
+    options.fetchImpl,
+    `${SEARCH_URL}?internalSymbolFull=${BENCHMARK_SYMBOL}&pageSize=5`,
+    apiKey,
+    userKey,
+    sleep,
+  );
+  const resolved = search === null ? null : parseBenchmarkId(search, BENCHMARK_SYMBOL);
+  const ids = [...new Set([...selected.map((row) => row.instrumentId), ...(resolved ? [resolved.instrumentId] : [])])];
+  const quotes = new Map<string, { price: string | null; time: string | null }>();
+  const names = new Map<string, string>();
+  if (ids.length > 0) {
+    const query = `instrumentIds=${ids.join(",")}`;
+    const [ratesBody, namesBody] = await Promise.all([
+      readBody(options.fetchImpl, `${DEMO_RATES_URL}?${query}`, apiKey, userKey, sleep),
+      readBody(options.fetchImpl, `${DEMO_INSTRUMENTS_URL}?${query}`, apiKey, userKey, sleep),
+    ]);
+    for (const [id, quote] of parseRates(ratesBody ?? "")) {
+      quotes.set(id, quote);
+    }
+    for (const [id, name] of parseInstrumentNames(namesBody ?? "")) {
+      names.set(id, name);
+    }
+  }
+  const positions = selected.map((row) => {
+    const quote = quotes.get(row.instrumentId);
+    return buildPosition(row, quote?.price ?? null, quote?.time ?? null, names.get(row.instrumentId) ?? null, eurUsdRate);
+  });
+  const openAt = selected.map((row) => row.openAt).filter((value): value is string => value !== null).sort()[0] ?? null;
+  const benchmark = await benchmarkQuote(options.fetchImpl, apiKey, userKey, sleep, resolved, quotes, openAt);
+  return {
+    budgetEurMinor: BUDGET_EUR_MINOR,
+    connected: true,
+    errorClass: null,
+    positions,
+    ...summarize(positions, eurUsdRate),
+    eurUsdRate,
+    benchmark,
+    readAt: now().toISOString(),
+  };
+}
+
+async function benchmarkQuote(
+  fetchImpl: FetchLike,
+  apiKey: string,
+  userKey: string,
+  sleep: (ms: number) => Promise<void>,
+  resolved: { instrumentId: string; name: string | null } | null,
+  quotes: Map<string, { price: string | null; time: string | null }>,
+  openAt: string | null,
+): Promise<BenchmarkQuote> {
+  if (!resolved) {
+    return missingBenchmark();
+  }
+  const quote = quotes.get(resolved.instrumentId);
+  const bid = quote?.price ?? null;
+  let referencePrice: string | null = null;
+  if (openAt) {
+    const body = await readBody(fetchImpl, candleUrl(resolved.instrumentId), apiKey, userKey, sleep);
+    referencePrice = body === null ? null : parseReferenceClose(body, openAt);
+  }
+  return {
+    resolved: true,
+    instrumentId: resolved.instrumentId,
+    name: resolved.name,
+    bid,
+    quoteTime: quote?.time ?? null,
+    referencePrice,
+    sinceReference: tick(referencePrice, bid),
+    changeBps: changeBps(referencePrice, bid),
+  };
+}
+
+function candleUrl(id: string): string {
+  if (!/^[1-9]\d{0,9}$/.test(id)) {
+    throw new Error("instrument id is not a positive integer");
+  }
+  const url = CANDLES_URL.replace("%s", id);
+  if (url !== CANDLES_URL.replace("%s", id) || url.includes("/real") || url.includes("%s")) {
+    throw new Error("candle url is not the five minute history");
+  }
+  return url;
+}
+
+function closedBook(at: Date, errorClass: string): ProgramBook {
+  return {
+    budgetEurMinor: BUDGET_EUR_MINOR,
+    connected: false,
+    errorClass,
+    positions: null,
+    valueUsdMinor: null,
+    valueEurMinor: null,
+    changeUsdMinor: null,
+    changeEurMinor: null,
+    lossEurMinor: null,
+    lossBpsOfBudget: null,
+    eurUsdRate: null,
+    benchmark: missingBenchmark(),
+    readAt: at.toISOString(),
+  };
 }
 
 export function formatCash(cash: BrokerCash | null): string {
