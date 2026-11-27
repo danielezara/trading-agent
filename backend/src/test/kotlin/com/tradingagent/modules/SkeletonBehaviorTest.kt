@@ -101,6 +101,8 @@ class SkeletonBehaviorTest {
         ).portfolio()
         assertNull(snapshot.equity)
         assertNull(snapshot.availableCash)
+        assertEquals(50_000L, snapshot.assignedBudget?.minorUnits)
+        assertEquals("EUR", snapshot.assignedBudget?.currency)
         assertNull(snapshot.positionCount)
         assertFalse(snapshot.tradingEnabled)
         assertEquals(OperationalState.OBSERVATION, snapshot.operationalState)

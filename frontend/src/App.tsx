@@ -184,6 +184,14 @@ function ConfigurationDetails({ configuration }: { configuration: Configuration 
       <div><dt>Confine di barra</dt><dd>{configuration.valid_from_bar_open}</dd></div>
       <div><dt>Valuta</dt><dd>{configuration.budget.base_currency ?? "non disponibile"}</dd></div>
       <div><dt>Budget</dt><dd>{minorOrMissing(configuration.budget.assigned_budget_minor, configuration.budget.base_currency)}</dd></div>
+      <div><dt>Perdita massima</dt><dd>{lossLimit(configuration.economic.max_loss_bps, configuration.economic.max_loss_action)}</dd></div>
+      <div><dt>Orizzonte</dt><dd>{configuration.economic.horizon ?? "non disponibile"}</dd></div>
+      <div><dt>Universo</dt><dd>{configuration.economic.allowlist_universe ?? "non disponibile"}</dd></div>
+      <div><dt>Direzione</dt><dd>{configuration.economic.allowlist_direction ?? "non disponibile"}</dd></div>
+      <div><dt>Leva</dt><dd>{configuration.economic.leverage ?? "non disponibile"}</dd></div>
+      <div><dt>Benchmark</dt><dd>{benchmarkLabel(configuration.economic.benchmark_name, configuration.economic.benchmark_return_basis)}</dd></div>
+      <div><dt>Soglie tecniche</dt><dd>{configuration.economic.technical_calibratable ? "calibrabili" : "non disponibile"}</dd></div>
+      <div><dt>File</dt><dd><code>{configuration.economic.source_path}</code></dd></div>
     </dl>
   );
 }
@@ -215,6 +223,23 @@ function formatMoney(value: Money | null): string {
     return "non disponibile";
   }
   return `${value.minor_units} ${value.currency}`;
+}
+
+function lossLimit(bps: number | null, action: string | null): string {
+  if (bps == null) {
+    return "non disponibile";
+  }
+  const whole = Math.trunc(bps / 100);
+  const fraction = Math.abs(bps % 100);
+  const percent = fraction === 0 ? `${whole}%` : `${whole}.${String(fraction).padStart(2, "0")}%`;
+  return action ? `${percent}, ${action}` : percent;
+}
+
+function benchmarkLabel(name: string | null, basis: string | null): string {
+  if (!name) {
+    return "non disponibile";
+  }
+  return basis ? `${name} ${basis}` : name;
 }
 
 function minorOrMissing(minor: number | null, currency: string | null): string {

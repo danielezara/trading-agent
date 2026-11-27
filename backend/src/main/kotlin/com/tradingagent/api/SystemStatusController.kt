@@ -88,7 +88,11 @@ class SystemStatusController(
     @GetMapping("/configurations/active")
     fun activeConfiguration(): ApiEnvelope<ConfigurationData> {
         val active = configurationService.active()
-        val budgetUnset = active.budget.assignedBudgetMinor == null
+        val budgetUnset = active.budget.assignedBudgetMinor == null || active.budget.baseCurrency == null
+        val capability = ApiWarning(
+            code = "CAPABILITY_UNVERIFIED",
+            detail = "Capability e licenze restano UNVERIFIED. La decisione resta NO-TRADE.",
+        )
         return ApiEnvelope(
             data = configurationData(active, active.versionId),
             meta = ApiMeta(
@@ -99,11 +103,12 @@ class SystemStatusController(
                 listOf(
                     ApiWarning(
                         code = "BUDGET_UNSET",
-                        detail = "La configurazione attiva non contiene parametri economici. Nessun ordine è possibile.",
+                        detail = "La configurazione attiva non contiene budget e valuta. Nessun ordine è possibile.",
                     ),
+                    capability,
                 )
             } else {
-                emptyList()
+                listOf(capability)
             },
         )
     }
@@ -247,6 +252,18 @@ class SystemStatusController(
             cashBufferMinor = version.budget.cashBufferMinor,
             maxPositions = version.budget.maxPositions,
         ),
+        economic = EconomicViewData(
+            maxLossBps = version.parameters.economic.maxLossBps,
+            maxLossAction = version.parameters.economic.maxLossAction,
+            horizon = version.parameters.economic.horizon,
+            allowlistUniverse = version.parameters.economic.allowlistUniverse,
+            allowlistDirection = version.parameters.economic.allowlistDirection,
+            leverage = version.parameters.economic.allowlistLeverage,
+            benchmarkName = version.parameters.economic.benchmarkName,
+            benchmarkReturnBasis = version.parameters.economic.benchmarkReturnBasis,
+            technicalCalibratable = version.parameters.technical.calibratable,
+            sourcePath = version.parameters.sourcePath,
+        ),
     )
 }
 
@@ -276,6 +293,20 @@ data class ConfigurationData(
     val validFromBarOpen: Instant,
     val active: Boolean,
     val budget: BudgetData,
+    val economic: EconomicViewData,
+)
+
+data class EconomicViewData(
+    val maxLossBps: Int?,
+    val maxLossAction: String?,
+    val horizon: String?,
+    val allowlistUniverse: String?,
+    val allowlistDirection: String?,
+    val leverage: Int?,
+    val benchmarkName: String?,
+    val benchmarkReturnBasis: String?,
+    val technicalCalibratable: Boolean,
+    val sourcePath: String,
 )
 
 data class BudgetData(

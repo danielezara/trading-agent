@@ -13,13 +13,14 @@ class ConfigurationServiceTest {
     private val clock = { Instant.parse("2026-11-27T00:00:00Z") }
 
     @Test
-    fun `the first version is active and has no economic parameters`() {
+    fun `the first version is the file and stays stable for the same clock`() {
         val service = ConfigurationService(clock)
         val active = service.active()
         assertEquals(1L, active.versionNumber)
-        assertEquals("system", active.author)
-        assertEquals(null, active.budget.assignedBudgetMinor)
-        assertEquals(null, active.budget.baseCurrency)
+        assertEquals("daniele", active.author)
+        assertEquals(50_000L, active.budget.assignedBudgetMinor)
+        assertEquals("EUR", active.budget.baseCurrency)
+        assertEquals("days", active.parameters.economic.horizon)
         assertEquals(64, active.contentSha256.length)
         assertEquals(active.contentSha256, ConfigurationService(clock).active().contentSha256)
     }

@@ -20,6 +20,7 @@ data class ConfigurationVersion(
     val reason: String,
     val contentSha256: String,
     val budget: BudgetPolicy,
+    val parameters: TradingParameters,
     val validFromBarOpen: Instant,
     val supersedes: UUID?,
 )
@@ -38,12 +39,13 @@ class ConfigurationService(
     private var activeId: UUID
 
     init {
+        val parameters = TradingParameters.current()
         val seededAt = clock()
         val seeded = build(
             versionNumber = 1,
-            author = "system",
-            reason = "Parametri economici non impostati. Lo stato resta OBSERVATION.",
-            budget = BudgetPolicy(),
+            author = parameters.author,
+            reason = parameters.reason,
+            parameters = parameters,
             validFromBarOpen = BarSchedule.open(seededAt),
             createdAt = seededAt,
             supersedes = null,
@@ -65,7 +67,7 @@ class ConfigurationService(
             versionNumber = versions.size + 1L,
             author = author.trim(),
             reason = reason.trim(),
-            budget = budget,
+            parameters = active().parameters.withBudget(budget),
             validFromBarOpen = BarSchedule.nextBoundary(createdAt),
             createdAt = createdAt,
             supersedes = activeId,
@@ -102,19 +104,21 @@ class ConfigurationService(
         versionNumber: Long,
         author: String,
         reason: String,
-        budget: BudgetPolicy,
+        parameters: TradingParameters,
         validFromBarOpen: Instant,
         createdAt: Instant,
         supersedes: UUID?,
     ): ConfigurationVersion {
+        val budget = parameters.toBudgetPolicy()
         return ConfigurationVersion(
             versionId = UUID.randomUUID(),
             versionNumber = versionNumber,
             author = author,
             createdAt = createdAt,
             reason = reason,
-            contentSha256 = contentSha256(versionNumber, author, createdAt, reason, budget, validFromBarOpen),
+            contentSha256 = contentSha256(versionNumber, author, createdAt, reason, parameters, validFromBarOpen),
             budget = budget,
+            parameters = parameters,
             validFromBarOpen = validFromBarOpen,
             supersedes = supersedes,
         )
@@ -156,7 +160,7 @@ class ConfigurationService(
             author: String,
             createdAt: Instant,
             reason: String,
-            budget: BudgetPolicy,
+            parameters: TradingParameters,
             validFromBarOpen: Instant,
         ): String {
             val payload = listOf(
@@ -164,10 +168,7 @@ class ConfigurationService(
                 author,
                 createdAt.toString(),
                 reason,
-                budget.baseCurrency ?: "",
-                budget.assignedBudgetMinor?.toString() ?: "",
-                budget.cashBufferMinor?.toString() ?: "",
-                budget.maxPositions?.toString() ?: "",
+                parameters.canonical(),
                 validFromBarOpen.toString(),
             ).joinToString("\n")
             val digest = MessageDigest.getInstance("SHA-256").digest(payload.toByteArray(Charsets.UTF_8))

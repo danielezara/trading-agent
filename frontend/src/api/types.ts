@@ -88,6 +88,19 @@ export type Budget = {
   max_positions: number | null;
 };
 
+export type EconomicView = {
+  max_loss_bps: number | null;
+  max_loss_action: string | null;
+  horizon: string | null;
+  allowlist_universe: string | null;
+  allowlist_direction: string | null;
+  leverage: number | null;
+  benchmark_name: string | null;
+  benchmark_return_basis: string | null;
+  technical_calibratable: boolean;
+  source_path: string;
+};
+
 export type Configuration = {
   version_id: string;
   version_number: number;
@@ -98,6 +111,7 @@ export type Configuration = {
   valid_from_bar_open: string;
   active: boolean;
   budget: Budget;
+  economic: EconomicView;
 };
 
 export type OperationalState = {

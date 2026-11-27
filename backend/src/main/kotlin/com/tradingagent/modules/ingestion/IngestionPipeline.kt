@@ -2,7 +2,7 @@ package com.tradingagent.modules.ingestion
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.tradingagent.kernel.QualityScale
+import com.tradingagent.modules.configuration.TradingParameters
 import java.math.BigDecimal
 import java.time.Duration
 import java.time.Instant
@@ -42,9 +42,10 @@ object DeterministicQuality {
         if (!licenseVerified || !contractVerified) {
             return 0
         }
-        return weighted(400, schemaNumerator, schemaDenominator) +
-            weighted(350, provenanceNumerator, provenanceDenominator) +
-            weighted(250, freshnessNumerator, freshnessDenominator)
+        val technical = TradingParameters.current().technical
+        return weighted(technical.qualitySchemaMillis, schemaNumerator, schemaDenominator) +
+            weighted(technical.qualityProvenanceMillis, provenanceNumerator, provenanceDenominator) +
+            weighted(technical.qualityFreshnessMillis, freshnessNumerator, freshnessDenominator)
     }
 
     private fun weighted(weight: Int, numerator: Int, denominator: Int): Int {
@@ -109,7 +110,7 @@ class IngestionPipeline private constructor(
             rows.isEmpty() -> "UNUSABLE"
             conflict -> "CONFLICT"
             stale -> "STALE"
-            quality < QualityScale.THRESHOLD_MILLIS -> "UNUSABLE"
+            quality < TradingParameters.current().technical.qualityThresholdMillis -> "UNUSABLE"
             else -> "HEALTHY"
         }
         return ChannelHealth(
@@ -252,11 +253,14 @@ class IngestionPipeline private constructor(
             providerClass = "none",
         )
 
-        private fun staleAfter(channel: String): Duration = when (channel) {
-            "prices" -> Duration.ofMinutes(2)
-            "news" -> Duration.ofMinutes(10)
-            "macro", "fundamentals", "calendar" -> Duration.ofHours(2)
-            else -> Duration.ZERO
+        private fun staleAfter(channel: String): Duration {
+            val technical = TradingParameters.current().technical
+            return when (channel) {
+                "prices" -> Duration.ofSeconds(technical.pricesStaleSeconds)
+                "news" -> Duration.ofSeconds(technical.newsStaleSeconds)
+                "macro", "fundamentals", "calendar" -> Duration.ofSeconds(technical.slowDataStaleSeconds)
+                else -> Duration.ZERO
+            }
         }
 
         private fun isStale(eventTime: Instant, now: Instant, threshold: Duration): Boolean {
@@ -273,7 +277,8 @@ class IngestionPipeline private constructor(
                         continue
                     }
                     val gap = Duration.between(left.eventTime, right.eventTime).abs()
-                    if (gap <= Duration.ofSeconds(30) && materialPriceGap(left.value, right.value)) {
+                    val align = TradingParameters.current().technical.priceConflictAlignSeconds
+                    if (gap <= Duration.ofSeconds(align) && materialPriceGap(left.value, right.value)) {
                         return true
                     }
                 }
@@ -288,7 +293,7 @@ class IngestionPipeline private constructor(
                 return false
             }
             val scaled = diff.multiply(BigDecimal(10_000))
-            val limit = base.multiply(BigDecimal(10))
+            val limit = base.multiply(BigDecimal(TradingParameters.current().technical.priceConflictBps))
             return scaled.compareTo(limit) > 0
         }
     }

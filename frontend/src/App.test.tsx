@@ -8,7 +8,7 @@ const overview = {
     trading_enabled: false,
     equity: null,
     broker_cash: null,
-    assigned_budget: null,
+    assigned_budget: { minor_units: 50000, currency: "EUR" },
     available_cash: null,
     reserved_cash: null,
     cash_buffer: null,
@@ -26,17 +26,29 @@ const configuration = {
   data: {
     version_id: "11111111-1111-1111-1111-111111111111",
     version_number: 1,
-    author: "system",
+    author: "daniele",
     created_at: "2026-11-27T00:00:00Z",
-    reason: "Parametri economici non impostati.",
+    reason: "Budget 500 EUR. Perdita massima 10% del budget, poi blocco. Orizzonte in giorni. Allowlist large-cap e ETF, solo long, leva 1. Benchmark MSCI World total return. Capability e licenze non verificate.",
     content_sha256: "a".repeat(64),
     valid_from_bar_open: "2026-11-27T00:00:00Z",
     active: true,
     budget: {
-      base_currency: null,
-      assigned_budget_minor: null,
+      base_currency: "EUR",
+      assigned_budget_minor: 50000,
       cash_buffer_minor: null,
       max_positions: null,
+    },
+    economic: {
+      max_loss_bps: 1000,
+      max_loss_action: "block",
+      horizon: "days",
+      allowlist_universe: "large_cap_stocks_and_etfs",
+      allowlist_direction: "long_only",
+      leverage: 1,
+      benchmark_name: "MSCI World",
+      benchmark_return_basis: "total_return",
+      technical_calibratable: true,
+      source_path: "config/observation-v1.yaml",
     },
   },
   meta: { environment: "DEMO", base_currency: null },
@@ -140,6 +152,7 @@ describe("dashboard skeleton", () => {
     expect(await screen.findByTestId("operational-state")).toHaveTextContent("OBSERVATION");
     expect(screen.getByRole("heading", { name: "Panoramica" })).toBeInTheDocument();
     expect(screen.getAllByText("non disponibile").length).toBeGreaterThan(0);
+    expect(screen.getByText("50000 EUR")).toBeInTheDocument();
     expect(await screen.findByTestId("decision")).toHaveTextContent("NO-TRADE");
     expect(screen.getByTestId("decision")).toHaveTextContent("CAPABILITY_UNVERIFIED");
     expect(screen.getByTestId("policy")).toHaveTextContent("MISSING_INTENT");
@@ -149,9 +162,14 @@ describe("dashboard skeleton", () => {
 
   it("shows the active configuration version", async () => {
     renderAt("/configurazione");
-    expect(await screen.findByText("system")).toBeInTheDocument();
+    expect(await screen.findByText("daniele")).toBeInTheDocument();
     expect(screen.getByText("2026-11-27T00:00:00Z")).toBeInTheDocument();
-    expect(screen.getByText("Parametri economici non impostati.")).toBeInTheDocument();
+    expect(screen.getByText(/Budget 500 EUR/)).toBeInTheDocument();
+    expect(screen.getByText("50000 EUR")).toBeInTheDocument();
+    expect(screen.getByText("10%, block")).toBeInTheDocument();
+    expect(screen.getByText("days")).toBeInTheDocument();
+    expect(screen.getByText("MSCI World total_return")).toBeInTheDocument();
+    expect(screen.getByText("config/observation-v1.yaml")).toBeInTheDocument();
   });
 
   it("keeps chat read only", async () => {

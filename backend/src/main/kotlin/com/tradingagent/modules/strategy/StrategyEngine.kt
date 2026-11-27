@@ -1,8 +1,8 @@
 package com.tradingagent.modules.strategy
 
 import com.tradingagent.kernel.OperationalState
-import com.tradingagent.kernel.QualityScale
 import com.tradingagent.kernel.ReasonCode
+import com.tradingagent.modules.configuration.TradingParameters
 import java.security.MessageDigest
 import java.time.Instant
 
@@ -30,7 +30,9 @@ data class StrategyOutcome(
     val evaluatedAt: Instant,
 )
 
-class StrategyEngine {
+class StrategyEngine(
+    private val qualityThresholdMillis: Int = TradingParameters.current().technical.qualityThresholdMillis,
+) {
     fun evaluate(): StrategyOutcome = evaluate(
         DecisionInput(
             operationalState = OperationalState.OBSERVATION,
@@ -51,7 +53,7 @@ class StrategyEngine {
             val channelStale = observed?.stale == true
             val channelConflict = observed?.conflict == true
             val quality = observed?.qualityMillis ?: 0
-            if (accepted == 0 || quality < QualityScale.THRESHOLD_MILLIS) {
+            if (accepted == 0 || quality < qualityThresholdMillis) {
                 missing += name
             }
             if (channelConflict) {

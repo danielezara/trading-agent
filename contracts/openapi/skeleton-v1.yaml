@@ -209,6 +209,37 @@ components:
             max_positions:
               type: integer
               nullable: true
+        economic:
+          type: object
+          properties:
+            max_loss_bps:
+              type: integer
+              nullable: true
+            max_loss_action:
+              type: string
+              nullable: true
+            horizon:
+              type: string
+              nullable: true
+            allowlist_universe:
+              type: string
+              nullable: true
+            allowlist_direction:
+              type: string
+              nullable: true
+            leverage:
+              type: integer
+              nullable: true
+            benchmark_name:
+              type: string
+              nullable: true
+            benchmark_return_basis:
+              type: string
+              nullable: true
+            technical_calibratable:
+              type: boolean
+            source_path:
+              type: string
     OperationalStateEnvelope:
       type: object
       required: [data, meta, warnings]

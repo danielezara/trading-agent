@@ -1,0 +1,127 @@
+# Parametri versionati del conto Demo. Nessuna credenziale e nessun indirizzo di rete.
+# Scala: minor unit della valuta (EUR, 2 decimali: 500.00 = 50000); bps = 1/100 di punto percentuale;
+# millis = millesimi di 1 (1000 = 1.00). Le soglie tecniche sono calibrabili.
+schema: trading-parameters/1
+author: daniele
+reason: "Budget 500 EUR. Perdita massima 10% del budget, poi blocco. Orizzonte in giorni. Allowlist large-cap e ETF, solo long, leva 1. Benchmark MSCI World total return. Capability e licenze non verificate."
+economic:
+  base_currency: EUR
+  currency_scale: 2
+  assigned_budget_amount: "500.00"
+  assigned_budget_minor: 50000
+  max_loss_bps: 1000
+  max_loss_action: block
+  horizon: days
+  allowlist:
+    universe: large_cap_stocks_and_etfs
+    direction: long_only
+    leverage: 1
+    instrument_ids: []
+  benchmark:
+    name: MSCI World
+    return_basis: total_return
+  cash_buffer_minor: null
+  max_positions: null
+  max_drawdown_bps: null
+  risk_per_trade_bps: null
+  aggregate_risk_bps: null
+  instrument_exposure_bps: null
+  sector_exposure_bps: null
+  min_cash_bps: null
+  fx_haircut_bps: null
+  cooldown_seconds: null
+  max_holding_count: null
+technical:
+  calibratable: true
+  tie_break: instrument_id
+  price_poll_seconds: 60
+  decision_bar_seconds: 300
+  order_poll_min_seconds: 15
+  order_poll_max_seconds: 30
+  news_poll_seconds: 300
+  macro_check_seconds: 3600
+  slow_data_refresh_seconds: 86400
+  prices_stale_seconds: 120
+  orders_stale_seconds: 45
+  news_stale_seconds: 600
+  slow_data_stale_seconds: 7200
+  price_conflict_bps: 10
+  price_conflict_spread_multiple: 3
+  price_conflict_align_seconds: 30
+  volume_conflict_bps: 3000
+  quality_schema_millis: 400
+  quality_provenance_millis: 350
+  quality_freshness_millis: 250
+  quality_threshold_millis: 850
+  probabilistic_schema_millis: 250
+  probabilistic_provenance_millis: 200
+  probabilistic_freshness_millis: 150
+  probabilistic_calibration_millis: 400
+  event_quality_threshold_millis: 650
+  weight_quant_millis: 450
+  weight_macro_millis: 150
+  weight_news_millis: 150
+  weight_fundamental_millis: 150
+  weight_liquidity_millis: 100
+  weight_trend_millis: 600
+  weight_momentum_millis: 250
+  weight_reversion_millis: 150
+  buy_score_millis: 650
+  buy_confidence_millis: 650
+  exit_score_millis: 350
+  confirmation_bars: 2
+  stability_scale_millis: 250
+  confidence_agreement_floor_millis: 500
+  confidence_agreement_slope_millis: 500
+  stop_atr_multiple_millis: 2000
+  chase_bps: 25
+  event_blackout_minutes: 30
+  event_key_floor_minutes: 30
+  edge_shrinkage_millis: 500
+  edge_min_observations: 100
+  edge_min_bps: 75
+  edge_to_stop_millis: 250
+  cost_share_of_gross_edge_millis: 500
+  edge_buffer_bps: 25
+  stressed_cost_multiple_millis: 1500
+  slippage_spread_divisor: 2
+  slippage_percentile: 95
+  slippage_atr_coefficient_millis: 100
+  regime_ema_fast_bars: 20
+  regime_ema_slow_bars: 60
+  regime_ema_bars: 200
+  regime_vol_bars: 20
+  regime_atr_bars: 20
+  regime_vol_percentile_favorable: 75
+  regime_vol_percentile_stress: 90
+  regime_lateral_atr_ratio_millis: 1000
+  regime_size_trend_millis: 1000
+  regime_size_lateral_millis: 750
+  regime_size_high_vol_millis: 500
+  regime_buy_score_lateral_millis: 700
+  regime_buy_score_high_vol_millis: 750
+  regime_stress_benchmark_drawdown_bps: 1000
+  ece_bins: 10
+  ece_max_observations: 2000
+  ece_min_observations: 500
+  ece_min_per_family: 50
+  ece_haircut_millis: 100
+  ece_divisor_millis: 100
+  winsor_low_percentile: 5
+  winsor_high_percentile: 95
+  correlation_cluster_millis: 700
+  ewma_half_life_bars: 390
+  covariance_weight_millis: 750
+  covariance_shrinkage_millis: 250
+  covariance_lookback_bars: 1560
+  utility_floor_bps: 1
+  rebalance_band_of_target_millis: 200
+  rebalance_band_floor_bps: 200
+  utility_buffer_bps: 25
+  sizing_confidence_mid_millis: 750
+  sizing_confidence_high_millis: 900
+  sizing_confidence_full_millis: 1000
+  llm_temperature_millis: 0
+  decision_deadline_seconds: 30
+  reconciliation_age_seconds: 45
+  alert_ack_seconds: 60

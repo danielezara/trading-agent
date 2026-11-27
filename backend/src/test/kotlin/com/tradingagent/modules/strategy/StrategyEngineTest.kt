@@ -2,6 +2,7 @@ package com.tradingagent.modules.strategy
 
 import com.tradingagent.kernel.OperationalState
 import com.tradingagent.kernel.ReasonCode
+import com.tradingagent.modules.configuration.TradingParameters
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import java.time.Instant
@@ -19,6 +20,8 @@ class StrategyEngineTest {
         assertEquals(first.inputHash, second.inputHash)
         assertEquals(first.reasonCodes, second.reasonCodes)
         assertEquals(64, first.inputHash.length)
+        assertEquals("EUR", TradingParameters.current().economic.baseCurrency)
+        assertEquals(50_000L, TradingParameters.current().economic.assignedBudgetMinor)
     }
 
     @Test
