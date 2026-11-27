@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { getJson } from "./api/client";
 import { assertSkeletonApiBase } from "./api/policy";
-import type { AuditChain, Configuration, DataChannel, DataHealth, Decision, Envelope, Money, OperationalState, Overview } from "./api/types";
+import type { AuditChain, ChatTurn, Configuration, DataChannel, DataHealth, Decision, Envelope, Money, OperationalState, Overview } from "./api/types";
 import "./styles.css";
 
 const NAV = [
@@ -476,20 +476,55 @@ function Page({ title }: { title: string }) {
 }
 
 function ChatPage() {
+  const [message, setMessage] = useState("");
+  const [answer, setAnswer] = useState<ChatTurn | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    const question = message.trim();
+    if (!question) {
+      return;
+    }
+    setError(null);
+    try {
+      const body = await getJson<Envelope<ChatTurn>>(`/api/v1/chat?q=${encodeURIComponent(question)}`);
+      setAnswer(body.data);
+    } catch {
+      setAnswer(null);
+      setError("Lettura chat non riuscita. Nessun ordine è stato inviato.");
+    }
+  }
+
   return (
     <section className="panel">
       <h1>Chat</h1>
-      <p>
-        Canale informativo non collegato. Il testo libero non crea ordini e non
-        esegue comandi.
-      </p>
-      <label htmlFor="chat-input">Messaggio</label>
-      <textarea
-        id="chat-input"
-        className="chat-box"
-        disabled
-        placeholder="Chat non disponibile nello scheletro"
-      />
+      <p>Canale informativo sullo stato locale. Il testo libero non crea ordini e non esegue comandi.</p>
+      <form onSubmit={onSubmit}>
+        <label htmlFor="chat-input">Messaggio</label>
+        <textarea
+          id="chat-input"
+          className="chat-box"
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          placeholder="Chiedi della decisione, delle posizioni o dei dati"
+        />
+        <button type="submit">Chiedi</button>
+      </form>
+      {error ? <p role="alert">{error}</p> : null}
+      {answer ? (
+        <>
+          <p data-testid="chat-answer">{answer.text}</p>
+          <p data-testid="chat-executed">{answer.executed ? "eseguito" : "nessuna azione"}</p>
+          {answer.citations.length > 0 ? (
+            <ol data-testid="chat-citations">
+              {answer.citations.map((citation) => (
+                <li key={citation.citation_id}>{`${citation.label}: ${citation.resource_id}`}</li>
+              ))}
+            </ol>
+          ) : null}
+        </>
+      ) : null}
     </section>
   );
 }

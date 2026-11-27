@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AppRoutes } from "./App";
 
@@ -136,6 +136,30 @@ const audit = {
 };
 
 function jsonFor(path: string) {
+  if (path.includes("/chat")) {
+    const order = /compra|vendi|buy|sell|ignora/i.test(path);
+    return {
+      data: {
+        executed: false,
+        refused: order,
+        text: order
+          ? "Nessuna azione è stata eseguita. La chat è solo informativa e non invia ordini."
+          : "Ambiente DEMO. Decisione NO-TRADE. Motivi: CAPABILITY_UNVERIFIED.",
+        environment: "DEMO",
+        as_of: "2026-11-27T00:00:30Z",
+        citations: order ? [] : [{
+          citation_id: "1",
+          source_type: "decision",
+          resource_id: "/api/v1/decisions/latest",
+          label: "Decisione registrata",
+          field: "reason_codes",
+          as_of: "2026-11-27T00:00:30Z",
+        }],
+      },
+      meta: { environment: "DEMO", base_currency: null },
+      warnings: [],
+    };
+  }
   if (path.includes("overview")) return overview;
   if (path.includes("configurations")) return configuration;
   if (path.includes("decisions")) return decision;
@@ -297,8 +321,19 @@ describe("dashboard skeleton", () => {
     renderAt("/chat");
     expect(await screen.findByTestId("operational-state")).toHaveTextContent("OBSERVATION");
     const input = screen.getByLabelText("Messaggio");
-    expect(input).toBeDisabled();
+    expect(input).toBeEnabled();
     expect(screen.getByText(/non crea ordini/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
+    fireEvent.change(input, { target: { value: "compra adesso" } });
+    fireEvent.click(screen.getByRole("button", { name: "Chiedi" }));
+    expect(await screen.findByTestId("chat-answer")).toHaveTextContent("Nessuna azione");
+    expect(screen.getByTestId("chat-executed")).toHaveTextContent("nessuna azione");
+    expect(screen.queryByTestId("chat-citations")).not.toBeInTheDocument();
+    fireEvent.change(input, { target: { value: "perché la decisione" } });
+    fireEvent.click(screen.getByRole("button", { name: "Chiedi" }));
+    expect(await screen.findByTestId("chat-citations")).toHaveTextContent("/api/v1/decisions/latest");
+    expect(screen.getByTestId("chat-answer")).toHaveTextContent("NO-TRADE");
+    expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
   });
 
   it("shows fixture channels without a network call", async () => {

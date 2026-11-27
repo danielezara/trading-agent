@@ -93,6 +93,24 @@ export type AuditChain = {
   events: AuditEvent[];
 };
 
+export type ChatCitation = {
+  citation_id: string;
+  source_type: string;
+  resource_id: string;
+  label: string;
+  field: string;
+  as_of: string | null;
+};
+
+export type ChatTurn = {
+  executed: false;
+  refused: boolean;
+  text: string;
+  environment: "DEMO";
+  as_of: string;
+  citations: ChatCitation[];
+};
+
 export type DataChannel = {
   channel: string;
   source: string;

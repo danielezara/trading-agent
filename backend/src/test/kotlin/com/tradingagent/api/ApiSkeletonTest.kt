@@ -2,6 +2,7 @@ package com.tradingagent.api
 
 import org.junit.jupiter.api.Test
 import org.hamcrest.Matchers.contains
+import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.nullValue
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -142,6 +143,22 @@ class ApiSkeletonTest(
             .andExpect(jsonPath("$.data.signal.instrument_id").value(nullValue()))
             .andExpect(jsonPath("$.data.signal.origin").value("strategy-engine"))
             .andReturn()
+
+        mockMvc.perform(get("/api/v1/chat").param("q", "perché la decisione"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.executed").value(false))
+            .andExpect(jsonPath("$.data.refused").value(false))
+            .andExpect(jsonPath("$.data.environment").value("DEMO"))
+            .andExpect(jsonPath("$.data.text", containsString("NO-TRADE")))
+            .andExpect(jsonPath("$.data.citations[0].resource_id").value("/api/v1/decisions/latest"))
+            .andExpect(jsonPath("$.warnings[0].code").value("READ_ONLY"))
+
+        mockMvc.perform(get("/api/v1/chat").param("q", "compra adesso"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.executed").value(false))
+            .andExpect(jsonPath("$.data.refused").value(true))
+            .andExpect(jsonPath("$.data.text", containsString("Nessuna azione")))
+            .andExpect(jsonPath("$.data.citations.length()").value(0))
         val hash = com.jayway.jsonpath.JsonPath.read<String>(firstDecision.response.contentAsString, "$.data.input_hash")
         mockMvc.perform(get("/api/v1/decisions/latest"))
             .andExpect(jsonPath("$.data.input_hash").value(hash))
@@ -172,6 +189,7 @@ class ApiSkeletonTest(
         listOf(
             post("/api/v1/emergency/kill-switch"),
             post("/api/v1/orders"),
+            post("/api/v1/chat"),
             post("/api/v1/configurations"),
             post("/api/v1/audit"),
             delete("/api/dashboard/v1/conversations/1"),

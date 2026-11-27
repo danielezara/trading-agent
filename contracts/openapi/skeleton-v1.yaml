@@ -94,6 +94,23 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DataHealthEnvelope"
+  /api/v1/chat:
+    get:
+      operationId: askChat
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            maxLength: 400
+      responses:
+        "200":
+          description: Read-only answer from local decision, positions and data health
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatEnvelope"
   /api/v1/decisions/latest:
     get:
       operationId: latestDecision
@@ -641,6 +658,54 @@ components:
                     nullable: true
                   license:
                     type: string
+                    nullable: true
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    ChatEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [executed, refused, text, environment, citations]
+          properties:
+            executed:
+              type: boolean
+              enum: [false]
+            refused:
+              type: boolean
+            text:
+              type: string
+            environment:
+              type: string
+              enum: [DEMO]
+            as_of:
+              type: string
+              format: date-time
+            citations:
+              type: array
+              items:
+                type: object
+                required: [citation_id, source_type, resource_id, label, field]
+                properties:
+                  citation_id:
+                    type: string
+                  source_type:
+                    type: string
+                    enum: [decision, positions, data-health]
+                  resource_id:
+                    type: string
+                  label:
+                    type: string
+                  field:
+                    type: string
+                  as_of:
+                    type: string
+                    format: date-time
                     nullable: true
         meta:
           $ref: "#/components/schemas/Meta"
