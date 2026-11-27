@@ -30,12 +30,12 @@ describe("demo read", () => {
   });
 
   it("reads cash and a public label from a demo portfolio", async () => {
-    const calls: Array<{ url: string; method: string; headers: Record<string, string> }> = [];
+    const calls: Array<{ url: string; method: string; cache: string; headers: Record<string, string> }> = [];
     const view = await readDemoOverview({
       env: keys,
       now: () => new Date("2026-11-27T08:00:00Z"),
       fetchImpl: async (url, init) => {
-        calls.push({ url, method: init.method, headers: init.headers });
+        calls.push({ url, method: init.method, cache: init.cache, headers: init.headers });
         return json(200, {
           clientPortfolio: { credit: 280.35, accountCurrencyId: 1, username: "demo.user", positions: [] },
         });
@@ -44,6 +44,7 @@ describe("demo read", () => {
     assert.equal(calls.length, 1);
     assert.equal(calls[0]?.url, DEMO_PORTFOLIO_URL);
     assert.equal(calls[0]?.method, "GET");
+    assert.equal(calls[0]?.cache, "no-store");
     assert.equal(calls[0]?.url.includes("/real/"), false);
     assert.equal(view.connected, true);
     assert.equal(view.accountLabel, "demo.user");
@@ -116,6 +117,29 @@ describe("demo read", () => {
     ]);
   });
 
+  it("reads the portfolio again when the page asks again", async () => {
+    let calls = 0;
+    const fetchImpl: Parameters<typeof readDemoOverview>[0]["fetchImpl"] = async () => {
+      calls += 1;
+      return json(200, {
+        clientPortfolio: {
+          credit: 10,
+          accountCurrencyId: 1,
+          positions: Array.from({ length: calls }, (_, index) => ({
+            instrumentID: index + 1,
+            units: 1,
+            amount: 1,
+          })),
+        },
+      });
+    };
+    const first = await readDemoOverview({ env: keys, fetchImpl });
+    const second = await readDemoOverview({ env: keys, fetchImpl });
+    assert.equal(first.positions?.length, 1);
+    assert.equal(second.positions?.length, 2);
+    assert.equal(calls, 2);
+  });
+
   it("ships no browser secret prefix and no order method", () => {
     const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
     const route = readFileSync(new URL("../app/api/overview/route.ts", import.meta.url), "utf8");
@@ -125,6 +149,8 @@ describe("demo read", () => {
     assert.equal(/\bPOST\b/.test(route), false);
     assert.match(route, /export async function GET/);
     assert.equal(page.includes("use client"), false);
+    assert.equal(page.includes("fetchCache = \"force-no-store\""), true);
+    assert.equal(route.includes("fetchCache = \"force-no-store\""), true);
     assert.equal(page.includes("Posizioni Demo"), true);
     assert.equal(page.includes("Nessuna posizione"), true);
   });

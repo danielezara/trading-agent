@@ -60,4 +60,38 @@ class DashboardReadModelTest {
         assertFalse(gate.allowsActive())
         assertFalse(snapshot.tradingEnabled)
     }
+
+    @Test
+    fun `a later overview read sees a position opened after the previous read`() {
+        val bodies = ArrayDeque(
+            listOf(
+                """{"clientPortfolio":{"credit":10,"accountCurrencyId":1,"positions":[{"instrumentID":1,"units":1,"amount":1}]}}""",
+                """{"clientPortfolio":{"credit":10,"accountCurrencyId":1,"positions":[{"instrumentID":1,"units":1,"amount":1},{"instrumentID":2,"units":2,"amount":2}]}}""",
+            ),
+        )
+        var calls = 0
+        val probe = CapabilityProbe(
+            evidenceGate = EvidenceGate(),
+            keys = {
+                DemoKeyMaterial.fromEnvironment(
+                    mapOf("ETORO_DEMO_API_KEY" to "test-api-key", "ETORO_DEMO_USER_KEY" to "test-user-key"),
+                )
+            },
+            transport = HttpGet { _, _ ->
+                calls += 1
+                InboundHttp(status = 200, retryAfterSeconds = null, body = bodies.removeFirst())
+            },
+            clock = { Instant.parse("2026-11-27T00:00:00Z") },
+        )
+        val model = DashboardReadModel(
+            operationalStateService = OperationalStateService(clock = { Instant.parse("2026-11-27T00:00:00Z") }),
+            ledger = Ledger(),
+            configurationService = ConfigurationService(),
+            capabilityProbe = probe,
+        )
+
+        assertEquals(listOf("1"), model.portfolio().positions?.map { it.instrumentId })
+        assertEquals(listOf("1", "2"), model.portfolio().positions?.map { it.instrumentId })
+        assertEquals(2, calls)
+    }
 }

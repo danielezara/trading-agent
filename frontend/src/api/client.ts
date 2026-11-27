@@ -9,6 +9,7 @@ export async function getJson<T>(path: string): Promise<T> {
     method: "GET",
     headers: { Accept: "application/json" },
     credentials: "omit",
+    cache: "no-store",
   });
   if (!response.ok) {
     throw new Error(`Lettura API non riuscita (${response.status})`);

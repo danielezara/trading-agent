@@ -26,7 +26,7 @@ export type DemoOverview = {
   probeErrorClass: string | null;
 };
 
-type FetchLike = (input: string, init: { method: "GET"; headers: Record<string, string>; redirect: "manual"; signal: AbortSignal }) => Promise<{
+type FetchLike = (input: string, init: { method: "GET"; headers: Record<string, string>; redirect: "manual"; signal: AbortSignal; cache: "no-store" }) => Promise<{
   status: number;
   headers: { get(name: string): string | null };
   text(): Promise<string>;
@@ -112,6 +112,7 @@ async function get(fetchImpl: FetchLike, apiKey: string, userKey: string) {
     const response = await fetchImpl(DEMO_PORTFOLIO_URL, {
       method: "GET",
       redirect: "manual",
+      cache: "no-store",
       signal: AbortSignal.timeout(5000),
       headers: {
         Accept: "application/json",

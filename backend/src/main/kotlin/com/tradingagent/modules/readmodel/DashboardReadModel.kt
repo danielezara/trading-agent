@@ -47,7 +47,7 @@ class DashboardReadModel(
     fun portfolio(): PortfolioSnapshot {
         val configuration = configurationService.active()
         val budget = configuration.budget
-        val observed = capabilityProbe.current()
+        val observed = capabilityProbe.refresh()
         val brokerCash = observed.brokerCash
         val quote = ledger.quote(
             CashInputs(

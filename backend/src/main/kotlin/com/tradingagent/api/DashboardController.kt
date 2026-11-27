@@ -7,6 +7,7 @@ import com.tradingagent.modules.brokerread.ObservedOrder
 import com.tradingagent.modules.brokerread.ObservedPosition
 import com.tradingagent.modules.ledger.Ledger
 import com.tradingagent.modules.readmodel.DashboardReadModel
+import jakarta.servlet.http.HttpServletResponse
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -42,7 +43,8 @@ class DashboardController(
     )
 
     @GetMapping("/overview")
-    fun overview(): ApiEnvelope<OverviewData> {
+    fun overview(response: HttpServletResponse): ApiEnvelope<OverviewData> {
+        response.setHeader("Cache-Control", "no-store")
         val snapshot = readModel.portfolio()
         return ApiEnvelope(
             data = OverviewData(

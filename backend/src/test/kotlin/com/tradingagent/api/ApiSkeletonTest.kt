@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
@@ -63,6 +64,7 @@ class ApiSkeletonTest(
     fun `overview does not invent portfolio numbers`() {
         mockMvc.perform(get("/api/dashboard/v1/overview"))
             .andExpect(status().isOk)
+            .andExpect(header().string("Cache-Control", "no-store"))
             .andExpect(jsonPath("$.data.operational_state").value("OBSERVATION"))
             .andExpect(jsonPath("$.data.trading_enabled").value(false))
             .andExpect(jsonPath("$.data.equity").value(nullValue()))

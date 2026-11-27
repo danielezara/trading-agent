@@ -1,6 +1,7 @@
 import { displayAccount, formatCash, readDemoOverview, type DemoPosition } from "../lib/demo-read";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export default async function Page() {
   const overview = await readDemoOverview({
