@@ -100,8 +100,8 @@ function PositionCard({ position, live }: { position: ProgramPosition; live: Tic
     <article className="card">
       <div className="card-top">
         <div>
-          <p className="symbol">{position.symbol}</p>
-          <p className="name">{position.name ?? "Nome non disponibile"}</p>
+          <p className="symbol">{position.symbol || position.name || "Nome non disponibile"}</p>
+          <p className="name">{position.symbol && position.name ? position.name : position.name ? `Strumento ${position.instrumentId}` : "Nome non disponibile"}</p>
         </div>
         <p className="order">Ordine {position.orderId}</p>
       </div>
@@ -119,7 +119,7 @@ function PositionCard({ position, live }: { position: ProgramPosition; live: Tic
 
 function BenchmarkCard({ book, live }: { book: ProgramBook; live: Tick | null }) {
   const benchmark = book.benchmark;
-  const botBps = book.positions?.[0] ? changeBps(book.positions[0].openRate, book.positions[0].bid) : null;
+  const botBps = bookMove(book);
   return (
     <article className="card">
       <div className="card-top">
@@ -176,6 +176,18 @@ function Metric({ label, value, detail, tone }: { label: string; value: string; 
       <span>{detail}</span>
     </article>
   );
+}
+
+function bookMove(book: ProgramBook): number | null {
+  if (book.valueUsdMinor === null || book.changeUsdMinor === null) {
+    return null;
+  }
+  const cost = book.valueUsdMinor - book.changeUsdMinor;
+  if (cost <= 0) {
+    return null;
+  }
+  const bps = Math.round((book.changeUsdMinor / cost) * 10_000);
+  return Number.isSafeInteger(bps) ? bps : null;
 }
 
 function toneOf(minor: number | null): string {

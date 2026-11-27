@@ -1,5 +1,6 @@
 import { BotPortfolio } from "./bot-portfolio";
 import { displayAccount, formatCash, readDemoOverview, readProgramBook, type CashMovement, type ClosedTrade } from "../lib/demo-read";
+import { serverFetch } from "../lib/server-fetch";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -8,12 +9,12 @@ export default async function Page() {
   const [overview, book] = await Promise.all([
     readDemoOverview({
       env: process.env,
-      fetchImpl: fetch,
+      fetchImpl: serverFetch,
       quotes: false,
     }),
     readProgramBook({
       env: process.env,
-      fetchImpl: fetch,
+      fetchImpl: serverFetch,
     }),
   ]);
   const rows = [

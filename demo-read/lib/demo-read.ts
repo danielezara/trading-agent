@@ -155,7 +155,7 @@ async function enrichPositions(
     const quote = rates.get(position.instrumentId);
     return {
       ...position,
-      displayName: names.get(position.instrumentId) ?? null,
+      displayName: names.get(position.instrumentId)?.name ?? null,
       quotePrice: quote?.price ?? null,
       quoteTime: quote?.time ?? null,
     };
@@ -412,16 +412,17 @@ export function parseRates(body: string): Map<string, { price: string | null; ti
   return parsed;
 }
 
-export function parseInstrumentNames(body: string): Map<string, string> {
+export function parseInstrumentNames(body: string): Map<string, { name: string; symbol: string | null }> {
   const rows = arrayField(body, "instrumentDisplayDatas");
-  const names = new Map<string, string>();
+  const names = new Map<string, { name: string; symbol: string | null }>();
   for (const item of rows) {
     const instrumentId = instrumentIdOf(item.instrumentID);
     const name = typeof item.instrumentDisplayName === "string" ? item.instrumentDisplayName.trim() : "";
+    const symbol = typeof item.symbolFull === "string" && /^[A-Z0-9.]{1,16}$/.test(item.symbolFull.trim()) ? item.symbolFull.trim() : null;
     if (!instrumentId || instrumentId === "0" || !name) {
       continue;
     }
-    names.set(instrumentId, name);
+    names.set(instrumentId, { name, symbol });
   }
   return names;
 }
@@ -644,7 +645,7 @@ export async function readProgramBook(options: ReadOptions): Promise<ProgramBook
   const resolved = search === null ? null : parseBenchmarkId(search, BENCHMARK_SYMBOL);
   const ids = [...new Set([...selected.map((row) => row.instrumentId), ...(resolved ? [resolved.instrumentId] : [])])];
   const quotes = new Map<string, { price: string | null; time: string | null }>();
-  const names = new Map<string, string>();
+  const names = new Map<string, { name: string; symbol: string | null }>();
   if (ids.length > 0) {
     const query = `instrumentIds=${ids.join(",")}`;
     const [ratesBody, namesBody] = await Promise.all([
@@ -654,13 +655,14 @@ export async function readProgramBook(options: ReadOptions): Promise<ProgramBook
     for (const [id, quote] of parseRates(ratesBody ?? "")) {
       quotes.set(id, quote);
     }
-    for (const [id, name] of parseInstrumentNames(namesBody ?? "")) {
-      names.set(id, name);
+    for (const [id, label] of parseInstrumentNames(namesBody ?? "")) {
+      names.set(id, label);
     }
   }
   const positions = selected.map((row) => {
     const quote = quotes.get(row.instrumentId);
-    return buildPosition(row, quote?.price ?? null, quote?.time ?? null, names.get(row.instrumentId) ?? null, eurUsdRate);
+    const label = names.get(row.instrumentId);
+    return buildPosition(row, quote?.price ?? null, quote?.time ?? null, label?.name ?? null, eurUsdRate, label?.symbol ?? null);
   });
   const openAt = selected.map((row) => row.openAt).filter((value): value is string => value !== null).sort()[0] ?? null;
   const benchmark = await benchmarkQuote(options.fetchImpl, apiKey, userKey, sleep, resolved, quotes, openAt);

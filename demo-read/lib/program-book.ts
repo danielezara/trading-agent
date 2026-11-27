@@ -1,9 +1,8 @@
 export const BUDGET_EUR_MINOR = 50_000;
 export const BENCHMARK_SYMBOL = "SWDA.L";
 
-export const PROGRAM_ORDERS = [
-  { orderId: "397030666", instrumentId: "1001", symbol: "AAPL" },
-] as const;
+/** Primo ordine del programma: AAPL, 2026-11-27T15:13:27.72Z. Prima di questo istante il conto ha solo le posizioni preesistenti. */
+export const PROGRAM_FROM_MS = Date.parse("2026-11-27T15:13:27.72Z");
 
 export type Tick = "up" | "down" | "flat";
 
@@ -243,39 +242,49 @@ export function selectProgramPositions(body: string): RawPosition[] | null {
   if (!isRecord(root) || !isRecord(root.clientPortfolio)) {
     return null;
   }
-  const rows = root.clientPortfolio.positions;
-  if (rows == null) {
-    return [];
-  }
-  if (!Array.isArray(rows)) {
+  const positions = root.clientPortfolio.positions;
+  if (positions != null && !Array.isArray(positions)) {
     return null;
   }
-  const known = new Map<string, (typeof PROGRAM_ORDERS)[number]>(PROGRAM_ORDERS.map((order) => [order.orderId, order]));
-  const selected: RawPosition[] = [];
-  for (const item of rows) {
-    if (!isRecord(item)) {
-      continue;
-    }
-    const orderId = positiveId(item.orderID);
-    const instrumentId = positiveId(item.instrumentID);
-    if (!orderId || !instrumentId) {
-      continue;
-    }
-    const order = known.get(orderId);
-    if (!order || order.instrumentId !== instrumentId) {
-      continue;
-    }
-    selected.push({
-      orderId,
-      instrumentId,
-      symbol: order.symbol,
-      units: decimalText(item.units),
-      openRate: decimalText(item.openRate),
-      openAt: typeof item.openDateTime === "string" && !Number.isNaN(Date.parse(item.openDateTime)) ? item.openDateTime : null,
-      costUsdMinor: moneyMinor(item.initialAmountInDollars),
-    });
+  const orders = root.clientPortfolio.ordersForOpen;
+  if (orders != null && !Array.isArray(orders)) {
+    return null;
   }
-  return selected;
+  const byOrder = new Map<string, RawPosition>();
+  for (const item of positions ?? []) {
+    const row = programRow(item);
+    if (row) {
+      byOrder.set(row.orderId, row);
+    }
+  }
+  for (const item of orders ?? []) {
+    const row = programRow(item);
+    if (row && !byOrder.has(row.orderId)) {
+      byOrder.set(row.orderId, row);
+    }
+  }
+  return [...byOrder.values()].sort((left, right) => (left.openAt ?? "").localeCompare(right.openAt ?? ""));
+}
+
+function programRow(item: unknown): RawPosition | null {
+  if (!isRecord(item)) {
+    return null;
+  }
+  const orderId = positiveId(item.orderID);
+  const instrumentId = positiveId(item.instrumentID);
+  const openAt = typeof item.openDateTime === "string" && !Number.isNaN(Date.parse(item.openDateTime)) ? item.openDateTime : null;
+  if (!orderId || !instrumentId || openAt === null || Date.parse(openAt) < PROGRAM_FROM_MS) {
+    return null;
+  }
+  return {
+    orderId,
+    instrumentId,
+    symbol: "",
+    units: decimalText(item.units),
+    openRate: decimalText(item.openRate),
+    openAt,
+    costUsdMinor: moneyMinor(item.initialAmountInDollars),
+  };
 }
 
 export function buildPosition(
@@ -284,13 +293,14 @@ export function buildPosition(
   quoteTime: string | null,
   name: string | null,
   eurUsdRate: string | null,
+  symbol: string | null = null,
 ): ProgramPosition {
   const valueUsdMinor = productMinor(row.units, bid);
   const changeUsdMinor = valueUsdMinor !== null && row.costUsdMinor !== null ? valueUsdMinor - row.costUsdMinor : null;
   return {
     orderId: row.orderId,
     instrumentId: row.instrumentId,
-    symbol: row.symbol,
+    symbol: symbol ?? row.symbol,
     name,
     units: row.units,
     openRate: row.openRate,

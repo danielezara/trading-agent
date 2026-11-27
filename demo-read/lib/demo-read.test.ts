@@ -287,8 +287,12 @@ describe("demo read", () => {
               credit: 10,
               accountCurrencyId: 1,
               positions: [
-                { instrumentID: 1002, orderID: 1, units: 1, amount: 50, initialAmountInDollars: 50, openRate: 10, openDateTime: "2026-11-27T15:13:27.72Z" },
+                { instrumentID: 1005, orderID: 9, units: 1, amount: 50, initialAmountInDollars: 50, openRate: 10, openDateTime: "2021-03-09T15:18:38.233Z" },
                 { instrumentID: 1001, orderID: 397030666, units: 0.229735, amount: 82.08, initialAmountInDollars: 82.08, openRate: 357.27, openDateTime: "2026-11-27T15:13:27.72Z" },
+              ],
+              ordersForOpen: [
+                { instrumentID: 1002, orderID: 397065869, amount: 82.01, openDateTime: "2026-11-27T20:55:47.463Z" },
+                { instrumentID: 1137, orderID: 880000001, amount: 82, openDateTime: "2026-11-27T21:05:15.697Z" },
               ],
             },
           });
@@ -300,34 +304,55 @@ describe("demo read", () => {
           return json(200, { items: [{ internalSymbolFull: "SWDA.L", instrumentId: 3040, internalInstrumentId: 3040, isHiddenFromClient: false, internalInstrumentDisplayName: "iShares Core MSCI World UCITS ETF" }] });
         }
         if (url.startsWith("https://public-api.etoro.com/api/v1/market-data/instruments/rates")) {
-          assert.equal(url.includes("1002"), false);
+          assert.equal(url.includes("1005"), false);
           assert.equal(url.includes("1001"), true);
+          assert.equal(url.includes("1002"), true);
+          assert.equal(url.includes("1137"), true);
           assert.equal(url.includes("3040"), true);
-          return json(200, { rates: [{ instrumentID: 1001, bid: 358.12, date: "2026-11-27T15:59:00Z" }, { instrumentID: 3040, bid: 110.5, date: "2026-11-27T15:59:00Z" }] });
+          return json(200, {
+            rates: [
+              { instrumentID: 1001, bid: 358.12, date: "2026-11-27T15:59:00Z" },
+              { instrumentID: 1002, bid: 320.5, date: "2026-11-27T15:59:00Z" },
+              { instrumentID: 1137, bid: 180, date: "2026-11-27T15:59:00Z" },
+              { instrumentID: 3040, bid: 110.5, date: "2026-11-27T15:59:00Z" },
+            ],
+          });
         }
         if (url.includes("/history/candles/")) {
           assert.equal(url.includes("/3040/"), true);
           return json(200, { interval: "FiveMinutes", candles: [{ candles: [{ fromDate: "2026-11-27T15:05:00Z", close: 110 }] }] });
         }
-        return json(200, { instrumentDisplayDatas: [{ instrumentID: 1001, instrumentDisplayName: "Apple" }] });
+        return json(200, {
+          instrumentDisplayDatas: [
+            { instrumentID: 1001, instrumentDisplayName: "Apple", symbolFull: "AAPL" },
+            { instrumentID: 1002, instrumentDisplayName: "Alphabet", symbolFull: "GOOG" },
+            { instrumentID: 1137, instrumentDisplayName: "NVIDIA Corporation", symbolFull: "NVDA" },
+          ],
+        });
       },
     });
     assert.equal(book.connected, true);
-    assert.equal(book.positions?.length, 1);
+    assert.equal(book.positions?.length, 3);
     assert.equal(book.positions?.[0]?.symbol, "AAPL");
     assert.equal(book.positions?.[0]?.orderId, "397030666");
     assert.equal(book.positions?.[0]?.sinceOpen, "up");
     assert.equal(book.positions?.[0]?.bid, "358.12");
-    assert.notEqual(book.valueEurMinor, null);
+    assert.equal(book.positions?.[1]?.symbol, "GOOG");
+    assert.equal(book.positions?.[1]?.orderId, "397065869");
+    assert.equal(book.positions?.[1]?.bid, "320.5");
+    assert.equal(book.positions?.[1]?.valueEurMinor, null);
+    assert.equal(book.positions?.[2]?.symbol, "NVDA");
+    assert.equal(book.positions?.[2]?.orderId, "880000001");
+    assert.equal(book.valueEurMinor, null);
     assert.equal(book.benchmark.resolved, true);
     assert.equal(book.benchmark.instrumentId, "3040");
     assert.equal(book.benchmark.referencePrice, "110");
     assert.equal(book.benchmark.sinceReference, "up");
-    assert.equal(calls.some((url) => url.includes("1002")), false);
+    assert.equal(calls.some((url) => url.includes("1005")), false);
 
     const hidden = parseBenchmarkId(JSON.stringify({ items: [{ internalSymbolFull: "SWDA.L", instrumentId: 3040, internalInstrumentId: 9, isHiddenFromClient: false }] }), "SWDA.L");
     assert.equal(hidden, null);
-    assert.equal(selectProgramPositions(JSON.stringify({ clientPortfolio: { positions: [{ instrumentID: 1005, orderID: 9 }] } }))?.length, 0);
+    assert.equal(selectProgramPositions(JSON.stringify({ clientPortfolio: { positions: [{ instrumentID: 1005, orderID: 9, openDateTime: "2021-03-09T15:18:38.233Z" }] } }))?.length, 0);
     assert.equal(parseReferenceClose(JSON.stringify({ interval: "FiveMinutes", candles: [] }), null), null);
     assert.equal(tick("10", null), null);
     assert.equal(changeBps("110", "110.5"), 45);
