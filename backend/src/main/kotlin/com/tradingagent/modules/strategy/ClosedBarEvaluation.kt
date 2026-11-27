@@ -15,6 +15,8 @@ data class BarBook(
     val instruments: List<InstrumentBars>,
     val reportedLossMinor: Long? = null,
     val reportedLossCurrency: String? = null,
+    val payloadRates: List<PayloadRate> = emptyList(),
+    val entriesBlocked: Boolean = false,
 )
 
 object ClosedBarEvaluation {
@@ -26,11 +28,15 @@ object ClosedBarEvaluation {
     ): RuleDecision {
         val instruments = book.instruments.sortedBy { it.instrumentId }
         if (instruments.isEmpty()) {
-            return ClosedBarPolicy.decide(input(now, null, "unknown", emptyList(), book, economic, technical))
+            return ClosedBarPolicy.decide(
+                input(now, null, "unknown", emptyList(), book, economic, technical),
+                book.entriesBlocked,
+            )
         }
         val pairs = instruments.map { instrument ->
             instrument to ClosedBarPolicy.decide(
                 input(now, instrument.instrumentId, instrument.assetClass, instrument.bars, book, economic, technical),
+                book.entriesBlocked,
             )
         }
         val chosen = pairs.firstOrNull { it.second.action == "ENTER" }
@@ -63,6 +69,7 @@ object ClosedBarEvaluation {
             book.reportedLossMinor,
             book.reportedLossCurrency,
             economic,
+            book.payloadRates,
         ),
         openPositions = book.openPositions,
         lastExitAt = null,

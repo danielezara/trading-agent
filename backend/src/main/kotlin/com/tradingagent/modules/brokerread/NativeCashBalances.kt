@@ -13,9 +13,20 @@ data class BrokerCashBalance(
     val currency: String,
 )
 
+data class ReportedRate(
+    val currency: String,
+    val displayCurrency: String,
+    val rate: String,
+)
+
 fun interface CashBalanceRead {
     /** Null when the balances GET is not attempted or does not return a list. */
     fun read(): List<BrokerCashBalance>?
+}
+
+fun interface ReportedRateSource {
+    /** Empty when the balances GET is not attempted or has no cross rate. */
+    fun load(): List<ReportedRate>
 }
 
 object NativeCashBalances {
@@ -84,6 +95,36 @@ object NativeCashBalances {
         return parsed
     }
 
+    /** Cross rates already on the balances payload. A row quoted in its own currency is not a rate. */
+    fun rates(body: String): List<ReportedRate> {
+        val root = try {
+            mapper.readTree(body)
+        } catch (_: Exception) {
+            return emptyList()
+        }
+        if (!root.isObject) {
+            return emptyList()
+        }
+        val rows = root.get("balances") ?: return emptyList()
+        if (!rows.isArray) {
+            return emptyList()
+        }
+        val parsed = mutableListOf<ReportedRate>()
+        for (row in rows) {
+            if (!row.isObject) {
+                continue
+            }
+            val currency = text(row.get("currency")) ?: continue
+            val display = text(row.get("displayCurrency")) ?: continue
+            if (!currencyCode.matches(currency) || !currencyCode.matches(display) || currency == display) {
+                continue
+            }
+            val rate = rateText(row.get("exchangeRate")) ?: continue
+            parsed += ReportedRate(currency, display, rate)
+        }
+        return parsed
+    }
+
     private fun text(node: JsonNode?): String? {
         if (node == null || !node.isTextual) {
             return null
@@ -101,6 +142,35 @@ object NativeCashBalances {
             return null
         }
         return scaled.longValueExact()
+    }
+
+    private fun rateText(node: JsonNode?): String? {
+        if (node == null || node.isNull || !node.isNumber) {
+            return null
+        }
+        val rate = node.decimalValue()
+        if (rate.signum() <= 0) {
+            return null
+        }
+        return rate.stripTrailingZeros().toPlainString()
+    }
+}
+
+class DemoReportedRateRead(
+    private val keys: () -> DemoKeyMaterial?,
+    private val transport: HttpGet,
+) : ReportedRateSource {
+    override fun load(): List<ReportedRate> {
+        val material = keys() ?: return emptyList()
+        val response = try {
+            transport.get(NativeCashBalances.ENDPOINT, material.headers())
+        } catch (_: Exception) {
+            return emptyList()
+        }
+        if (response.status != 200 || response.body.isBlank()) {
+            return emptyList()
+        }
+        return NativeCashBalances.rates(response.body)
     }
 }
 

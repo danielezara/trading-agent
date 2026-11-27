@@ -15,6 +15,33 @@ data class BrokerBooks(
     val executionIds: List<String>,
 )
 
+data class FillRegister(
+    val fillIds: List<String>,
+    val status: String,
+) {
+    init {
+        require(status == EMPTY_HISTORY || status == UNAVAILABLE || status == POPULATED) {
+            "stato del registro sconosciuto"
+        }
+        if (status == EMPTY_HISTORY || status == UNAVAILABLE) {
+            require(fillIds.isEmpty()) { "un registro vuoto non contiene fill" }
+        }
+    }
+
+    companion object {
+        const val EMPTY_HISTORY: String = "EMPTY_HISTORY"
+        const val UNAVAILABLE: String = "UNAVAILABLE"
+        const val POPULATED: String = "POPULATED"
+
+        /** History null means the read did not happen. An empty list is a real empty history, not a fill. */
+        fun align(historyIds: List<String>?): FillRegister = when {
+            historyIds == null -> FillRegister(emptyList(), UNAVAILABLE)
+            historyIds.isEmpty() -> FillRegister(emptyList(), EMPTY_HISTORY)
+            else -> FillRegister(historyIds, POPULATED)
+        }
+    }
+}
+
 data class ReconciliationReport(
     val status: String,
     val classes: List<String>,
@@ -23,12 +50,20 @@ data class ReconciliationReport(
     val orderSent: Boolean,
     val brokerCalled: Boolean,
     val operationalState: OperationalState,
+    val fillCount: Int = 0,
+    val fillStatus: String = FillRegister.UNAVAILABLE,
 ) {
     init {
         require(!orderSent) { "la riconciliazione non può inviare un ordine" }
         require(!brokerCalled) { "la riconciliazione non chiama il broker" }
         require(operationalState == OperationalState.OBSERVATION) {
             "la riconciliazione non può lasciare OBSERVATION"
+        }
+        require(
+            (fillStatus == FillRegister.POPULATED && fillCount > 0) ||
+                (fillStatus != FillRegister.POPULATED && fillCount == 0),
+        ) {
+            "un registro vuoto non contiene fill"
         }
     }
 }
@@ -39,7 +74,13 @@ object Reconciliation {
     const val UNAVAILABLE: String = "UNAVAILABLE"
     const val CASH_TOLERANCE_MINOR: Long = 1
 
-    fun compare(broker: BrokerBooks?, ledger: LedgerBook, state: OperationalState): ReconciliationReport {
+    fun compare(
+        broker: BrokerBooks?,
+        ledger: LedgerBook,
+        state: OperationalState,
+        executionHistoryIds: List<String>? = null,
+    ): ReconciliationReport {
+        val fills = FillRegister.align(executionHistoryIds)
         if (broker == null) {
             return ReconciliationReport(
                 status = UNAVAILABLE,
@@ -49,6 +90,8 @@ object Reconciliation {
                 orderSent = false,
                 brokerCalled = false,
                 operationalState = state,
+                fillCount = fills.fillIds.size,
+                fillStatus = fills.status,
             )
         }
         val positionDiffs = positionDiffCount(broker.positions, ledger.positions)
@@ -72,6 +115,8 @@ object Reconciliation {
             orderSent = false,
             brokerCalled = false,
             operationalState = state,
+            fillCount = fills.fillIds.size,
+            fillStatus = fills.status,
         )
     }
 
@@ -83,6 +128,8 @@ object Reconciliation {
         "order_sent=${report.orderSent}",
         "broker_called=${report.brokerCalled}",
         "operational_state=${report.operationalState.wire}",
+        "fill_count=${report.fillCount}",
+        "fill_status=${report.fillStatus}",
     ).joinToString("\n")
 
     private fun positionDiffCount(broker: List<LedgerPosition>, ledger: List<LedgerPosition>): Int {

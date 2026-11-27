@@ -395,16 +395,17 @@ function ActivityPage({ loaded }: { loaded: LoadState }) {
 }
 
 function ReconciliationLine({ report }: { report: Overview["reconciliation"] }) {
+  const emptyHistory = report?.fill_status === "EMPTY_HISTORY" ? " Storico eseguiti vuoto." : "";
   if (!report || report.status === "UNAVAILABLE") {
-    return <p data-testid="reconciliation">Riconciliazione non disponibile. Nessun ordine. Lo stato resta OBSERVATION.</p>;
+    return <p data-testid="reconciliation">{`Riconciliazione non disponibile. Nessun ordine. Lo stato resta OBSERVATION.${emptyHistory}`}</p>;
   }
   if (report.status === "MATCH") {
-    return <p data-testid="reconciliation">Riconciliazione: i conti coincidono. Nessun ordine. Lo stato resta OBSERVATION.</p>;
+    return <p data-testid="reconciliation">{`Riconciliazione: i conti coincidono. Nessun ordine. Lo stato resta OBSERVATION.${emptyHistory}`}</p>;
   }
   const classes = report.classes.length === 0 ? "non classificata" : report.classes.join(", ");
   return (
     <p data-testid="reconciliation">
-      {`Riconciliazione: differenza ${classes}. Nessun ordine. Lo stato resta OBSERVATION.`}
+      {`Riconciliazione: differenza ${classes}. Nessun ordine. Lo stato resta OBSERVATION.${emptyHistory}`}
     </p>
   );
 }

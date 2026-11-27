@@ -28,6 +28,8 @@ fun reconciliationData(report: ReconciliationReport) = ReconciliationData(
     orderSent = report.orderSent,
     brokerCalled = report.brokerCalled,
     operationalState = report.operationalState.wire,
+    fillCount = report.fillCount,
+    fillStatus = report.fillStatus,
 )
 
 data class ReconciliationData(
@@ -38,4 +40,6 @@ data class ReconciliationData(
     val orderSent: Boolean,
     val brokerCalled: Boolean,
     val operationalState: String,
+    val fillCount: Int,
+    val fillStatus: String,
 )

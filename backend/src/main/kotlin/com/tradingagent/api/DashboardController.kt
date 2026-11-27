@@ -66,6 +66,7 @@ class DashboardController(
                 },
                 ledger = ledger.book(),
                 state = snapshot.operationalState,
+                executionHistoryIds = snapshot.closedTrades?.map { trade -> trade.positionId },
             ),
             occurredAt = Instant.now(),
             configVersionId = configuration.versionId.toString(),

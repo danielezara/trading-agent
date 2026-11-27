@@ -435,6 +435,34 @@ describe("dashboard skeleton", () => {
     expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
   });
 
+  it("says the fill register is empty when the execution history is empty", async () => {
+    const withEmptyHistory = {
+      ...overview,
+      data: {
+        ...overview.data,
+        reconciliation: {
+          ...overview.data.reconciliation,
+          status: "MATCH",
+          fill_count: 0,
+          fill_status: "EMPTY_HISTORY",
+        },
+      },
+    };
+    vi.stubGlobal("fetch", (input: string) => Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => (String(input).includes("overview") ? withEmptyHistory : jsonFor(String(input))),
+    }));
+    render(
+      <MemoryRouter initialEntries={["/portafoglio"]}>
+        <AppRoutes />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId("reconciliation")).toHaveTextContent("Storico eseguiti vuoto");
+    expect(screen.getByTestId("reconciliation")).toHaveTextContent("Nessun ordine");
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
   it("has no order action on the portfolio route", async () => {
     renderAt("/portafoglio");
     expect(screen.getByRole("heading", { name: "Portafoglio" })).toBeInTheDocument();

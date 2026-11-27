@@ -168,8 +168,12 @@ object MandateControl {
 object ClosedBarPolicy {
     const val RULE_ID: String = "closed-bar-trend/1"
     const val PRICE_SOURCE: String = "etoro"
+    const val KILL_SWITCH: String = "KILL_SWITCH"
 
-    fun decide(input: ClosedBarInput): RuleDecision {
+    fun decide(input: ClosedBarInput, entriesBlocked: Boolean = false): RuleDecision {
+        if (entriesBlocked) {
+            return if (input.position != null) hold(input, KILL_SWITCH) else none(KILL_SWITCH)
+        }
         MandateControl.configReason(input.economic)?.let { return none(it) }
         technicalReason(input.technical)?.let { return none(it) }
         if (input.priceSource != PRICE_SOURCE) {
@@ -209,6 +213,12 @@ object ClosedBarPolicy {
         val maxLoss = input.economic.maxLossMinor()
         if (position != null && maxLoss != null && input.lossMinor >= maxLoss) {
             return hold(input, MandateControl.LOSS_LIMIT)
+        }
+        if (position == null) {
+            val cap = input.economic.maxPositions
+            if (cap != null && input.openPositions >= cap) {
+                return none(MandateControl.EXPOSURE_LIMIT)
+            }
         }
         val atrBars = input.technical.int("regime_atr_bars")
         val atr = averageRange(closed, atrBars)

@@ -25,7 +25,9 @@ import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.configuration.EvidenceGate
 import com.tradingagent.modules.decision.DecisionCycle
 import com.tradingagent.modules.corporateaction.CorporateActionRegistry
+import com.tradingagent.modules.brokerread.DemoReportedRateRead
 import com.tradingagent.modules.executor.DisabledBrokerExecutor
+import com.tradingagent.modules.oms.KillSwitch
 import com.tradingagent.modules.features.FeatureStore
 import com.tradingagent.modules.identity.AccessModel
 import com.tradingagent.modules.ingestion.IngestionPipeline
@@ -99,6 +101,8 @@ class ModuleConfiguration {
 
     @Bean fun policyGate() = PolicyGate()
 
+    @Bean fun killSwitch() = KillSwitch()
+
     @Bean fun ledger() = Ledger()
 
     @Bean fun orderIntentService() = OrderIntentService()
@@ -123,6 +127,7 @@ class ModuleConfiguration {
         ledger: Ledger,
         capabilityProbe: CapabilityProbe,
         observationPrices: ObservationPrices,
+        killSwitch: KillSwitch,
     ): DecisionCycle {
         val cycle = DecisionCycle(
             strategyEngine = strategyEngine,
@@ -140,6 +145,11 @@ class ModuleConfiguration {
                 keys = { DemoKeyMaterial.fromEnvironment(System.getenv()) },
                 transport = JdkHttpGet(),
             ),
+            reportedRates = DemoReportedRateRead(
+                keys = { DemoKeyMaterial.fromEnvironment(System.getenv()) },
+                transport = JdkHttpGet(),
+            ),
+            entriesBlocked = { killSwitch.armed() },
         )
         val recorded = cycle.record()
         auditLog.sealDay(LocalDate.ofInstant(recorded.outcome.evaluatedAt, ZoneOffset.UTC))

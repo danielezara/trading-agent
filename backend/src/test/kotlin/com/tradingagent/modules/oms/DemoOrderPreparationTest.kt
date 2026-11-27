@@ -1,12 +1,15 @@
 package com.tradingagent.modules.oms
 
 import com.tradingagent.kernel.EvidenceStatus
+import com.tradingagent.kernel.OperationalState
 import com.tradingagent.kernel.OrderCreationForbidden
 import com.tradingagent.modules.configuration.EvidenceGate
+import com.tradingagent.modules.operational.OperationalStateService
 import com.tradingagent.modules.risk.PolicyGate
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class DemoOrderPreparationTest {
@@ -51,5 +54,38 @@ class DemoOrderPreparationTest {
         assertEquals(EvidenceStatus.UNVERIFIED, gate.rows().first { it.controlId == "RF-044" }.status)
         assertEquals(EvidenceStatus.UNVERIFIED, gate.rows().first { it.controlId == "RF-045" }.status)
         assertFalse(gate.allowsActive())
+    }
+
+    @Test
+    fun `sixteen open positions reject a new draft and do not close anything`() {
+        val book = DemoOrderBook()
+        val blocked = book.prepare("cap-1", "1001", "BUY", 250, "EUR", openPositions = 16)
+        assertEquals(DraftOutcome.Rejected(DemoOrderBook.POSITION_CAP), blocked)
+        assertEquals(0, book.size())
+        val close = book.prepare("cap-2", "1001", "SELL", 250, "EUR", openPositions = 16)
+        assertEquals(DraftOutcome.Rejected(DemoOrderBook.POSITION_CAP), close)
+        assertEquals(0, book.size())
+    }
+
+    @Test
+    fun `an armed kill switch rejects every new order without a broker call`() {
+        val switch = KillSwitch()
+        val state = OperationalStateService()
+        val book = DemoOrderBook(switch)
+        val orders = UnsentDemoOrders(killSwitch = switch)
+        switch.engage()
+        val blocked = book.prepare("kill-1", "1001", "BUY", 250, "EUR")
+        assertEquals(DraftOutcome.Rejected(DemoOrderBook.KILL_SWITCH), blocked)
+        assertEquals(0, book.size())
+        val parked = DemoOrderDraft("kill-1", "1001", "BUY", 250, "EUR", orderable = false)
+        val verdict = orders.submit(parked)
+        assertFalse(verdict.accepted)
+        assertFalse(verdict.brokerCalled)
+        assertEquals(DemoOrderBook.KILL_SWITCH, verdict.reason)
+        assertEquals(OperationalState.OBSERVATION, state.current())
+        switch.reset()
+        val prepared = book.prepare("kill-2", "1001", "BUY", 250, "EUR")
+        assertTrue(prepared is DraftOutcome.Accepted)
+        assertFalse((prepared as DraftOutcome.Accepted).draft.orderable)
     }
 }

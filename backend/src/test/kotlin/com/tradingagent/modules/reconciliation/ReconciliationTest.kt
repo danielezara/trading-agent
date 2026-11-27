@@ -112,6 +112,31 @@ class ReconciliationTest {
     }
 
     @Test
+    fun `an empty execution history keeps the fill register empty`() {
+        val report = Reconciliation.compare(
+            broker = emptyBroker(positions = listOf(LedgerPosition("1002", "1"))),
+            ledger = LedgerBook.empty(),
+            state = OperationalState.OBSERVATION,
+            executionHistoryIds = emptyList(),
+        )
+        assertEquals(0, report.fillCount)
+        assertEquals(FillRegister.EMPTY_HISTORY, report.fillStatus)
+        assertEquals(Reconciliation.MISMATCH, report.status)
+        assertFalse(report.orderSent)
+        assertFalse(report.brokerCalled)
+        assertTrue(Reconciliation.payload(report).contains("fill_status=EMPTY_HISTORY"))
+        assertFalse(Reconciliation.payload(report).contains("1002"))
+
+        val unread = FillRegister.align(null)
+        assertEquals(FillRegister.UNAVAILABLE, unread.status)
+        assertTrue(unread.fillIds.isEmpty())
+
+        val one = FillRegister.align(listOf("position-7"))
+        assertEquals(listOf("position-7"), one.fillIds)
+        assertEquals(FillRegister.POPULATED, one.status)
+    }
+
+    @Test
     fun `a missing portfolio read is unavailable rather than a mismatch`() {
         val report = Reconciliation.compare(broker = null, ledger = Ledger().book(), state = OperationalState.OBSERVATION)
         assertEquals(Reconciliation.UNAVAILABLE, report.status)

@@ -6,6 +6,7 @@ import com.tradingagent.modules.brokerread.CapabilityProbe
 import com.tradingagent.modules.brokerread.ClosedBarSource
 import com.tradingagent.modules.brokerread.EuroFxRead
 import com.tradingagent.modules.brokerread.ObservedBars
+import com.tradingagent.modules.brokerread.ReportedRateSource
 import com.tradingagent.modules.brokerread.ObservedInstrumentBars
 import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.configuration.ConfigurationVersion
@@ -24,6 +25,7 @@ import com.tradingagent.modules.strategy.BudgetLoss
 import com.tradingagent.modules.strategy.ChannelObservation
 import com.tradingagent.modules.strategy.ClosedBarEvaluation
 import com.tradingagent.modules.strategy.InstrumentBars
+import com.tradingagent.modules.strategy.PayloadRate
 import com.tradingagent.modules.strategy.PriceBar
 import com.tradingagent.modules.strategy.RuleDecision
 import com.tradingagent.modules.strategy.DecisionInput
@@ -57,6 +59,8 @@ class DecisionCycle(
     private val assess: (Instant) -> IngestionAssessment = { instant -> ingestionPipeline.assess(instant) },
     private val euroFx: EuroFxRead = EuroFxRead { _, _, _ -> null },
     private val closedBars: ClosedBarSource = ClosedBarSource { null },
+    private val reportedRates: ReportedRateSource = ReportedRateSource { emptyList() },
+    private val entriesBlocked: () -> Boolean = { false },
 ) {
     private var recorded: RecordedDecision? = null
     private var storedBars: List<ObservedInstrumentBars> = emptyList()
@@ -94,6 +98,13 @@ class DecisionCycle(
             null
         } ?: ObservedBars(0, emptyList())
         storedBars = observed.instruments
+        val rates = try {
+            reportedRates.load().map { rate ->
+                PayloadRate(rate.currency, rate.displayCurrency, rate.rate)
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
         val book = BarBook(
             openPositions = observed.openPositions,
             instruments = observed.instruments.map { instrument ->
@@ -107,11 +118,14 @@ class DecisionCycle(
             },
             reportedLossMinor = observed.bookLossMinor,
             reportedLossCurrency = observed.bookLossCurrency,
+            payloadRates = rates,
+            entriesBlocked = entriesBlocked(),
         )
         val lossBlocksEntries = BudgetLoss.blocksNewEntries(
             observed.bookLossMinor,
             observed.bookLossCurrency,
             configuration.parameters.economic,
+            rates,
         )
         val rule = ClosedBarEvaluation.decide(
             at,

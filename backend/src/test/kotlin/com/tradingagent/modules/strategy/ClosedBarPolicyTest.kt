@@ -128,6 +128,41 @@ class ClosedBarPolicyTest {
     }
 
     @Test
+    fun `sixteen open positions reject a new entry and do not close an open one`() {
+        val blocked = ClosedBarPolicy.decide(input(bars = rising(), openPositions = 16))
+        assertEquals("NO-TRADE", blocked.action)
+        assertEquals(MandateControl.EXPOSURE_LIMIT, blocked.reason)
+        assertFalse(blocked.orderable)
+        assertNull(blocked.notionalMinor)
+
+        val held = ClosedBarPolicy.decide(
+            input(
+                bars = flatBars(),
+                position = HeldPosition(entryCloseMinor = 10_000, barsHeld = 3),
+                openPositions = 16,
+            ),
+        )
+        assertEquals("HOLD", held.action)
+        assertFalse(held.orderable)
+    }
+
+    @Test
+    fun `an armed kill switch rejects a new entry and holds an open position`() {
+        val blocked = ClosedBarPolicy.decide(input(bars = rising()), entriesBlocked = true)
+        assertEquals("NO-TRADE", blocked.action)
+        assertEquals(ClosedBarPolicy.KILL_SWITCH, blocked.reason)
+        assertFalse(blocked.orderable)
+
+        val held = ClosedBarPolicy.decide(
+            input(bars = falling(), position = HeldPosition(entryCloseMinor = 10_100, barsHeld = 3)),
+            entriesBlocked = true,
+        )
+        assertEquals("HOLD", held.action)
+        assertEquals(ClosedBarPolicy.KILL_SWITCH, held.reason)
+        assertFalse(held.orderable)
+    }
+
+    @Test
     fun `a loss at ten percent holds an open position instead of closing it`() {
         val held = ClosedBarPolicy.decide(
             input(
@@ -183,6 +218,7 @@ class ClosedBarPolicyTest {
         investedMinor: Long = 0,
         sectorInvestedMinor: Long? = 0,
         lossMinor: Long = 0,
+        openPositions: Int = 0,
     ) = ClosedBarInput(
         now = now,
         instrumentId = "1001",
@@ -194,7 +230,7 @@ class ClosedBarPolicyTest {
         investedMinor = investedMinor,
         sectorInvestedMinor = sectorInvestedMinor,
         lossMinor = lossMinor,
-        openPositions = 0,
+        openPositions = openPositions,
         lastExitAt = null,
         economic = parameters.economic,
         technical = parameters.technical,

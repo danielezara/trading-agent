@@ -50,6 +50,20 @@ class NativeCashBalancesTest {
     }
 
     @Test
+    fun `a cross rate on the payload is kept and a same currency rate is not`() {
+        val rates = NativeCashBalances.rates(
+            """
+            {"balances":[
+              {"accountType":"Cash","currency":"EUR","displayCurrency":"USD","displayBalance":2239.05,"exchangeRate":1.09626},
+              {"accountType":"Trading","currency":"USD","displayCurrency":"USD","displayBalance":14998.61,"exchangeRate":1}
+            ]}
+            """.trimIndent(),
+        )
+        assertEquals(listOf(ReportedRate("EUR", "USD", "1.09626")), rates)
+        assertTrue(rates.none { it.rate == "2239.05" || it.rate == "1" })
+    }
+
+    @Test
     fun `a usd only payload does not invent eur`() {
         val parsed = NativeCashBalances.parse(
             """

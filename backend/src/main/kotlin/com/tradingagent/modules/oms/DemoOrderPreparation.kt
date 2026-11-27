@@ -20,7 +20,23 @@ sealed interface DraftOutcome {
     data class Rejected(val reason: String) : DraftOutcome
 }
 
-class DemoOrderBook {
+class KillSwitch {
+    private var armed = false
+
+    fun armed(): Boolean = armed
+
+    fun engage() {
+        armed = true
+    }
+
+    fun reset() {
+        armed = false
+    }
+}
+
+class DemoOrderBook(
+    private val killSwitch: KillSwitch = KillSwitch(),
+) {
     private val drafts = linkedMapOf<String, DemoOrderDraft>()
 
     fun size(): Int = drafts.size
@@ -31,7 +47,14 @@ class DemoOrderBook {
         side: String,
         notionalMinor: Long,
         currency: String,
+        openPositions: Int = 0,
     ): DraftOutcome {
+        if (killSwitch.armed()) {
+            return DraftOutcome.Rejected(KILL_SWITCH)
+        }
+        if (openPositions >= MAX_OPEN_POSITIONS) {
+            return DraftOutcome.Rejected(POSITION_CAP)
+        }
         val reason = rejectReason(clientOrderId, instrumentId, side, notionalMinor, currency)
         if (reason != null) {
             return DraftOutcome.Rejected(reason)
@@ -69,14 +92,21 @@ class DemoOrderBook {
 
     companion object {
         const val MIN_NOTIONAL_MINOR: Long = 100
+        const val MAX_OPEN_POSITIONS: Int = 8
+        const val KILL_SWITCH: String = "KILL_SWITCH"
+        const val POSITION_CAP: String = "POSITION_CAP"
         private val instrument = Regex("[1-9][0-9]{0,9}")
     }
 }
 
 class UnsentDemoOrders(
     private val gate: PolicyGate = PolicyGate(),
+    private val killSwitch: KillSwitch = KillSwitch(),
 ) {
     fun submit(draft: DemoOrderDraft): PolicyVerdict {
+        if (killSwitch.armed()) {
+            return PolicyVerdict(accepted = false, reason = DemoOrderBook.KILL_SWITCH, brokerCalled = false)
+        }
         val verdict = gate.evaluate(DispatchPreconditions(intentId = draft.clientOrderId))
         check(!verdict.accepted && !verdict.brokerCalled) { "il percorso Demo non invia" }
         return verdict

@@ -89,6 +89,8 @@ export type Overview = {
     classes: string[];
     order_sent: boolean;
     operational_state: string;
+    fill_count?: number;
+    fill_status?: string;
   };
 };
 

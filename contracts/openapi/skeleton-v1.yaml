@@ -738,6 +738,13 @@ components:
         operational_state:
           type: string
           enum: [OBSERVATION]
+        fill_count:
+          type: integer
+          minimum: 0
+        fill_status:
+          type: string
+          enum: [EMPTY_HISTORY, UNAVAILABLE, POPULATED]
+          description: EMPTY_HISTORY means the execution history was read and had no fills. The register stays empty. UNAVAILABLE means the history was not read. POPULATED lists only the history rows.
     ClosedTrade:
       type: object
       required: [position_id]
