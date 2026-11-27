@@ -128,17 +128,25 @@ function useDashboardData(): LoadState {
   return loaded;
 }
 
+function brokerLink(overview: Overview): string {
+  const connected = overview.broker_connected ? "sì" : "no";
+  const error = overview.probe_error_class ?? "nessuno";
+  const at = overview.last_probe_at ?? "non disponibile";
+  return `Demo API connessa: ${connected}. Ultimo probe: ${at}. Errore: ${error}.`;
+}
+
 function OverviewPage({ loaded }: { loaded: LoadState }) {
   return (
     <>
       <section className="panel">
         <h1>Panoramica</h1>
-        <p>Lettura locale di stato, configurazione e budget. Nessun ordine e nessuna chiamata al broker.</p>
+        <p>Lettura locale di stato, configurazione e budget. Nessun ordine. La lettura Demo, se presente, è solo GET.</p>
         <LoadNotice loaded={loaded} />
         {loaded.status === "ready" ? (
           <>
             <p data-testid="decision">{`Decisione: ${loaded.data.decision.action} · ${loaded.data.decision.reason_codes[0]}`}</p>
             <p data-testid="policy">{`Policy: ${loaded.data.decision.policy.reason}. Broker chiamato: no.`}</p>
+            <p data-testid="broker-link">{brokerLink(loaded.data.overview)}</p>
           </>
         ) : null}
       </section>

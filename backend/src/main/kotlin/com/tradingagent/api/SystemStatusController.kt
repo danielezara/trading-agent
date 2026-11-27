@@ -1,6 +1,7 @@
 package com.tradingagent.api
 
 import com.tradingagent.modules.audit.AuditLog
+import com.tradingagent.modules.brokerread.CapabilityProbe
 import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.configuration.ConfigurationVersion
 import com.tradingagent.modules.configuration.EvidenceGate
@@ -31,16 +32,21 @@ class SystemStatusController(
     private val reconciliationJob: ReconciliationJob,
     private val durableScheduler: DurableScheduler,
     private val auditLog: AuditLog,
+    private val capabilityProbe: CapabilityProbe,
 ) {
     @GetMapping("/system/status")
     fun status(): ApiEnvelope<SystemStatusData> {
         val outcome = decisionCycle.latest().outcome
+        val probe = capabilityProbe.current()
         return ApiEnvelope(
             data = SystemStatusData(
                 operationalState = operationalStateService.current().wire,
                 environment = "DEMO",
                 tradingEnabled = false,
                 brokerDispatch = "disabled",
+                brokerConnected = probe.connected,
+                lastProbeAt = probe.observedAt,
+                probeErrorClass = probe.errorClass,
                 activeTransitionAllowed = evidenceGate.allowsActive(),
                 strategyAction = outcome.action,
                 strategyReason = outcome.reasonCode.name,
@@ -55,16 +61,21 @@ class SystemStatusController(
             warnings = listOf(
                 ApiWarning(
                     code = "SKELETON",
-                    detail = "Nessun broker, nessun ordine e nessuna promozione ad ACTIVE.",
+                    detail = "Nessun ordine e nessuna promozione ad ACTIVE. La lettura Demo è solo GET.",
                 ),
             ),
         )
     }
 
     @GetMapping("/evidence-gate")
-    fun evidence(): ApiEnvelope<EvidenceGateData> = ApiEnvelope(
+    fun evidence(): ApiEnvelope<EvidenceGateData> {
+        val probe = capabilityProbe.refreshIfStale()
+        return ApiEnvelope(
         data = EvidenceGateData(
             allowsActive = evidenceGate.allowsActive(),
+            brokerConnected = probe.connected,
+            lastProbeAt = probe.observedAt,
+            probeErrorClass = probe.errorClass,
             rows = evidenceGate.rows().map { row ->
                 EvidenceRowData(
                     controlId = row.controlId,
@@ -76,7 +87,8 @@ class SystemStatusController(
         ),
         meta = ApiMeta(schemaVersion = "evidence-gate/1"),
         warnings = emptyList(),
-    )
+        )
+    }
 
     @GetMapping("/configurations")
     fun configurations(): ApiEnvelope<List<ConfigurationData>> = ApiEnvelope(
@@ -272,6 +284,9 @@ data class SystemStatusData(
     val environment: String,
     val tradingEnabled: Boolean,
     val brokerDispatch: String,
+    val brokerConnected: Boolean,
+    val lastProbeAt: Instant?,
+    val probeErrorClass: String?,
     val activeTransitionAllowed: Boolean,
     val strategyAction: String,
     val strategyReason: String,
@@ -334,6 +349,9 @@ data class OperationalActionsData(
 
 data class EvidenceGateData(
     val allowsActive: Boolean,
+    val brokerConnected: Boolean,
+    val lastProbeAt: Instant?,
+    val probeErrorClass: String?,
     val rows: List<EvidenceRowData>,
 )
 

@@ -63,6 +63,7 @@ class ArchitectureBoundaryTest {
 
     @ArchTest
     val noHttpClients: ArchRule = noClasses()
+        .that().resideOutsideOfPackage("..modules.brokerread..")
         .should().dependOnClassesThat().resideInAnyPackage(
             "java.net.http..",
             "okhttp3..",

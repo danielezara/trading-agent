@@ -59,12 +59,15 @@ class DashboardController(
                 ledgerStatus = snapshot.ledgerStatus,
                 journalEntryCount = snapshot.journalEntryCount,
                 journalBalanced = snapshot.journalBalanced,
+                brokerConnected = snapshot.brokerConnected,
+                lastProbeAt = snapshot.lastProbeAt,
+                probeErrorClass = snapshot.probeErrorClass,
             ),
             meta = ApiMeta(schemaVersion = "portfolio-snapshot/1"),
             warnings = listOf(
                 ApiWarning(
                     code = "DATA_UNAVAILABLE",
-                    detail = "Portafoglio non disponibile: ledger e broker non sono collegati. I null non sono zeri.",
+                    detail = "Il giornale locale non è collegato. I null non sono zeri.",
                 ),
             ),
         )
@@ -104,4 +107,7 @@ data class OverviewData(
     val ledgerStatus: String,
     val journalEntryCount: Int,
     val journalBalanced: Boolean,
+    val brokerConnected: Boolean,
+    val lastProbeAt: java.time.Instant?,
+    val probeErrorClass: String?,
 )

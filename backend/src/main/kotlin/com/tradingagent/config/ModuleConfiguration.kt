@@ -1,6 +1,9 @@
 package com.tradingagent.config
 
 import com.tradingagent.modules.audit.AuditLog
+import com.tradingagent.modules.brokerread.CapabilityProbe
+import com.tradingagent.modules.brokerread.DemoKeyMaterial
+import com.tradingagent.modules.brokerread.JdkHttpGet
 import com.tradingagent.modules.chat.ChatQuery
 import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.configuration.EvidenceGate
@@ -31,6 +34,17 @@ class ModuleConfiguration {
     @Bean fun accessModel() = AccessModel()
 
     @Bean fun evidenceGate() = EvidenceGate()
+
+    @Bean
+    fun capabilityProbe(evidenceGate: EvidenceGate): CapabilityProbe {
+        val probe = CapabilityProbe(
+            evidenceGate = evidenceGate,
+            keys = { DemoKeyMaterial.fromEnvironment(System.getenv()) },
+            transport = JdkHttpGet(),
+        )
+        probe.refresh()
+        return probe
+    }
 
     @Bean fun configurationService() = ConfigurationService()
 
@@ -89,7 +103,8 @@ class ModuleConfiguration {
         operationalStateService: OperationalStateService,
         ledger: Ledger,
         configurationService: ConfigurationService,
-    ) = DashboardReadModel(operationalStateService, ledger, configurationService)
+        capabilityProbe: CapabilityProbe,
+    ) = DashboardReadModel(operationalStateService, ledger, configurationService, capabilityProbe)
 
     @Bean fun chatQuery() = ChatQuery()
 

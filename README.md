@@ -31,6 +31,8 @@ Il valore della variabile non viene scritto nel messaggio di errore. Il servizio
 
 Le chiavi Demo locali sono `ETORO_DEMO_API_KEY` e `ETORO_DEMO_USER_KEY`, lette solo dall’ambiente del processo. I nomi con valore vuoto stanno in [`backend/.env.example`](backend/.env.example); `backend/.env` è ignorato da git. Se mancano, la decisione resta `NO-TRADE` con `CAPABILITY_UNVERIFIED`. I valori non vengono scritti nei log.
 
+All’avvio il processo fa al massimo una GET autenticata verso il portafoglio Demo pubblico. Se la lettura riesce, la riga RF-044 diventa `PASS` e la cassa osservata compare in panoramica. `401`/`403` segnano `FAIL`. Senza chiavi, timeout o rate limit la riga resta `UNVERIFIED`. Non esiste alcun POST. Lo stato resta `OBSERVATION`.
+
 `POSTGRES_*` serve solo a Compose. Il backend non le legge.
 
 ## Avvio locale

@@ -20,6 +20,9 @@ export type Overview = {
   ledger_status: string;
   journal_entry_count: number;
   journal_balanced: boolean;
+  broker_connected: boolean;
+  last_probe_at: string | null;
+  probe_error_class: string | null;
   configuration_version_id: string;
   configuration_version_number: number;
 };

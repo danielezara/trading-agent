@@ -44,6 +44,9 @@ class ApiSkeletonTest(
             .andExpect(jsonPath("$.data.active_transition_allowed").value(false))
             .andExpect(jsonPath("$.data.strategy_action").value("NO-TRADE"))
             .andExpect(jsonPath("$.data.strategy_reason").value("CAPABILITY_UNVERIFIED"))
+            .andExpect(jsonPath("$.data.broker_connected").value(false))
+            .andExpect(jsonPath("$.data.probe_error_class").value("KEYS_MISSING"))
+            .andExpect(jsonPath("$.data.trading_enabled").value(false))
             .andExpect(jsonPath("$.data.ingestion_enabled").value(false))
             .andExpect(jsonPath("$.data.ingestion_source").value("classpath-fixture"))
             .andExpect(jsonPath("$.meta.environment").value("DEMO"))
@@ -52,6 +55,8 @@ class ApiSkeletonTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.allows_active").value(false))
             .andExpect(jsonPath("$.data.rows[0].status").value("UNVERIFIED"))
+            .andExpect(jsonPath("$.data.broker_connected").value(false))
+            .andExpect(jsonPath("$.data.allows_active").value(false))
     }
 
     @Test
@@ -65,6 +70,9 @@ class ApiSkeletonTest(
             .andExpect(jsonPath("$.data.assigned_budget.minor_units").value(50000))
             .andExpect(jsonPath("$.data.assigned_budget.currency").value("EUR"))
             .andExpect(jsonPath("$.data.available_cash").value(nullValue()))
+            .andExpect(jsonPath("$.data.broker_cash").value(nullValue()))
+            .andExpect(jsonPath("$.data.broker_connected").value(false))
+            .andExpect(jsonPath("$.data.probe_error_class").value("KEYS_MISSING"))
             .andExpect(jsonPath("$.data.ledger_status").value("UNOBSERVED"))
             .andExpect(jsonPath("$.data.journal_entry_count").value(0))
             .andExpect(jsonPath("$.data.journal_balanced").value(true))

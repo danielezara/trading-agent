@@ -10,9 +10,17 @@ data class EvidenceRow(
 )
 
 class EvidenceGate {
-    fun rows(): List<EvidenceRow> = ROWS
+    private val lock = Any()
+    private val rows = ROWS.map { it.copy() }.toMutableList()
 
-    fun allowsActive(): Boolean = false
+    fun rows(): List<EvidenceRow> = synchronized(lock) { rows.toList() }
+
+    fun recordBrokerRead(status: EvidenceStatus) = synchronized(lock) {
+        val index = rows.indexOfFirst { it.controlId == "RF-044" }
+        rows[index] = rows[index].copy(status = status)
+    }
+
+    fun allowsActive(): Boolean = rows().all { it.status == EvidenceStatus.PASS }
 
     companion object {
         val ROWS: List<EvidenceRow> = listOf(

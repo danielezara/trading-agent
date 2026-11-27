@@ -15,6 +15,9 @@ const overview = {
     ledger_status: "UNOBSERVED",
     journal_entry_count: 0,
     journal_balanced: true,
+    broker_connected: false,
+    last_probe_at: null,
+    probe_error_class: "KEYS_MISSING",
     configuration_version_id: "11111111-1111-1111-1111-111111111111",
     configuration_version_number: 1,
   },
@@ -157,6 +160,8 @@ describe("dashboard skeleton", () => {
     expect(screen.getByTestId("decision")).toHaveTextContent("CAPABILITY_UNVERIFIED");
     expect(screen.getByTestId("policy")).toHaveTextContent("MISSING_INTENT");
     expect(screen.getByTestId("policy")).toHaveTextContent("Broker chiamato: no");
+    expect(screen.getByTestId("broker-link")).toHaveTextContent("Demo API connessa: no");
+    expect(screen.getByTestId("broker-link")).toHaveTextContent("KEYS_MISSING");
     expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
   });
 

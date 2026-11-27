@@ -361,6 +361,15 @@ components:
             broker_dispatch:
               type: string
               enum: [disabled]
+            broker_connected:
+              type: boolean
+            last_probe_at:
+              type: string
+              format: date-time
+              nullable: true
+            probe_error_class:
+              type: string
+              nullable: true
             active_transition_allowed:
               type: boolean
               enum: [false]
@@ -392,6 +401,15 @@ components:
             allows_active:
               type: boolean
               enum: [false]
+            broker_connected:
+              type: boolean
+            last_probe_at:
+              type: string
+              format: date-time
+              nullable: true
+            probe_error_class:
+              type: string
+              nullable: true
             rows:
               type: array
               items:
@@ -406,7 +424,7 @@ components:
                     type: string
                   status:
                     type: string
-                    enum: [UNVERIFIED]
+                    enum: [UNVERIFIED, PASS, FAIL, EXPIRED]
         meta:
           $ref: "#/components/schemas/Meta"
         warnings:
@@ -487,6 +505,15 @@ components:
               type: integer
             journal_balanced:
               type: boolean
+            broker_connected:
+              type: boolean
+            last_probe_at:
+              type: string
+              format: date-time
+              nullable: true
+            probe_error_class:
+              type: string
+              nullable: true
         meta:
           $ref: "#/components/schemas/Meta"
         warnings:
