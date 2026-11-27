@@ -1,4 +1,4 @@
-import { displayAccount, formatCash, readDemoOverview } from "../lib/demo-read";
+import { displayAccount, formatCash, readDemoOverview, type DemoPosition } from "../lib/demo-read";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +29,38 @@ export default async function Page() {
           </div>
         ))}
       </dl>
+      <Positions positions={overview.positions} />
       {overview.probeErrorClass ? <p>Errore: {overview.probeErrorClass}</p> : null}
     </main>
+  );
+}
+
+function Positions({ positions }: { positions: DemoPosition[] | null }) {
+  if (positions == null) {
+    return <p>Posizioni non disponibili</p>;
+  }
+  if (positions.length === 0) {
+    return <p>Nessuna posizione</p>;
+  }
+  return (
+    <table>
+      <caption>Posizioni Demo</caption>
+      <thead>
+        <tr>
+          <th>Strumento</th>
+          <th>Quantità</th>
+          <th>Valore</th>
+        </tr>
+      </thead>
+      <tbody>
+        {positions.map((position, index) => (
+          <tr key={`${position.instrumentId}-${index}`}>
+            <td>{position.instrumentId}</td>
+            <td>{position.quantity ?? "non disponibile"}</td>
+            <td>{formatCash(position.value)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

@@ -24,6 +24,7 @@ describe("demo read", () => {
     assert.equal(view.probeErrorClass, "KEYS_MISSING");
     assert.equal(view.accountLabel, null);
     assert.equal(view.brokerCash, null);
+    assert.equal(view.positions, null);
     assert.equal(view.operationalState, "OBSERVATION");
     assert.equal(view.tradingEnabled, false);
   });
@@ -48,6 +49,7 @@ describe("demo read", () => {
     assert.equal(view.accountLabel, "demo.user");
     assert.deepEqual(view.brokerCash, { minorUnits: 28035, currency: "USD" });
     assert.equal(formatCash(view.brokerCash), "280,35 USD");
+    assert.deepEqual(view.positions, []);
     assert.equal(view.probeErrorClass, null);
   });
 
@@ -68,6 +70,7 @@ describe("demo read", () => {
     });
     assert.equal(denied.connected, false);
     assert.equal(denied.probeErrorClass, "AUTHENTICATION");
+    assert.equal(denied.positions, null);
 
     let calls = 0;
     const limited = await readDemoOverview({
@@ -88,6 +91,31 @@ describe("demo read", () => {
     assert.equal(limited.probeErrorClass, "RATE_LIMITED");
   });
 
+  it("lists direct positions and ignores copies and rows without an instrument", async () => {
+    const view = await readDemoOverview({
+      env: keys,
+      fetchImpl: async () => json(200, {
+        clientPortfolio: {
+          credit: 280.35,
+          accountCurrencyId: 1,
+          positions: [
+            { instrumentID: 1002, units: 0.049485, amount: 100, CID: 7765437 },
+            { units: 1, amount: 5 },
+            "skip",
+            { instrumentID: 1003, amount: 12.5 },
+          ],
+          mirrors: [{ positions: [{ instrumentID: 9, units: 1, amount: 50 }] }],
+        },
+      }),
+    });
+    assert.equal(view.connected, true);
+    assert.equal(view.tradingEnabled, false);
+    assert.deepEqual(view.positions, [
+      { instrumentId: "1002", quantity: "0.049485", value: { minorUnits: 10000, currency: "USD" } },
+      { instrumentId: "1003", quantity: null, value: { minorUnits: 1250, currency: "USD" } },
+    ]);
+  });
+
   it("ships no browser secret prefix and no order method", () => {
     const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
     const route = readFileSync(new URL("../app/api/overview/route.ts", import.meta.url), "utf8");
@@ -97,6 +125,8 @@ describe("demo read", () => {
     assert.equal(/\bPOST\b/.test(route), false);
     assert.match(route, /export async function GET/);
     assert.equal(page.includes("use client"), false);
+    assert.equal(page.includes("Posizioni Demo"), true);
+    assert.equal(page.includes("Nessuna posizione"), true);
   });
 });
 

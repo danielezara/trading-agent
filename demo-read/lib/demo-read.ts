@@ -8,6 +8,12 @@ export type BrokerCash = {
   currency: string;
 };
 
+export type DemoPosition = {
+  instrumentId: string;
+  quantity: string | null;
+  value: BrokerCash | null;
+};
+
 export type DemoOverview = {
   platform: "Demo eToro";
   operationalState: "OBSERVATION";
@@ -15,6 +21,7 @@ export type DemoOverview = {
   connected: boolean;
   accountLabel: string | null;
   brokerCash: BrokerCash | null;
+  positions: DemoPosition[] | null;
   lastProbeAt: string | null;
   probeErrorClass: string | null;
 };
@@ -37,19 +44,20 @@ export async function readDemoOverview(options: ReadOptions): Promise<DemoOvervi
   const apiKey = options.env.ETORO_DEMO_API_KEY?.trim() ?? "";
   const userKey = options.env.ETORO_DEMO_USER_KEY?.trim() ?? "";
   if (!apiKey || !userKey) {
-    return view(false, null, null, now(), "KEYS_MISSING");
+    return view(false, null, null, null, now(), "KEYS_MISSING");
   }
   const outcome = await readOnce(options.fetchImpl, apiKey, userKey, options.sleep ?? defaultSleep);
   if (outcome.kind === "pass") {
-    return view(true, outcome.accountLabel, outcome.brokerCash, now(), null);
+    return view(true, outcome.accountLabel, outcome.brokerCash, outcome.positions, now(), null);
   }
-  return view(false, null, null, now(), outcome.errorClass);
+  return view(false, null, null, null, now(), outcome.errorClass);
 }
 
 function view(
   connected: boolean,
   accountLabel: string | null,
   brokerCash: BrokerCash | null,
+  positions: DemoPosition[] | null,
   at: Date,
   probeErrorClass: string | null,
 ): DemoOverview {
@@ -60,6 +68,7 @@ function view(
     connected,
     accountLabel,
     brokerCash,
+    positions,
     lastProbeAt: at.toISOString(),
     probeErrorClass,
   };
@@ -70,7 +79,7 @@ async function readOnce(
   apiKey: string,
   userKey: string,
   sleep: (ms: number) => Promise<void>,
-): Promise<{ kind: "pass"; accountLabel: string | null; brokerCash: BrokerCash | null } | { kind: "closed"; errorClass: string }> {
+): Promise<{ kind: "pass"; accountLabel: string | null; brokerCash: BrokerCash | null; positions: DemoPosition[] | null } | { kind: "closed"; errorClass: string }> {
   const first = await get(fetchImpl, apiKey, userKey);
   if (first.kind === "transport") {
     return { kind: "closed", errorClass: "TRANSPORT" };
@@ -151,7 +160,7 @@ function classify(status: number, body: string) {
   return { kind: "closed" as const, errorClass: "TRANSPORT" };
 }
 
-export function parsePortfolio(body: string): { accountLabel: string | null; brokerCash: BrokerCash | null } | null {
+export function parsePortfolio(body: string): { accountLabel: string | null; brokerCash: BrokerCash | null; positions: DemoPosition[] | null } | null {
   let root: unknown;
   try {
     root = JSON.parse(body);
@@ -165,10 +174,53 @@ export function parsePortfolio(body: string): { accountLabel: string | null; bro
   if (!isRecord(portfolio)) {
     return null;
   }
+  const cash = brokerCash(portfolio);
   return {
     accountLabel: accountLabel(root, portfolio),
-    brokerCash: brokerCash(portfolio),
+    brokerCash: cash,
+    positions: positions(portfolio, cash?.currency ?? currencyCode(portfolio.accountCurrencyId)),
   };
+}
+
+function positions(portfolio: Record<string, unknown>, currency: string | null): DemoPosition[] | null {
+  if (!Object.prototype.hasOwnProperty.call(portfolio, "positions") || portfolio.positions == null) {
+    return [];
+  }
+  if (!Array.isArray(portfolio.positions)) {
+    return null;
+  }
+  const rows: DemoPosition[] = [];
+  for (const item of portfolio.positions) {
+    if (!isRecord(item)) {
+      continue;
+    }
+    const instrumentId = instrumentIdOf(item.instrumentID);
+    if (!instrumentId) {
+      continue;
+    }
+    const amount = minor(item.amount);
+    rows.push({
+      instrumentId,
+      quantity: quantity(item.units),
+      value: currency && amount !== null && amount >= 0 ? { minorUnits: amount, currency } : null,
+    });
+  }
+  return rows;
+}
+
+function instrumentIdOf(value: unknown): string | null {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+    return null;
+  }
+  return String(value);
+}
+
+function quantity(value: unknown): string | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+  const text = Object.is(value, -0) ? "0" : value.toString();
+  return /^-?\d+(\.\d+)?$/.test(text) ? text : null;
 }
 
 function brokerCash(portfolio: Record<string, unknown>): BrokerCash | null {
