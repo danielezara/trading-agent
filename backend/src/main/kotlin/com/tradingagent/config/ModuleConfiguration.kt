@@ -83,6 +83,8 @@ class ModuleConfiguration {
         configurationService: ConfigurationService,
         auditLog: AuditLog,
         policyGate: PolicyGate,
+        ledger: Ledger,
+        capabilityProbe: CapabilityProbe,
     ): DecisionCycle {
         val cycle = DecisionCycle(
             strategyEngine = strategyEngine,
@@ -92,6 +94,8 @@ class ModuleConfiguration {
             configurationService = configurationService,
             auditLog = auditLog,
             policyGate = policyGate,
+            ledger = ledger,
+            capabilityProbe = capabilityProbe,
         )
         val recorded = cycle.record()
         auditLog.sealDay(LocalDate.ofInstant(recorded.outcome.evaluatedAt, ZoneOffset.UTC))

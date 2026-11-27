@@ -24,6 +24,7 @@ data class PortfolioSnapshot(
     val configurationVersionId: String,
     val configurationVersionNumber: Long,
     val ledgerStatus: String,
+    val fxStatus: String,
     val journalEntryCount: Int,
     val journalBalanced: Boolean,
     val brokerConnected: Boolean,
@@ -42,10 +43,12 @@ class DashboardReadModel(
         val configuration = configurationService.active()
         val budget = configuration.budget
         val observed = capabilityProbe.current()
+        val brokerCash = observed.brokerCash
         val quote = ledger.quote(
             CashInputs(
                 currency = budget.baseCurrency,
-                brokerCashMinor = null,
+                brokerCashMinor = brokerCash?.minorUnits,
+                brokerCurrency = brokerCash?.currency,
                 assignedBudgetMinor = budget.assignedBudgetMinor,
                 externalHoldingsMinor = null,
                 reservedCashMinor = null,
@@ -67,6 +70,7 @@ class DashboardReadModel(
             configurationVersionId = configuration.versionId.toString(),
             configurationVersionNumber = configuration.versionNumber,
             ledgerStatus = quote.status,
+            fxStatus = quote.fxStatus,
             journalEntryCount = ledger.journalEntryCount(),
             journalBalanced = ledger.journalBalanced(),
             brokerConnected = observed.connected,

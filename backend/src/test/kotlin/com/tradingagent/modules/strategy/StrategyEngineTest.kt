@@ -6,6 +6,7 @@ import com.tradingagent.kernel.ReasonCode
 import com.tradingagent.modules.configuration.TradingParameters
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import java.time.Instant
 
@@ -28,6 +29,32 @@ class StrategyEngineTest {
         assertFalse(missingKeys.complete())
         assertEquals(ReasonCode.CAPABILITY_UNVERIFIED, first.reasonCode)
         assertEquals("NO-TRADE", first.action)
+        assertFalse(first.signal.orderable)
+        assertEquals("NONE", first.signal.direction)
+        assertNull(first.signal.instrumentId)
+        assertEquals(first.signal.signalId, second.signal.signalId)
+        assertEquals(64, first.signal.signalId.length)
+    }
+
+    @Test
+    fun `a missing eur usd quote is a no trade reason and not an order`() {
+        val input = DecisionInput(
+            operationalState = OperationalState.OBSERVATION,
+            evidenceAllowsActive = false,
+            channels = emptyList(),
+            evaluatedAt = at,
+            fxStatus = "UNCONFIGURED",
+        )
+        val outcome = engine.evaluate(input)
+        assertEquals("NO-TRADE", outcome.action)
+        assertEquals(
+            listOf(ReasonCode.CAPABILITY_UNVERIFIED, ReasonCode.FX_UNAVAILABLE, ReasonCode.DATA_MISSING),
+            outcome.reasonCodes,
+        )
+        assertFalse(outcome.signal.orderable)
+        assertEquals(0, outcome.signal.confidenceMillis)
+        assertNull(outcome.signal.validUntil)
+        assertEquals(outcome.signal.signalId, engine.evaluate(input).signal.signalId)
     }
 
     @Test

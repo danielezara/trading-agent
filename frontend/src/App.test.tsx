@@ -89,6 +89,15 @@ const decision = {
     audit_sequence: 1,
     audit_event_hash: "c".repeat(64),
     policy: { accepted: false, reason: "MISSING_INTENT", broker_called: false },
+    signal: {
+      signal_id: "e".repeat(64),
+      origin: "strategy-engine",
+      direction: "NONE",
+      instrument_id: null,
+      confidence_millis: 0,
+      orderable: false,
+      rationale: "NO-TRADE",
+    },
   },
   meta: { environment: "DEMO", base_currency: null },
   warnings: [],
@@ -161,6 +170,8 @@ describe("dashboard skeleton", () => {
     expect(screen.getByTestId("decision")).toHaveTextContent("CAPABILITY_UNVERIFIED");
     expect(screen.getByTestId("policy")).toHaveTextContent("MISSING_INTENT");
     expect(screen.getByTestId("policy")).toHaveTextContent("Broker chiamato: no");
+    expect(screen.getByTestId("signal")).toHaveTextContent("direzione NONE");
+    expect(screen.getByTestId("signal")).toHaveTextContent("eseguibile: no");
     expect(screen.getByTestId("account-card")).toHaveTextContent("Demo eToro");
     expect(screen.getByTestId("account-card")).toHaveTextContent("Connessa");
     expect(screen.getByTestId("account-card")).toHaveTextContent("no");
@@ -177,6 +188,10 @@ describe("dashboard skeleton", () => {
         ...overview.data,
         broker_connected: true,
         broker_cash: { minor_units: 28035, currency: "USD" },
+        assigned_budget: { minor_units: 50000, currency: "EUR" },
+        available_cash: null,
+        ledger_status: "FX_UNAVAILABLE",
+        fx_status: "UNCONFIGURED",
         account_label: "demo.user",
       },
     };
@@ -195,6 +210,9 @@ describe("dashboard skeleton", () => {
     expect(card).toHaveTextContent("sì");
     expect(card).toHaveTextContent("demo.user");
     expect(card).toHaveTextContent("280,35 USD");
+    expect(screen.getByTestId("cash-alignment")).toHaveTextContent("cassa USD, budget EUR");
+    expect(screen.getByTestId("cash-alignment")).toHaveTextContent("Nessun cambio configurato");
+    expect(screen.getByText("50000 EUR")).toBeInTheDocument();
     expect(card).not.toHaveTextContent("Conto Demo delle chiavi");
   });
 

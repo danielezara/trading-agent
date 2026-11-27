@@ -7,6 +7,7 @@ import com.tradingagent.modules.configuration.ConfigurationVersion
 import com.tradingagent.modules.configuration.EvidenceGate
 import com.tradingagent.modules.decision.DecisionCycle
 import com.tradingagent.modules.decision.RecordedDecision
+import com.tradingagent.modules.strategy.ObservationSignal
 import com.tradingagent.modules.ingestion.ChannelHealth
 import com.tradingagent.modules.ingestion.IngestionAssessment
 import com.tradingagent.modules.ingestion.IngestionPipeline
@@ -247,6 +248,20 @@ class SystemStatusController(
             reason = recorded.policy.reason,
             brokerCalled = recorded.policy.brokerCalled,
         ),
+        signal = signalData(recorded.outcome.signal),
+    )
+
+    private fun signalData(signal: ObservationSignal) = SignalData(
+        signalId = signal.signalId,
+        origin = signal.origin,
+        originVersion = signal.originVersion,
+        instrumentId = signal.instrumentId,
+        direction = signal.direction,
+        evaluatedAt = signal.evaluatedAt,
+        validUntil = signal.validUntil,
+        confidenceMillis = signal.confidenceMillis,
+        rationale = signal.rationale,
+        orderable = signal.orderable,
     )
 
     private fun configurationData(version: ConfigurationVersion, activeId: java.util.UUID) = ConfigurationData(
@@ -424,6 +439,20 @@ data class DecisionData(
     val auditSequence: Long,
     val auditEventHash: String,
     val policy: PolicyData,
+    val signal: SignalData,
+)
+
+data class SignalData(
+    val signalId: String,
+    val origin: String,
+    val originVersion: String,
+    val instrumentId: String?,
+    val direction: String,
+    val evaluatedAt: Instant,
+    val validUntil: Instant?,
+    val confidenceMillis: Int,
+    val rationale: String,
+    val orderable: Boolean,
 )
 
 data class PolicyData(

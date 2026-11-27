@@ -18,6 +18,7 @@ export type Overview = {
   reserved_cash: Money;
   cash_buffer: Money;
   ledger_status: string;
+  fx_status?: string;
   journal_entry_count: number;
   journal_balanced: boolean;
   broker_connected: boolean;
@@ -42,6 +43,15 @@ export type Decision = {
     accepted: boolean;
     reason: string;
     broker_called: boolean;
+  };
+  signal?: {
+    signal_id: string;
+    origin: string;
+    direction: string;
+    instrument_id: string | null;
+    confidence_millis: number;
+    orderable: boolean;
+    rationale: string;
   };
 };
 

@@ -19,6 +19,20 @@ data class DecisionInput(
     val evidenceAllowsActive: Boolean,
     val channels: List<ChannelObservation>,
     val evaluatedAt: Instant,
+    val fxStatus: String = "UNOBSERVED",
+)
+
+data class ObservationSignal(
+    val signalId: String,
+    val origin: String,
+    val originVersion: String,
+    val instrumentId: String?,
+    val direction: String,
+    val evaluatedAt: Instant,
+    val validUntil: Instant?,
+    val confidenceMillis: Int,
+    val rationale: String,
+    val orderable: Boolean,
 )
 
 data class StrategyOutcome(
@@ -28,6 +42,7 @@ data class StrategyOutcome(
     val summary: String,
     val inputHash: String,
     val evaluatedAt: Instant,
+    val signal: ObservationSignal,
 )
 
 class StrategyEngine(
@@ -75,6 +90,9 @@ class StrategyEngine(
         if (capabilityClosed) {
             reasonCodes += ReasonCode.CAPABILITY_UNVERIFIED
         }
+        if (input.fxStatus == "UNCONFIGURED") {
+            reasonCodes += ReasonCode.FX_UNAVAILABLE
+        }
         if (missing.isNotEmpty()) {
             reasonCodes += ReasonCode.DATA_MISSING
         }
@@ -88,20 +106,47 @@ class StrategyEngine(
             reasonCodes += ReasonCode.WARMUP_INCOMPLETE
         }
         val action = "NO-TRADE"
-        val hash = hash(input.operationalState, input.evidenceAllowsActive, input.evaluatedAt, normalized)
+        val hash = hash(input.operationalState, input.evidenceAllowsActive, input.fxStatus, input.evaluatedAt, normalized)
+        val summary = "NO-TRADE. Motivi: ${reasonCodes.joinToString(", ") { it.name }}."
+        val signal = signal(hash, input.evaluatedAt, summary)
         return StrategyOutcome(
             action = action,
             reasonCode = reasonCodes.first(),
             reasonCodes = reasonCodes,
-            summary = "NO-TRADE. Motivi: ${reasonCodes.joinToString(", ") { it.name }}.",
+            summary = summary,
             inputHash = hash,
             evaluatedAt = input.evaluatedAt,
+            signal = signal,
+        )
+    }
+
+    private fun signal(inputHash: String, evaluatedAt: Instant, rationale: String): ObservationSignal {
+        val identity = buildString {
+            append("observation-signal/1\n")
+            append("input_hash=").append(inputHash).append('\n')
+            append("direction=").append(SIGNAL_DIRECTION).append('\n')
+            append("instrument=\n")
+            append("confidence_millis=0\n")
+            append("orderable=false\n")
+        }
+        return ObservationSignal(
+            signalId = sha256(identity),
+            origin = SIGNAL_ORIGIN,
+            originVersion = SIGNAL_VERSION,
+            instrumentId = null,
+            direction = SIGNAL_DIRECTION,
+            evaluatedAt = evaluatedAt,
+            validUntil = null,
+            confidenceMillis = 0,
+            rationale = rationale,
+            orderable = false,
         )
     }
 
     private fun hash(
         state: OperationalState,
         evidenceAllowsActive: Boolean,
+        fxStatus: String,
         evaluatedAt: Instant,
         channels: List<ChannelObservation>,
     ): String {
@@ -109,6 +154,7 @@ class StrategyEngine(
             append("decision-input/v1\n")
             append("state=").append(state.wire).append('\n')
             append("evidence=").append(evidenceAllowsActive).append('\n')
+            append("fx=").append(fxStatus).append('\n')
             append("evaluated_at=").append(evaluatedAt).append('\n')
             channels.forEach { channel ->
                 append("channel=").append(channel.channel)
@@ -119,11 +165,19 @@ class StrategyEngine(
                 append('\n')
             }
         }
+        return sha256(payload)
+    }
+
+    private fun sha256(payload: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(payload.toByteArray(Charsets.UTF_8))
         return digest.joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
     }
 
     companion object {
+        const val SIGNAL_ORIGIN: String = "strategy-engine"
+        const val SIGNAL_VERSION: String = "observation-signal/1"
+        const val SIGNAL_DIRECTION: String = "NONE"
+
         val MANDATORY_CHANNELS: List<String> = listOf(
             "calendar",
             "fundamentals",

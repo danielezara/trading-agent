@@ -3,6 +3,7 @@ package com.tradingagent.api
 import com.tradingagent.kernel.Money
 import com.tradingagent.modules.identity.AccessModel
 import com.tradingagent.modules.identity.Role
+import com.tradingagent.modules.ledger.Ledger
 import com.tradingagent.modules.readmodel.DashboardReadModel
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
@@ -57,6 +58,7 @@ class DashboardController(
                 configurationVersionId = snapshot.configurationVersionId,
                 configurationVersionNumber = snapshot.configurationVersionNumber,
                 ledgerStatus = snapshot.ledgerStatus,
+                fxStatus = snapshot.fxStatus,
                 journalEntryCount = snapshot.journalEntryCount,
                 journalBalanced = snapshot.journalBalanced,
                 brokerConnected = snapshot.brokerConnected,
@@ -65,12 +67,22 @@ class DashboardController(
                 accountLabel = snapshot.accountLabel,
             ),
             meta = ApiMeta(schemaVersion = "portfolio-snapshot/1"),
-            warnings = listOf(
-                ApiWarning(
-                    code = "DATA_UNAVAILABLE",
-                    detail = "Il giornale locale non è collegato. I null non sono zeri.",
-                ),
-            ),
+            warnings = buildList {
+                add(
+                    ApiWarning(
+                        code = "DATA_UNAVAILABLE",
+                        detail = "Il giornale locale non è collegato. I null non sono zeri.",
+                    ),
+                )
+                if (snapshot.ledgerStatus == Ledger.STATUS_FX_UNAVAILABLE) {
+                    add(
+                        ApiWarning(
+                            code = "FX_UNAVAILABLE",
+                            detail = "Cassa broker e budget sono in valute diverse. Nessun cambio con fonte, versione, timestamp e haircut è configurato, quindi il disponibile resta assente.",
+                        ),
+                    )
+                }
+            },
         )
     }
 }
@@ -106,6 +118,7 @@ data class OverviewData(
     val configurationVersionId: String,
     val configurationVersionNumber: Long,
     val ledgerStatus: String,
+    val fxStatus: String,
     val journalEntryCount: Int,
     val journalBalanced: Boolean,
     val brokerConnected: Boolean,

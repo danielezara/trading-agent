@@ -2,10 +2,13 @@ package com.tradingagent.modules.decision
 
 import com.tradingagent.modules.audit.AuditEvent
 import com.tradingagent.modules.audit.AuditLog
+import com.tradingagent.modules.brokerread.CapabilityProbe
 import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.configuration.ConfigurationVersion
 import com.tradingagent.modules.configuration.EvidenceGate
 import com.tradingagent.modules.ingestion.IngestionPipeline
+import com.tradingagent.modules.ledger.CashInputs
+import com.tradingagent.modules.ledger.Ledger
 import com.tradingagent.modules.operational.OperationalStateService
 import com.tradingagent.modules.risk.DispatchPreconditions
 import com.tradingagent.modules.risk.PolicyGate
@@ -32,6 +35,8 @@ class DecisionCycle(
     private val auditLog: AuditLog,
     private val policyGate: PolicyGate,
     private val clock: () -> Instant = Instant::now,
+    private val ledger: Ledger = Ledger(),
+    private val capabilityProbe: CapabilityProbe = CapabilityProbe.offline(),
 ) {
     private var recorded: RecordedDecision? = null
 
@@ -41,6 +46,17 @@ class DecisionCycle(
     fun record(): RecordedDecision {
         val at = clock()
         val assessment = ingestionPipeline.assess(at)
+        val configuration = configurationService.active()
+        val brokerCash = capabilityProbe.current().brokerCash
+        val quote = ledger.quote(
+            CashInputs(
+                currency = configuration.budget.baseCurrency,
+                brokerCashMinor = brokerCash?.minorUnits,
+                brokerCurrency = brokerCash?.currency,
+                assignedBudgetMinor = configuration.budget.assignedBudgetMinor,
+                cashBufferMinor = configuration.budget.cashBufferMinor,
+            ),
+        )
         val outcome = strategyEngine.evaluate(
             DecisionInput(
                 operationalState = operationalStateService.current(),
@@ -55,10 +71,13 @@ class DecisionCycle(
                     )
                 },
                 evaluatedAt = at,
+                fxStatus = quote.fxStatus,
             ),
         )
         check(outcome.action == "NO-TRADE") { "il ciclo di osservazione non può emettere un ordine" }
-        val configuration = configurationService.active()
+        check(!outcome.signal.orderable && outcome.signal.direction == "NONE" && outcome.signal.instrumentId == null) {
+            "un segnale di osservazione non è eseguibile"
+        }
         val payload = decisionPayload(outcome)
         val auditEvent = auditLog.append(
             occurredAt = at,
@@ -83,6 +102,8 @@ class DecisionCycle(
             "action=${outcome.action}",
             "reasons=${outcome.reasonCodes.joinToString(",") { it.name }}",
             "input_hash=${outcome.inputHash}",
+            "signal_id=${outcome.signal.signalId}",
+            "signal_orderable=${outcome.signal.orderable}",
         ).joinToString("\n")
     }
 }

@@ -501,6 +501,9 @@ components:
               nullable: true
             ledger_status:
               type: string
+            fx_status:
+              type: string
+              enum: [UNOBSERVED, NOT_REQUIRED, UNCONFIGURED, APPLIED]
             journal_entry_count:
               type: integer
             journal_balanced:
@@ -620,6 +623,36 @@ components:
                 reason:
                   type: string
                 broker_called:
+                  type: boolean
+                  enum: [false]
+            signal:
+              type: object
+              required: [signal_id, origin, direction, confidence_millis, orderable]
+              properties:
+                signal_id:
+                  type: string
+                origin:
+                  type: string
+                origin_version:
+                  type: string
+                instrument_id:
+                  type: string
+                  nullable: true
+                direction:
+                  type: string
+                  enum: [NONE]
+                evaluated_at:
+                  type: string
+                  format: date-time
+                valid_until:
+                  type: string
+                  format: date-time
+                  nullable: true
+                confidence_millis:
+                  type: integer
+                rationale:
+                  type: string
+                orderable:
                   type: boolean
                   enum: [false]
         meta:

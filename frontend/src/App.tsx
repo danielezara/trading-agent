@@ -152,6 +152,12 @@ function OverviewPage({ loaded }: { loaded: LoadState }) {
           <>
             <p data-testid="decision">{`Decisione: ${loaded.data.decision.action} · ${loaded.data.decision.reason_codes[0]}`}</p>
             <p data-testid="policy">{`Policy: ${loaded.data.decision.policy.reason}. Broker chiamato: no.`}</p>
+            {loaded.data.decision.signal ? (
+              <p data-testid="signal">{`Segnale ${loaded.data.decision.signal.signal_id.slice(0, 12)} · direzione ${loaded.data.decision.signal.direction} · eseguibile: no`}</p>
+            ) : null}
+            {loaded.data.overview.ledger_status === "FX_UNAVAILABLE" ? (
+              <p data-testid="cash-alignment">{`Disponibile non calcolato: cassa ${loaded.data.overview.broker_cash?.currency ?? "non osservata"}, budget ${loaded.data.overview.assigned_budget?.currency ?? "non osservato"}. Nessun cambio configurato.`}</p>
+            ) : null}
             <dl className="facts" data-testid="account-card">
               <div><dt>Piattaforma</dt><dd>Demo eToro</dd></div>
               <div><dt>Connessa</dt><dd>{loaded.data.overview.broker_connected ? "sì" : "no"}</dd></div>
@@ -172,7 +178,7 @@ function PortfolioPage({ loaded }: { loaded: LoadState }) {
     <section className="panel">
       <h1>Portafoglio</h1>
       <p>Il ledger espone solo il budget osservabile. I valori assenti restano non disponibili.</p>
-      <p>Disponibile = min(cassa broker, budget − posizioni esterne) − riservato − buffer.</p>
+      <p>Disponibile = min(cassa broker, budget − posizioni esterne) − riservato − buffer. Se la cassa e il budget sono in valute diverse e non c’è un cambio configurato, il disponibile resta non disponibile.</p>
       <LoadNotice loaded={loaded} />
       {loaded.status === "ready" ? (
         <>
