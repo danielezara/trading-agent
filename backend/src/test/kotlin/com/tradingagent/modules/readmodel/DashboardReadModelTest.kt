@@ -7,6 +7,7 @@ import com.tradingagent.modules.brokerread.DemoKeyMaterial
 import com.tradingagent.modules.brokerread.DisplayQuote
 import com.tradingagent.modules.brokerread.HttpGet
 import com.tradingagent.modules.brokerread.InboundHttp
+import com.tradingagent.modules.brokerread.InstrumentNameRead
 import com.tradingagent.modules.brokerread.PositionQuoteRead
 import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.configuration.EvidenceGate
@@ -118,6 +119,22 @@ class DashboardReadModelTest {
     }
 
     @Test
+    fun `a display name is attached and a missing name stays absent`() {
+        val snapshot = model(
+            """{"clientPortfolio":{"credit":10,"accountCurrencyId":1,"positions":[{"instrumentID":6270,"units":1,"amount":1},{"instrumentID":100032,"units":2,"amount":2}]}}""",
+            PositionQuoteRead { emptyMap() },
+            InstrumentNameRead { ids ->
+                assertEquals(listOf("6270", "100032"), ids)
+                mapOf("6270" to "Apple")
+            },
+        ).portfolio()
+        assertEquals("Apple", snapshot.instrumentNames?.get("6270"))
+        assertNull(snapshot.instrumentNames?.get("100032"))
+        assertEquals(OperationalState.OBSERVATION, snapshot.operationalState)
+        assertFalse(snapshot.tradingEnabled)
+    }
+
+    @Test
     fun `quotes are not requested when there are no positions`() {
         var calls = 0
         val snapshot = model(
@@ -132,7 +149,11 @@ class DashboardReadModelTest {
         assertEquals(emptyList<Any>(), snapshot.positions)
     }
 
-    private fun model(body: String, quotes: PositionQuoteRead) = DashboardReadModel(
+    private fun model(
+        body: String,
+        quotes: PositionQuoteRead,
+        names: InstrumentNameRead = InstrumentNameRead { null },
+    ) = DashboardReadModel(
         operationalStateService = OperationalStateService(clock = { Instant.parse("2026-11-27T00:00:00Z") }),
         ledger = Ledger(),
         configurationService = ConfigurationService(),
@@ -147,5 +168,6 @@ class DashboardReadModelTest {
             clock = { Instant.parse("2026-11-27T00:00:00Z") },
         ),
         positionQuotes = quotes,
+        instrumentNames = names,
     )
 }

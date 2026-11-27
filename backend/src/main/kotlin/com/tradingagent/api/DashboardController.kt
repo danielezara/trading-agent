@@ -95,7 +95,9 @@ class DashboardController(
                 lastProbeAt = snapshot.lastProbeAt,
                 probeErrorClass = snapshot.probeErrorClass,
                 accountLabel = snapshot.accountLabel,
-                positions = snapshot.positions?.map { position -> positionData(position, snapshot.quotes) },
+                positions = snapshot.positions?.map { position ->
+                    positionData(position, snapshot.quotes, snapshot.instrumentNames)
+                },
                 orders = snapshot.orders?.map { order -> orderData(order) },
                 executions = snapshot.executions?.map { order -> orderData(order) },
                 reconciliation = reconciliationData(report),
@@ -171,6 +173,7 @@ data class PositionData(
     val value: Money?,
     val quotePrice: String?,
     val quoteTime: Instant?,
+    val displayName: String?,
 )
 
 data class OrderData(
@@ -182,12 +185,17 @@ data class OrderData(
     val openedAt: String?,
 )
 
-private fun positionData(position: ObservedPosition, quotes: Map<String, DisplayQuote>?) = PositionData(
+private fun positionData(
+    position: ObservedPosition,
+    quotes: Map<String, DisplayQuote>?,
+    names: Map<String, String>?,
+) = PositionData(
     instrumentId = position.instrumentId,
     quantity = position.quantity,
     value = position.value,
     quotePrice = quotes?.get(position.instrumentId)?.price?.toPlainString(),
     quoteTime = quotes?.get(position.instrumentId)?.quotedAt,
+    displayName = names?.get(position.instrumentId)?.takeIf { it.isNotBlank() },
 )
 
 private fun orderData(order: ObservedOrder) = OrderData(

@@ -14,6 +14,7 @@ export type DemoPosition = {
   value: Money;
   quote_price?: string | null;
   quote_time?: string | null;
+  display_name?: string | null;
 };
 
 export type DemoOrder = {

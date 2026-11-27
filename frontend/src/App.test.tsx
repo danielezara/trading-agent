@@ -411,6 +411,7 @@ describe("dashboard skeleton", () => {
             value: null,
             quote_price: "1.25",
             quote_time: "2026-11-27T09:30:00Z",
+            display_name: "Apple",
           },
           {
             instrument_id: "100032",
@@ -418,6 +419,7 @@ describe("dashboard skeleton", () => {
             value: null,
             quote_price: null,
             quote_time: null,
+            display_name: null,
           },
         ],
       },
@@ -441,6 +443,10 @@ describe("dashboard skeleton", () => {
     expect(times[0]).toHaveTextContent("2026-11-27T09:30:00Z");
     expect(prices[1].textContent).toBe("");
     expect(times[1].textContent).toBe("");
+    const names = screen.getAllByTestId("instrument-name");
+    expect(names[0]).toHaveTextContent("Apple");
+    expect(names[1].textContent).toBe("");
+    expect(screen.getByTestId("positions")).toHaveTextContent("100032");
     expect(screen.getByTestId("positions")).toHaveTextContent("6270");
     expect(screen.getByTestId("positions")).toHaveTextContent("100032");
     expect(calls.some((path) => path.includes("news") || path.includes("feeds"))).toBe(false);

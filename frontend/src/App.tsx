@@ -143,6 +143,7 @@ function PositionsTable({ positions }: { positions: Overview["positions"] | unde
       <thead>
         <tr>
           <th>Strumento</th>
+          <th>Nome</th>
           <th>Quantità</th>
           <th>Valore</th>
           <th>Quotazione</th>
@@ -153,6 +154,7 @@ function PositionsTable({ positions }: { positions: Overview["positions"] | unde
         {positions.map((position, index) => (
           <tr key={`${position.instrument_id}-${index}`}>
             <td>{position.instrument_id}</td>
+            <td data-testid="instrument-name">{position.display_name ?? ""}</td>
             <td>{position.quantity ?? "non disponibile"}</td>
             <td>{cashAmount(position.value)}</td>
             <td data-testid="quote-price">{position.quote_price ?? ""}</td>

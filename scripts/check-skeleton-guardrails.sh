@@ -16,7 +16,28 @@ if [[ -n "$tracked_secrets" ]]; then
 fi
 
 broker_urls="$(git grep -I -n -E -i 'https?://[^[:space:]]*etoro' -- . ':!scripts/check-skeleton-guardrails.sh' || true)"
-unexpected_broker_urls="$(printf '%s\n' "$broker_urls" | grep -v -F 'https://public-api.etoro.com/api/v1/trading/info/demo/portfolio' | grep -v -F 'https://public-api.etoro.com/api/v1/market-data/instruments/rates' || true)"
+allowed_broker_url() {
+  local base="${1%%\?*}"
+  case "$base" in
+    https://public-api.etoro.com/api/v1/trading/info/demo/portfolio|\
+    https://public-api.etoro.com/api/v1/market-data/instruments/rates|\
+    https://public-api.etoro.com/api/v1/market-data/instruments)
+      return 0
+      ;;
+  esac
+  return 1
+}
+unexpected_broker_urls=""
+while IFS= read -r line; do
+  [[ -z "$line" ]] && continue
+  while IFS= read -r url; do
+    [[ -z "$url" ]] && continue
+    if ! allowed_broker_url "$url"; then
+      unexpected_broker_urls+="$line"$'\n'
+      break
+    fi
+  done < <(printf '%s\n' "$line" | grep -oE 'https?://[^[:space:]"'\''`<>)]+' || true)
+done <<< "$broker_urls"
 if [[ -n "$unexpected_broker_urls" ]]; then
   fail "broker URL is not allowed:\n$unexpected_broker_urls"
 fi

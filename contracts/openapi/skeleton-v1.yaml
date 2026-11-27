@@ -569,6 +569,10 @@ components:
                     type: string
                     format: date-time
                     nullable: true
+                  display_name:
+                    type: string
+                    nullable: true
+                    description: Official instrumentDisplayName from the instruments GET. Null when that read has no name. The instrument id is never replaced by an invented name.
             orders:
               type: array
               nullable: true
