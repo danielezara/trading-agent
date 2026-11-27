@@ -184,6 +184,74 @@ class DecisionCycleTest {
         assertEquals("ACCEPTED", recorded.demoEntry.status)
         assertEquals(200, recorded.demoEntry.httpStatus)
         assertEquals("9001", recorded.demoEntry.orderId)
+        assertEquals(1, recorded.programOpenPositions)
+        assertEquals(7_500L, recorded.programInvestedMinor)
+    }
+
+    @Test
+    fun `an opened program position is not ordered again and the next symbol can be`() {
+        val origin = Instant.parse("2026-11-27T10:00:00Z")
+        val at = origin.plusSeconds(300L * 20)
+        val sender = RecordingEntry()
+        val book = ProgramPositions(mapOf("1001" to 7_500L))
+        var pass = 0
+        val cycle = cycleWith(
+            at = at,
+            brokerPositions = 16,
+            held = ObservedInstrumentBars("1005", "stock", emptyList()),
+            candidate = ObservedInstrumentBars("1002", "stock", risingBars(origin)),
+            sender = sender,
+            rate = "1.09626",
+            programPositions = book,
+            candidates = { heldIds ->
+                pass += 1
+                val id = if (pass == 1) "1001" else "1002"
+                listOf(ObservedInstrumentBars(id, "stock", risingBars(origin))).filter { it.instrumentId !in heldIds }
+            },
+        )
+        val skipped = cycle.record()
+        assertEquals("NO-TRADE", skipped.rule.action)
+        assertEquals("WARMUP", skipped.rule.reason)
+        assertEquals(0, sender.calls.size)
+        assertEquals(1, skipped.programOpenPositions)
+        assertEquals(7_500L, skipped.programInvestedMinor)
+
+        val opened = cycle.record()
+        assertEquals("ENTER", opened.rule.action)
+        assertEquals("1002", opened.rule.instrumentId)
+        assertEquals(7_500L, opened.rule.notionalMinor)
+        assertEquals(1, sender.calls.size)
+        assertEquals("1002", sender.calls.single().first)
+        assertTrue(sender.calls.single().third.contains("1001"))
+        assertEquals(2, opened.programOpenPositions)
+        assertEquals(15_000L, opened.programInvestedMinor)
+        assertFalse(EntryPace.finished(opened.rule.reason))
+    }
+
+    @Test
+    fun `four program positions leave no aggregate room for a fifth`() {
+        val origin = Instant.parse("2026-11-27T10:00:00Z")
+        val at = origin.plusSeconds(300L * 20)
+        val sender = RecordingEntry()
+        val book = ProgramPositions(
+            mapOf("1001" to 7_500L, "1002" to 7_500L, "1003" to 7_500L, "1004" to 7_500L),
+        )
+        val cycle = cycleWith(
+            at = at,
+            brokerPositions = 16,
+            held = ObservedInstrumentBars("1005", "stock", emptyList()),
+            candidate = ObservedInstrumentBars("1008", "stock", risingBars(origin)),
+            sender = sender,
+            rate = "1.09626",
+            programPositions = book,
+        )
+        val recorded = cycle.record()
+        assertEquals("NO-TRADE", recorded.rule.action)
+        assertEquals("EXPOSURE_LIMIT", recorded.rule.reason)
+        assertEquals(0, sender.calls.size)
+        assertEquals(4, recorded.programOpenPositions)
+        assertEquals(30_000L, recorded.programInvestedMinor)
+        assertTrue(EntryPace.finished(recorded.rule.reason))
     }
 
     @Test
@@ -614,6 +682,8 @@ class DecisionCycleTest {
         candidate: ObservedInstrumentBars,
         sender: RecordingEntry,
         rate: String?,
+        programPositions: ProgramPositions = ProgramPositions(),
+        candidates: ((Set<String>) -> List<ObservedInstrumentBars>)? = null,
     ): DecisionCycle = DecisionCycle(
         strategyEngine = StrategyEngine(),
         ingestionPipeline = IngestionPipeline.fromClasspath(),
@@ -627,8 +697,9 @@ class DecisionCycleTest {
         reportedRates = ReportedRateSource {
             if (rate == null) emptyList() else listOf(ReportedRate("EUR", "USD", rate))
         },
-        entryCandidates = EntryCandidates { _, _ -> listOf(candidate) },
+        entryCandidates = EntryCandidates { _, heldIds -> candidates?.invoke(heldIds) ?: listOf(candidate) },
         demoEntries = sender,
+        programPositions = programPositions,
     )
 
     private fun risingBars(origin: Instant): List<ObservedBar> = (0 until 20).map { index ->

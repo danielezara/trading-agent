@@ -313,6 +313,9 @@ class SystemStatusController(
         demoEntryReason = recorded.demoEntry.reason,
         demoEntryHttpStatus = recorded.demoEntry.httpStatus,
         demoEntryOrderId = recorded.demoEntry.orderId,
+        programOpenPositions = recorded.programOpenPositions,
+        programInvestedMinor = recorded.programInvestedMinor,
+        entryLoop = decisionCycle.entryLoop,
     )
 
     private fun signalData(signal: ObservationSignal) = SignalData(
@@ -540,6 +543,9 @@ data class DecisionData(
     val demoEntryReason: String,
     val demoEntryHttpStatus: Int?,
     val demoEntryOrderId: String?,
+    val programOpenPositions: Int,
+    val programInvestedMinor: Long,
+    val entryLoop: String,
 )
 
 data class SignalData(

@@ -48,6 +48,8 @@ data class RecordedDecision(
     val bookLossCurrency: String? = null,
     val lossBlocksEntries: Boolean = false,
     val demoEntry: DemoOpenResult = DemoOpenResult("NOT_SENT", "WARMUP"),
+    val programOpenPositions: Int = 0,
+    val programInvestedMinor: Long = 0,
 )
 
 class DecisionCycle(
@@ -72,6 +74,9 @@ class DecisionCycle(
 ) {
     private var recorded: RecordedDecision? = null
     private var storedBars: List<ObservedInstrumentBars> = emptyList()
+
+    @Volatile
+    var entryLoop: String = "OFF"
 
     fun storedBars(): List<ObservedInstrumentBars> = storedBars
 
@@ -100,8 +105,9 @@ class DecisionCycle(
                 fx = fx,
             ),
         )
+        val programHeld = programPositions.ids()
         val candidates = try {
-            entryCandidates.load(at, emptySet())
+            entryCandidates.load(at, programHeld)
         } catch (_: Exception) {
             emptyList()
         }
@@ -111,7 +117,7 @@ class DecisionCycle(
             null
         } ?: ObservedBars(0, emptyList())
         storedBars = observed.instruments
-        val held = observed.instruments.map { it.instrumentId }.filter { it.isNotBlank() }.toSet()
+        val held = observed.instruments.map { it.instrumentId }.filter { it.isNotBlank() }.toSet() + programHeld
         val rates = try {
             reportedRates.load().map { rate ->
                 PayloadRate(rate.currency, rate.displayCurrency, rate.rate)
@@ -136,7 +142,8 @@ class DecisionCycle(
             payloadRates = rates,
             entriesBlocked = entriesBlocked(),
             investedMinor = programInvested,
-            sectorInvestedMinor = programInvested,
+            // Il feed non assegna un settore comune: il tetto di settore non accorpa nomi diversi.
+            sectorInvestedMinor = 0,
             heldInstrumentIds = held,
         )
         val lossBlocksEntries = BudgetLoss.blocksNewEntries(
@@ -234,6 +241,8 @@ class DecisionCycle(
             observed.bookLossCurrency,
             lossBlocksEntries,
             demoEntry,
+            programPositions.count(),
+            programPositions.investedMinor(),
         )
         recorded = result
         return result
@@ -325,14 +334,34 @@ class DecisionCycle(
     }
 }
 
-class ProgramPositions {
+class ProgramPositions(seed: Map<String, Long> = emptyMap()) {
     private val notionals = linkedMapOf<String, Long>()
+
+    init {
+        seed.forEach { (instrumentId, notionalMinor) ->
+            require(instrumentId.isNotBlank() && notionalMinor > 0) { "una posizione del programma ha un nominale positivo" }
+            notionals.putIfAbsent(instrumentId, notionalMinor)
+        }
+    }
+
+    fun ids(): Set<String> = notionals.keys.toSet()
 
     fun count(): Int = notionals.size
 
     fun investedMinor(): Long = notionals.values.sum()
 
     fun note(instrumentId: String, notionalMinor: Long) {
+        if (instrumentId.isBlank() || notionalMinor <= 0) {
+            return
+        }
         notionals.putIfAbsent(instrumentId, notionalMinor)
+    }
+
+    companion object {
+        const val OPENED_INSTRUMENT: String = "1001"
+        const val OPENED_NOTIONAL_MINOR: Long = 7_500L
+
+        /** AAPL, ordine 397030666, 75,00 EUR. Conta nel budget e non si riapre. */
+        fun withOpenedBook(): ProgramPositions = ProgramPositions(mapOf(OPENED_INSTRUMENT to OPENED_NOTIONAL_MINOR))
     }
 }

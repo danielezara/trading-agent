@@ -1016,6 +1016,17 @@ components:
               type: string
               nullable: true
               description: Identificativo numerico dell'ordine Demo. Non è un token.
+            program_open_positions:
+              type: integer
+              minimum: 0
+              description: Posizioni aperte da questo programma, dentro i 500 EUR.
+            program_invested_minor:
+              type: integer
+              minimum: 0
+              description: Nominale EUR già impegnato dal programma, in minor unit.
+            entry_loop:
+              type: string
+              description: ON finché un giro sulle barre da 5 minuti può ancora aprire. Altrimenti il motivo di stop.
         meta:
           $ref: "#/components/schemas/Meta"
         warnings:
