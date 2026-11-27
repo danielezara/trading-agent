@@ -583,6 +583,10 @@ components:
                     nullable: true
                     enum: [inside, outside, unknown]
                     description: inside for official Stocks or ETF. outside for any other official type. unknown when the type is missing. No order is sent.
+                  official_type:
+                    type: string
+                    nullable: true
+                    description: Exact instrumentTypeDescription. Null when the type is missing. The name is never used as a type.
             orders:
               type: array
               nullable: true

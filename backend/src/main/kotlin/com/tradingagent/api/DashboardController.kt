@@ -178,6 +178,7 @@ data class PositionData(
     val displayName: String?,
     val assetClass: String?,
     val allowlist: String?,
+    val officialType: String?,
 )
 
 data class ClosedTradeData(
@@ -214,6 +215,7 @@ private fun positionData(
         ?: classes?.let { com.tradingagent.modules.brokerread.InstrumentClassification.ASSET_UNKNOWN },
     allowlist = classes?.get(position.instrumentId)?.allowlist
         ?: classes?.let { com.tradingagent.modules.brokerread.InstrumentClassification.ALLOW_UNKNOWN },
+    officialType = classes?.get(position.instrumentId)?.officialType,
 )
 
 private fun closedTradeData(trade: com.tradingagent.modules.brokerread.ClosedTrade) = ClosedTradeData(

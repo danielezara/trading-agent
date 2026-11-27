@@ -440,6 +440,7 @@ describe("dashboard skeleton", () => {
             display_name: "Apple",
             asset_class: "stock",
             allowlist: "inside",
+            official_type: "Stocks",
           },
           {
             instrument_id: "100032",
@@ -450,6 +451,7 @@ describe("dashboard skeleton", () => {
             display_name: null,
             asset_class: "other",
             allowlist: "outside",
+            official_type: "Crypto",
           },
         ],
       },
@@ -476,8 +478,8 @@ describe("dashboard skeleton", () => {
     const names = screen.getAllByTestId("instrument-name");
     expect(names[0]).toHaveTextContent("Apple");
     expect(names[1].textContent).toBe("");
-    expect(screen.getAllByTestId("asset-class").map((cell) => cell.textContent)).toEqual(["azione", "altro"]);
-    expect(screen.getAllByTestId("allowlist").map((cell) => cell.textContent)).toEqual(["dentro", "fuori"]);
+    expect(screen.getAllByTestId("asset-class").map((cell) => cell.textContent)).toEqual(["Stocks", "Crypto"]);
+    expect(screen.getAllByTestId("allowlist").map((cell) => cell.textContent)).toEqual(["inside", "outside"]);
     expect(screen.getByTestId("positions")).toHaveTextContent("100032");
     expect(screen.getByTestId("positions")).toHaveTextContent("6270");
     expect(screen.getByTestId("positions")).toHaveTextContent("100032");

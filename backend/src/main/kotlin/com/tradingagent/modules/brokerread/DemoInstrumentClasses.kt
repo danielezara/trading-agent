@@ -8,6 +8,7 @@ import java.time.Duration
 data class InstrumentClassification(
     val assetClass: String,
     val allowlist: String,
+    val officialType: String? = null,
 ) {
     companion object {
         val UNKNOWN = InstrumentClassification("unknown", "unknown")
@@ -69,10 +70,10 @@ object DemoInstrumentClasses {
     }
 
     fun classify(description: String?): InstrumentClassification = when (description) {
-        "Stocks" -> InstrumentClassification(InstrumentClassification.ASSET_STOCK, InstrumentClassification.ALLOW_INSIDE)
-        "ETF" -> InstrumentClassification(InstrumentClassification.ASSET_ETF, InstrumentClassification.ALLOW_INSIDE)
+        "Stocks" -> InstrumentClassification(InstrumentClassification.ASSET_STOCK, InstrumentClassification.ALLOW_INSIDE, "Stocks")
+        "ETF" -> InstrumentClassification(InstrumentClassification.ASSET_ETF, InstrumentClassification.ALLOW_INSIDE, "ETF")
         null, "" -> InstrumentClassification.UNKNOWN
-        else -> InstrumentClassification(InstrumentClassification.ASSET_OTHER, InstrumentClassification.ALLOW_OUTSIDE)
+        else -> InstrumentClassification(InstrumentClassification.ASSET_OTHER, InstrumentClassification.ALLOW_OUTSIDE, description)
     }
 
     private fun readTypeIds(

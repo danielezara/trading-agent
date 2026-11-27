@@ -161,8 +161,8 @@ function PositionsTable({ positions }: { positions: Overview["positions"] | unde
             <td>{cashAmount(position.value)}</td>
             <td data-testid="quote-price">{position.quote_price ?? ""}</td>
             <td data-testid="quote-time">{position.quote_time ?? ""}</td>
-            <td data-testid="asset-class">{assetClassLabel(position.asset_class)}</td>
-            <td data-testid="allowlist">{allowlistLabel(position.allowlist)}</td>
+            <td data-testid="asset-class">{position.official_type ?? ""}</td>
+            <td data-testid="allowlist">{allowlistMark(position.allowlist)}</td>
           </tr>
         ))}
       </tbody>
@@ -170,31 +170,9 @@ function PositionsTable({ positions }: { positions: Overview["positions"] | unde
   );
 }
 
-function assetClassLabel(value: string | null | undefined): string {
-  if (value === "stock") {
-    return "azione";
-  }
-  if (value === "etf") {
-    return "ETF";
-  }
-  if (value === "other") {
-    return "altro";
-  }
-  if (value === "unknown") {
-    return "sconosciuto";
-  }
-  return "";
-}
-
-function allowlistLabel(value: string | null | undefined): string {
-  if (value === "inside") {
-    return "dentro";
-  }
-  if (value === "outside") {
-    return "fuori";
-  }
-  if (value === "unknown") {
-    return "sconosciuto";
+function allowlistMark(value: string | null | undefined): string {
+  if (value === "inside" || value === "outside") {
+    return value;
   }
   return "";
 }
