@@ -51,4 +51,26 @@ class SkeletonSafetyCheckTest {
         assertTrue(error.message!!.contains("ETORO_API_KEY"))
         assertTrue(!error.message!!.contains("super-secret-value"))
     }
+
+    @Test
+    fun `demo key names are read from the environment and are not rejected`() {
+        val apiValue = "local-demo-api-value"
+        val userValue = "local-demo-user-value"
+        SkeletonSafetyCheck.assertConfiguration(
+            safe,
+            mapOf(
+                DemoKeySlot.API_KEY_ENV to apiValue,
+                DemoKeySlot.USER_KEY_ENV to userValue,
+            ),
+        )
+        val slot = DemoKeySlot.fromEnvironment(
+            mapOf(
+                DemoKeySlot.API_KEY_ENV to apiValue,
+                DemoKeySlot.USER_KEY_ENV to userValue,
+            ),
+        )
+        assertTrue(slot.complete())
+        assertTrue(!slot.toString().contains(apiValue))
+        assertTrue(!slot.toString().contains(userValue))
+    }
 }

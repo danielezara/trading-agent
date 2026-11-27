@@ -9,6 +9,10 @@ class SkeletonSafetyGuard(
 ) {
     @PostConstruct
     fun validate() {
-        SkeletonSafetyCheck.assertConfiguration(properties, System.getenv())
+        val env = System.getenv()
+        SkeletonSafetyCheck.assertConfiguration(properties, env)
+        demoKeys = DemoKeySlot.fromEnvironment(env)
     }
+
+    private var demoKeys: DemoKeySlot = DemoKeySlot.fromEnvironment(emptyMap())
 }

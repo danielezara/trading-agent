@@ -1,9 +1,11 @@
 package com.tradingagent.modules.strategy
 
+import com.tradingagent.config.DemoKeySlot
 import com.tradingagent.kernel.OperationalState
 import com.tradingagent.kernel.ReasonCode
 import com.tradingagent.modules.configuration.TradingParameters
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
 import java.time.Instant
 
@@ -22,6 +24,10 @@ class StrategyEngineTest {
         assertEquals(64, first.inputHash.length)
         assertEquals("EUR", TradingParameters.current().economic.baseCurrency)
         assertEquals(50_000L, TradingParameters.current().economic.assignedBudgetMinor)
+        val missingKeys = DemoKeySlot.fromEnvironment(emptyMap())
+        assertFalse(missingKeys.complete())
+        assertEquals(ReasonCode.CAPABILITY_UNVERIFIED, first.reasonCode)
+        assertEquals("NO-TRADE", first.action)
     }
 
     @Test

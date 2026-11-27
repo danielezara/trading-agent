@@ -29,6 +29,8 @@ I default sono in `backend/src/main/resources/application.yml` e in [`.env.examp
 
 Il valore della variabile non viene scritto nel messaggio di errore. Il servizio ascolta su `127.0.0.1`. L’identità non è collegata: non esporre la porta.
 
+Le chiavi Demo locali sono `ETORO_DEMO_API_KEY` e `ETORO_DEMO_USER_KEY`, lette solo dall’ambiente del processo. I nomi con valore vuoto stanno in [`backend/.env.example`](backend/.env.example); `backend/.env` è ignorato da git. Se mancano, la decisione resta `NO-TRADE` con `CAPABILITY_UNVERIFIED`. I valori non vengono scritti nei log.
+
 `POSTGRES_*` serve solo a Compose. Il backend non le legge.
 
 ## Avvio locale
