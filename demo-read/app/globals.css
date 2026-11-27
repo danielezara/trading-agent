@@ -1,0 +1,25 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+  line-height: 1.5;
+  background: #f3f6f8;
+  color: #14202b;
+}
+
+body { margin: 0; }
+
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.product { margin: 0; color: #3e4c59; }
+
+h1 { margin: 0.2rem 0 0.5rem; }
+
+dl { margin: 1rem 0; background: #ffffff; border: 1px solid #d9e2ec; border-radius: 12px; }
+dl div { display: grid; grid-template-columns: 9rem 1fr; gap: 0.75rem; padding: 0.6rem 0.9rem; border-top: 1px solid #d9e2ec; }
+dl div:first-child { border-top: 0; }
+dt { color: #3e4c59; }
+dd { margin: 0; overflow-wrap: anywhere; }

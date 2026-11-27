@@ -45,6 +45,21 @@ jobs:
           npm test
           npm run build
 
+  demo-read:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: demo-read/package-lock.json
+      - name: Test the server-side Demo read
+        working-directory: demo-read
+        run: |
+          npm ci
+          npm test
+
   infra:
     runs-on: ubuntu-latest
     steps:
