@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { getJson } from "./api/client";
 import { assertSkeletonApiBase } from "./api/policy";
-import type { Configuration, DataHealth, Decision, Envelope, Money, OperationalState, Overview } from "./api/types";
+import type { AuditChain, Configuration, DataHealth, Decision, Envelope, Money, OperationalState, Overview } from "./api/types";
 import "./styles.css";
 
 const NAV = [
@@ -23,6 +23,7 @@ type DashboardData = {
   operational: OperationalState;
   decision: Decision;
   health: DataHealth;
+  audit: AuditChain;
 };
 
 type LoadState =
@@ -81,7 +82,7 @@ function DashboardShell() {
           <Route path="/attivita" element={<Page title="Attività" />} />
           <Route path="/dati" element={<DataPage loaded={loaded} />} />
           <Route path="/alert" element={<Page title="Alert" />} />
-          <Route path="/audit" element={<Page title="Audit" />} />
+          <Route path="/audit" element={<AuditPage loaded={loaded} />} />
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/configurazione" element={<ConfigurationPage loaded={loaded} />} />
         </Routes>
@@ -100,7 +101,8 @@ function useDashboardData(): LoadState {
       getJson<Envelope<OperationalState>>("/api/v1/operational-state"),
       getJson<Envelope<Decision>>("/api/v1/decisions/latest"),
       getJson<Envelope<DataHealth>>("/api/v1/data-health"),
-    ]).then(([overview, configuration, operational, decision, health]) => {
+      getJson<Envelope<AuditChain>>("/api/v1/audit"),
+    ]).then(([overview, configuration, operational, decision, health, audit]) => {
       if (!cancelled) {
         setLoaded({
           status: "ready",
@@ -110,6 +112,7 @@ function useDashboardData(): LoadState {
             operational: operational.data,
             decision: decision.data,
             health: health.data,
+            audit: audit.data,
           },
         });
       }
@@ -133,7 +136,10 @@ function OverviewPage({ loaded }: { loaded: LoadState }) {
         <p>Lettura locale di stato, configurazione e budget. Nessun ordine e nessuna chiamata al broker.</p>
         <LoadNotice loaded={loaded} />
         {loaded.status === "ready" ? (
-          <p data-testid="decision">{`Decisione: ${loaded.data.decision.action} · ${loaded.data.decision.reason_codes[0]}`}</p>
+          <>
+            <p data-testid="decision">{`Decisione: ${loaded.data.decision.action} · ${loaded.data.decision.reason_codes[0]}`}</p>
+            <p data-testid="policy">{`Policy: ${loaded.data.decision.policy.reason}. Broker chiamato: no.`}</p>
+          </>
         ) : null}
       </section>
       <AmountGrid loaded={loaded} />
@@ -175,6 +181,7 @@ function ConfigurationDetails({ configuration }: { configuration: Configuration 
       <div><dt>Autore</dt><dd>{configuration.author}</dd></div>
       <div><dt>Motivo</dt><dd>{configuration.reason}</dd></div>
       <div><dt>Impronta</dt><dd><code>{configuration.content_sha256}</code></dd></div>
+      <div><dt>Confine di barra</dt><dd>{configuration.valid_from_bar_open}</dd></div>
       <div><dt>Valuta</dt><dd>{configuration.budget.base_currency ?? "non disponibile"}</dd></div>
       <div><dt>Budget</dt><dd>{minorOrMissing(configuration.budget.assigned_budget_minor, configuration.budget.base_currency)}</dd></div>
     </dl>
@@ -261,6 +268,24 @@ function ChannelTable({ health }: { health: DataHealth }) {
         ))}
       </tbody>
     </table>
+  );
+}
+
+function AuditPage({ loaded }: { loaded: LoadState }) {
+  const audit = loaded.status === "ready" ? loaded.data.audit : null;
+  return (
+    <section className="panel">
+      <h1>Audit</h1>
+      <p>Catena append-only delle decisioni. Il digest esterno non è collegato e nessuna chiave di firma è presente.</p>
+      <LoadNotice loaded={loaded} />
+      {audit ? (
+        <>
+          <p>{`Catena: ${audit.chain_valid ? "integra" : "alterata"}. Eventi: ${audit.event_count}.`}</p>
+          <p>{`Digest del giorno sigillato: ${audit.daily_digest_sealed ? "sì" : "no"}. Storage esterno: ${audit.durable ? "collegato" : "non collegato"}.`}</p>
+          <p><code>{audit.head_hash ?? "non disponibile"}</code></p>
+        </>
+      ) : null}
+    </section>
   );
 }
 

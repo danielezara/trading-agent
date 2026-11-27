@@ -1,0 +1,42 @@
+[
+  {
+    "name": "missing-intent",
+    "intent_id": null,
+    "reservation_id": "reservation-1",
+    "audit_event_id": "audit-1",
+    "outbox_id": "outbox-1",
+    "reason": "MISSING_INTENT"
+  },
+  {
+    "name": "missing-reservation",
+    "intent_id": "intent-1",
+    "reservation_id": null,
+    "audit_event_id": "audit-1",
+    "outbox_id": "outbox-1",
+    "reason": "MISSING_RESERVATION"
+  },
+  {
+    "name": "missing-audit",
+    "intent_id": "intent-1",
+    "reservation_id": "reservation-1",
+    "audit_event_id": null,
+    "outbox_id": "outbox-1",
+    "reason": "MISSING_AUDIT"
+  },
+  {
+    "name": "missing-outbox",
+    "intent_id": "intent-1",
+    "reservation_id": "reservation-1",
+    "audit_event_id": "audit-1",
+    "outbox_id": null,
+    "reason": "MISSING_OUTBOX"
+  },
+  {
+    "name": "complete-still-refused",
+    "intent_id": "intent-1",
+    "reservation_id": "reservation-1",
+    "audit_event_id": "audit-1",
+    "outbox_id": "outbox-1",
+    "reason": "DISPATCH_DISABLED"
+  }
+]

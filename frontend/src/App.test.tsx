@@ -30,6 +30,7 @@ const configuration = {
     created_at: "2026-11-27T00:00:00Z",
     reason: "Parametri economici non impostati.",
     content_sha256: "a".repeat(64),
+    valid_from_bar_open: "2026-11-27T00:00:00Z",
     active: true,
     budget: {
       base_currency: null,
@@ -67,6 +68,11 @@ const decision = {
     summary: "NO-TRADE. Motivi: CAPABILITY_UNVERIFIED, DATA_MISSING.",
     input_hash: "b".repeat(64),
     evaluated_at: "2026-11-27T00:00:30Z",
+    config_version_id: "11111111-1111-1111-1111-111111111111",
+    config_content_sha256: "a".repeat(64),
+    audit_sequence: 1,
+    audit_event_hash: "c".repeat(64),
+    policy: { accepted: false, reason: "MISSING_INTENT", broker_called: false },
   },
   meta: { environment: "DEMO", base_currency: null },
   warnings: [],
@@ -87,11 +93,26 @@ const health = {
   warnings: [],
 };
 
+const audit = {
+  data: {
+    durable: false,
+    chain_valid: true,
+    event_count: 1,
+    head_hash: "c".repeat(64),
+    daily_digest: "d".repeat(64),
+    daily_digest_sealed: true,
+    events: [],
+  },
+  meta: { environment: "DEMO", base_currency: null },
+  warnings: [],
+};
+
 function jsonFor(path: string) {
   if (path.includes("overview")) return overview;
   if (path.includes("configurations")) return configuration;
   if (path.includes("decisions")) return decision;
   if (path.includes("data-health")) return health;
+  if (path.includes("audit")) return audit;
   return operational;
 }
 
@@ -121,12 +142,15 @@ describe("dashboard skeleton", () => {
     expect(screen.getAllByText("non disponibile").length).toBeGreaterThan(0);
     expect(await screen.findByTestId("decision")).toHaveTextContent("NO-TRADE");
     expect(screen.getByTestId("decision")).toHaveTextContent("CAPABILITY_UNVERIFIED");
+    expect(screen.getByTestId("policy")).toHaveTextContent("MISSING_INTENT");
+    expect(screen.getByTestId("policy")).toHaveTextContent("Broker chiamato: no");
     expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
   });
 
   it("shows the active configuration version", async () => {
     renderAt("/configurazione");
     expect(await screen.findByText("system")).toBeInTheDocument();
+    expect(screen.getByText("2026-11-27T00:00:00Z")).toBeInTheDocument();
     expect(screen.getByText("Parametri economici non impostati.")).toBeInTheDocument();
   });
 
@@ -145,6 +169,14 @@ describe("dashboard skeleton", () => {
     expect(screen.getByText("CONFLICT")).toBeInTheDocument();
     expect(screen.getByText("NOT_WIRED")).toBeInTheDocument();
     expect(screen.getByText(/Rete: no/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the audit chain without a durable store", async () => {
+    renderAt("/audit");
+    expect(await screen.findByRole("heading", { name: "Audit" })).toBeInTheDocument();
+    expect(screen.getByText(/Catena: integra/)).toBeInTheDocument();
+    expect(screen.getByText(/Storage esterno: non collegato/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
   });
 

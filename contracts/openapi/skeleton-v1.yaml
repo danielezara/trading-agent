@@ -104,6 +104,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DecisionEnvelope"
+  /api/v1/audit:
+    get:
+      operationId: auditChain
+      responses:
+        "200":
+          description: In-memory tamper-evident decision audit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEnvelope"
   /api/v1/evidence-gate:
     get:
       operationId: evidenceGate
@@ -179,6 +189,9 @@ components:
           type: string
         content_sha256:
           type: string
+        valid_from_bar_open:
+          type: string
+          format: date-time
         active:
           type: boolean
         budget:
@@ -532,6 +545,51 @@ components:
             evaluated_at:
               type: string
               format: date-time
+            config_version_id:
+              type: string
+            audit_event_hash:
+              type: string
+            policy:
+              type: object
+              required: [accepted, reason, broker_called]
+              properties:
+                accepted:
+                  type: boolean
+                  enum: [false]
+                reason:
+                  type: string
+                broker_called:
+                  type: boolean
+                  enum: [false]
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    AuditEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [durable, chain_valid, event_count]
+          properties:
+            durable:
+              type: boolean
+              enum: [false]
+            chain_valid:
+              type: boolean
+            event_count:
+              type: integer
+            head_hash:
+              type: string
+              nullable: true
+            daily_digest:
+              type: string
+              nullable: true
+            daily_digest_sealed:
+              type: boolean
         meta:
           $ref: "#/components/schemas/Meta"
         warnings:

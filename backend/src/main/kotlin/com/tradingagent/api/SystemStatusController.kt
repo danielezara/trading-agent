@@ -4,16 +4,16 @@ import com.tradingagent.modules.audit.AuditLog
 import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.configuration.ConfigurationVersion
 import com.tradingagent.modules.configuration.EvidenceGate
+import com.tradingagent.modules.decision.DecisionCycle
+import com.tradingagent.modules.decision.RecordedDecision
 import com.tradingagent.modules.ingestion.ChannelHealth
 import com.tradingagent.modules.ingestion.IngestionAssessment
 import com.tradingagent.modules.ingestion.IngestionPipeline
 import com.tradingagent.modules.operational.OperationalStateService
 import com.tradingagent.modules.reconciliation.ReconciliationJob
 import com.tradingagent.modules.scheduler.DurableScheduler
-import com.tradingagent.modules.strategy.ChannelObservation
-import com.tradingagent.modules.strategy.DecisionInput
-import com.tradingagent.modules.strategy.StrategyEngine
-import com.tradingagent.modules.strategy.StrategyOutcome
+import java.time.LocalDate
+import java.time.ZoneOffset
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -26,7 +26,7 @@ class SystemStatusController(
     private val operationalStateService: OperationalStateService,
     private val configurationService: ConfigurationService,
     private val evidenceGate: EvidenceGate,
-    private val strategyEngine: StrategyEngine,
+    private val decisionCycle: DecisionCycle,
     private val ingestionPipeline: IngestionPipeline,
     private val reconciliationJob: ReconciliationJob,
     private val durableScheduler: DurableScheduler,
@@ -34,7 +34,7 @@ class SystemStatusController(
 ) {
     @GetMapping("/system/status")
     fun status(): ApiEnvelope<SystemStatusData> {
-        val outcome = latestDecision()
+        val outcome = decisionCycle.latest().outcome
         return ApiEnvelope(
             data = SystemStatusData(
                 operationalState = operationalStateService.current().wire,
@@ -147,9 +147,9 @@ class SystemStatusController(
 
     @GetMapping("/decisions/latest")
     fun latest(): ApiEnvelope<DecisionData> {
-        val outcome = latestDecision()
+        val recorded = decisionCycle.latest()
         return ApiEnvelope(
-            data = decisionData(outcome),
+            data = decisionData(recorded),
             meta = ApiMeta(schemaVersion = "decision/1"),
             warnings = listOf(
                 ApiWarning(
@@ -160,22 +160,37 @@ class SystemStatusController(
         )
     }
 
-    private fun latestDecision(at: Instant = Instant.now()): StrategyOutcome {
-        val assessment = ingestionPipeline.assess(at)
-        return strategyEngine.evaluate(
-            DecisionInput(
-                operationalState = operationalStateService.current(),
-                evidenceAllowsActive = evidenceGate.allowsActive(),
-                channels = assessment.channels.map { channel ->
-                    ChannelObservation(
-                        channel = channel.channel,
-                        acceptedCount = channel.acceptedCount,
-                        stale = channel.stale,
-                        conflict = channel.conflict,
-                        qualityMillis = channel.qualityMillis,
+    @GetMapping("/audit")
+    fun audit(): ApiEnvelope<AuditData> {
+        val events = auditLog.events()
+        val verification = auditLog.verify()
+        val day = events.lastOrNull()?.let { LocalDate.ofInstant(it.occurredAt, ZoneOffset.UTC) }
+        return ApiEnvelope(
+            data = AuditData(
+                durable = false,
+                chainValid = verification.valid,
+                eventCount = verification.eventCount,
+                headHash = verification.headHash,
+                dailyDigest = day?.let { auditLog.dailyDigest(it) },
+                dailyDigestSealed = day?.let { auditLog.digestSealed(it) } ?: false,
+                events = events.map { event ->
+                    AuditEventData(
+                        sequence = event.sequence,
+                        occurredAt = event.occurredAt,
+                        correlationId = event.correlationId,
+                        eventType = event.eventType,
+                        configVersionId = event.configVersionId,
+                        configContentSha256 = event.configContentSha256,
+                        eventHash = event.eventHash,
                     )
                 },
-                evaluatedAt = at,
+            ),
+            meta = ApiMeta(schemaVersion = "audit/1"),
+            warnings = listOf(
+                ApiWarning(
+                    code = "AUDIT_NOT_DURABLE",
+                    detail = "La catena è in memoria. Il digest esterno non è collegato e nessuna firma è stata prodotta.",
+                ),
             ),
         )
     }
@@ -200,12 +215,21 @@ class SystemStatusController(
         status = channel.status,
     )
 
-    private fun decisionData(outcome: StrategyOutcome) = DecisionData(
-        action = outcome.action,
-        reasonCodes = outcome.reasonCodes.map { it.name },
-        summary = outcome.summary,
-        inputHash = outcome.inputHash,
-        evaluatedAt = outcome.evaluatedAt,
+    private fun decisionData(recorded: RecordedDecision) = DecisionData(
+        action = recorded.outcome.action,
+        reasonCodes = recorded.outcome.reasonCodes.map { it.name },
+        summary = recorded.outcome.summary,
+        inputHash = recorded.outcome.inputHash,
+        evaluatedAt = recorded.outcome.evaluatedAt,
+        configVersionId = recorded.configuration.versionId.toString(),
+        configContentSha256 = recorded.configuration.contentSha256,
+        auditSequence = recorded.auditEvent.sequence,
+        auditEventHash = recorded.auditEvent.eventHash,
+        policy = PolicyData(
+            accepted = recorded.policy.accepted,
+            reason = recorded.policy.reason,
+            brokerCalled = recorded.policy.brokerCalled,
+        ),
     )
 
     private fun configurationData(version: ConfigurationVersion, activeId: java.util.UUID) = ConfigurationData(
@@ -215,6 +239,7 @@ class SystemStatusController(
         createdAt = version.createdAt,
         reason = version.reason,
         contentSha256 = version.contentSha256,
+        validFromBarOpen = version.validFromBarOpen,
         active = version.versionId == activeId,
         budget = BudgetData(
             baseCurrency = version.budget.baseCurrency,
@@ -248,6 +273,7 @@ data class ConfigurationData(
     val createdAt: Instant,
     val reason: String,
     val contentSha256: String,
+    val validFromBarOpen: Instant,
     val active: Boolean,
     val budget: BudgetData,
 )
@@ -344,4 +370,35 @@ data class DecisionData(
     val summary: String,
     val inputHash: String,
     val evaluatedAt: Instant,
+    val configVersionId: String,
+    val configContentSha256: String,
+    val auditSequence: Long,
+    val auditEventHash: String,
+    val policy: PolicyData,
+)
+
+data class PolicyData(
+    val accepted: Boolean,
+    val reason: String,
+    val brokerCalled: Boolean,
+)
+
+data class AuditData(
+    val durable: Boolean,
+    val chainValid: Boolean,
+    val eventCount: Int,
+    val headHash: String?,
+    val dailyDigest: String?,
+    val dailyDigestSealed: Boolean,
+    val events: List<AuditEventData>,
+)
+
+data class AuditEventData(
+    val sequence: Long,
+    val occurredAt: Instant,
+    val correlationId: String,
+    val eventType: String,
+    val configVersionId: String,
+    val configContentSha256: String,
+    val eventHash: String,
 )

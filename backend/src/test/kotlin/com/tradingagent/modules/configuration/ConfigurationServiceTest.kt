@@ -1,5 +1,7 @@
 package com.tradingagent.modules.configuration
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.tradingagent.kernel.OrderIntentState
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -41,16 +43,75 @@ class ConfigurationServiceTest {
     }
 
     @Test
-    fun `cutover is refused while an intent is in flight`() {
+    fun `cutover happens only at the scheduled bar boundary without in-flight intents`() {
         val service = ConfigurationService(clock)
         val original = service.active()
-        val recorded = service.record("operator", "Budget proposto.", BudgetPolicy(baseCurrency = "EUR", assignedBudgetMinor = 1))
+        val recorded = service.record(
+            "operator",
+            "Budget proposto.",
+            BudgetPolicy(baseCurrency = "EUR", assignedBudgetMinor = 1),
+        )
+        assertEquals(Instant.parse("2026-11-27T00:05:00Z"), recorded.validFromBarOpen)
+        val filled = BoundIntent("done", OrderIntentState.FILLED, original.versionId)
+        val pending = BoundIntent("open", OrderIntentState.DISPATCH_PENDING, original.versionId)
         assertThrows(IllegalStateException::class.java) {
-            service.activate(recorded.versionId, inFlightIntents = 1)
+            service.activate(recorded.versionId, listOf(pending, filled), recorded.validFromBarOpen)
         }
         assertEquals(original.versionId, service.active().versionId)
-        assertEquals(recorded.versionId, service.activate(recorded.versionId, inFlightIntents = 0).versionId)
+        assertEquals(original.versionId, pending.configVersionId)
+        assertEquals(original.versionId, filled.configVersionId)
+        assertThrows(IllegalStateException::class.java) {
+            service.activate(recorded.versionId, emptyList(), Instant.parse("2026-11-27T00:03:00Z"))
+        }
+        val activated = service.activate(recorded.versionId, listOf(filled), recorded.validFromBarOpen)
+        assertEquals(recorded.versionId, activated.versionId)
         assertEquals(recorded.budget, service.active().budget)
+        assertEquals(original.versionId, filled.configVersionId)
+    }
+
+    @Test
+    fun `a mid bar change is scheduled for the next boundary`() {
+        val service = ConfigurationService { Instant.parse("2026-11-27T00:03:10Z") }
+        assertEquals(Instant.parse("2026-11-27T00:00:00Z"), service.active().validFromBarOpen)
+        val recorded = service.record("operator", "Dopo l'apertura della barra.", BudgetPolicy())
+        assertEquals(Instant.parse("2026-11-27T00:05:00Z"), recorded.validFromBarOpen)
+    }
+
+    @Test
+    fun `sent and unknown block cutover and terminal states do not`() {
+        val blocking = listOf(
+            OrderIntentState.PROPOSED,
+            OrderIntentState.RISK_RESERVED,
+            OrderIntentState.DISPATCH_PENDING,
+            OrderIntentState.SENT,
+            OrderIntentState.UNKNOWN,
+        )
+        val open = listOf(OrderIntentState.FILLED, OrderIntentState.CANCELLED, OrderIntentState.ACKNOWLEDGED)
+        blocking.forEach { state -> assertTrue(state in ConfigurationService.BLOCKING_STATES) }
+        open.forEach { state -> assertTrue(state !in ConfigurationService.BLOCKING_STATES) }
+    }
+
+    @Test
+    fun `fixture intents keep the configuration they were created with`() {
+        val service = ConfigurationService(clock)
+        val original = service.active()
+        val recorded = service.record("operator", "Cutover di fixture.", BudgetPolicy(baseCurrency = "EUR", assignedBudgetMinor = 1))
+        val fixture = ObjectMapper().readTree(
+            javaClass.getResourceAsStream("/fixtures/configuration/cutover-intents.json"),
+        )
+        val bound = fixture.get("intents").map { node ->
+            BoundIntent(
+                intentId = node.get("intent_id").asText(),
+                state = OrderIntentState.values().first { it.wire == node.get("state").asText() },
+                configVersionId = original.versionId,
+            )
+        }
+        assertEquals(recorded.validFromBarOpen.toString(), fixture.get("scheduled_bar_open").asText())
+        assertThrows(IllegalStateException::class.java) {
+            service.activate(recorded.versionId, bound, recorded.validFromBarOpen)
+        }
+        assertEquals(original.versionId, service.active().versionId)
+        assertTrue(bound.all { it.configVersionId == original.versionId })
     }
 
     @Test

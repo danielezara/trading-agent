@@ -30,6 +30,35 @@ export type Decision = {
   summary: string;
   input_hash: string;
   evaluated_at: string;
+  config_version_id: string;
+  config_content_sha256: string;
+  audit_sequence: number;
+  audit_event_hash: string;
+  policy: {
+    accepted: boolean;
+    reason: string;
+    broker_called: boolean;
+  };
+};
+
+export type AuditEvent = {
+  sequence: number;
+  occurred_at: string;
+  correlation_id: string;
+  event_type: string;
+  config_version_id: string;
+  config_content_sha256: string;
+  event_hash: string;
+};
+
+export type AuditChain = {
+  durable: boolean;
+  chain_valid: boolean;
+  event_count: number;
+  head_hash: string | null;
+  daily_digest: string | null;
+  daily_digest_sealed: boolean;
+  events: AuditEvent[];
 };
 
 export type DataChannel = {
@@ -66,6 +95,7 @@ export type Configuration = {
   created_at: string;
   reason: string;
   content_sha256: string;
+  valid_from_bar_open: string;
   active: boolean;
   budget: Budget;
 };

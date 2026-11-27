@@ -101,10 +101,28 @@ class ApiSkeletonTest(
             .andExpect(jsonPath("$.data.channels[?(@.channel == 'prices')].status", contains("CONFLICT")))
             .andExpect(jsonPath("$.data.channels[?(@.channel == 'orders')].status", contains("NOT_WIRED")))
 
-        mockMvc.perform(get("/api/v1/decisions/latest"))
+        val firstDecision = mockMvc.perform(get("/api/v1/decisions/latest"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.action").value("NO-TRADE"))
             .andExpect(jsonPath("$.data.reason_codes[0]").value("CAPABILITY_UNVERIFIED"))
+            .andExpect(jsonPath("$.data.policy.accepted").value(false))
+            .andExpect(jsonPath("$.data.policy.broker_called").value(false))
+            .andExpect(jsonPath("$.data.policy.reason").value("MISSING_INTENT"))
+            .andReturn()
+        val hash = com.jayway.jsonpath.JsonPath.read<String>(firstDecision.response.contentAsString, "$.data.input_hash")
+        mockMvc.perform(get("/api/v1/decisions/latest"))
+            .andExpect(jsonPath("$.data.input_hash").value(hash))
+
+        mockMvc.perform(get("/api/v1/audit"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.durable").value(false))
+            .andExpect(jsonPath("$.data.chain_valid").value(true))
+            .andExpect(jsonPath("$.data.event_count").value(1))
+            .andExpect(jsonPath("$.data.daily_digest_sealed").value(true))
+            .andExpect(jsonPath("$.data.events[0].event_type").value("DecisionRecorded"))
+
+        mockMvc.perform(get("/api/v1/configurations/active"))
+            .andExpect(jsonPath("$.data.valid_from_bar_open").isString())
     }
 
     @Test
@@ -122,6 +140,7 @@ class ApiSkeletonTest(
             post("/api/v1/emergency/kill-switch"),
             post("/api/v1/orders"),
             post("/api/v1/configurations"),
+            post("/api/v1/audit"),
             delete("/api/dashboard/v1/conversations/1"),
         ).forEach { request ->
             mockMvc.perform(request.contentType(MediaType.APPLICATION_JSON).content("{}"))

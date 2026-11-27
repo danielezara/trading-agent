@@ -1,5 +1,6 @@
 package com.tradingagent.modules.configuration
 
+import com.tradingagent.kernel.OrderIntentState
 import java.security.MessageDigest
 import java.time.Instant
 import java.util.UUID
@@ -19,7 +20,14 @@ data class ConfigurationVersion(
     val reason: String,
     val contentSha256: String,
     val budget: BudgetPolicy,
+    val validFromBarOpen: Instant,
     val supersedes: UUID?,
+)
+
+data class BoundIntent(
+    val intentId: String,
+    val state: OrderIntentState,
+    val configVersionId: UUID,
 )
 
 class ConfigurationService(
@@ -30,11 +38,14 @@ class ConfigurationService(
     private var activeId: UUID
 
     init {
+        val seededAt = clock()
         val seeded = build(
             versionNumber = 1,
             author = "system",
             reason = "Parametri economici non impostati. Lo stato resta OBSERVATION.",
             budget = BudgetPolicy(),
+            validFromBarOpen = BarSchedule.open(seededAt),
+            createdAt = seededAt,
             supersedes = null,
         )
         versions += seeded
@@ -49,24 +60,40 @@ class ConfigurationService(
 
     fun record(author: String, reason: String, budget: BudgetPolicy): ConfigurationVersion = synchronized(lock) {
         validate(author, reason, budget)
+        val createdAt = clock()
         val created = build(
             versionNumber = versions.size + 1L,
             author = author.trim(),
             reason = reason.trim(),
             budget = budget,
+            validFromBarOpen = BarSchedule.nextBoundary(createdAt),
+            createdAt = createdAt,
             supersedes = activeId,
         )
         versions += created
         created
     }
 
-    fun activate(versionId: UUID, inFlightIntents: Int): ConfigurationVersion = synchronized(lock) {
+    fun activate(versionId: UUID, inFlightIntents: Int, at: Instant = clock()): ConfigurationVersion {
         require(inFlightIntents >= 0) { "inFlightIntents must be >= 0" }
-        if (inFlightIntents > 0) {
-            throw IllegalStateException("Cutover rifiutato: esistono intent in volo.")
+        val blocking = List(inFlightIntents) { index ->
+            BoundIntent("in-flight-$index", OrderIntentState.PROPOSED, active().versionId)
         }
+        return activate(versionId, blocking, at)
+    }
+
+    fun activate(versionId: UUID, bound: List<BoundIntent>, at: Instant = clock()): ConfigurationVersion = synchronized(lock) {
         val version = versions.firstOrNull { it.versionId == versionId }
             ?: throw IllegalArgumentException("Versione di configurazione sconosciuta.")
+        if (!BarSchedule.isBoundary(at) || at != version.validFromBarOpen) {
+            throw IllegalStateException(
+                "Cutover rifiutato: la versione vale dal confine di barra ${version.validFromBarOpen}.",
+            )
+        }
+        val blocking = bound.filter { it.state in BLOCKING_STATES }
+        if (blocking.isNotEmpty()) {
+            throw IllegalStateException("Cutover rifiutato: esistono intent in volo.")
+        }
         activeId = version.versionId
         version
     }
@@ -76,17 +103,19 @@ class ConfigurationService(
         author: String,
         reason: String,
         budget: BudgetPolicy,
+        validFromBarOpen: Instant,
+        createdAt: Instant,
         supersedes: UUID?,
     ): ConfigurationVersion {
-        val createdAt = clock()
         return ConfigurationVersion(
             versionId = UUID.randomUUID(),
             versionNumber = versionNumber,
             author = author,
             createdAt = createdAt,
             reason = reason,
-            contentSha256 = contentSha256(versionNumber, author, createdAt, reason, budget),
+            contentSha256 = contentSha256(versionNumber, author, createdAt, reason, budget, validFromBarOpen),
             budget = budget,
+            validFromBarOpen = validFromBarOpen,
             supersedes = supersedes,
         )
     }
@@ -114,12 +143,21 @@ class ConfigurationService(
     }
 
     companion object {
+        val BLOCKING_STATES = setOf(
+            OrderIntentState.PROPOSED,
+            OrderIntentState.RISK_RESERVED,
+            OrderIntentState.DISPATCH_PENDING,
+            OrderIntentState.SENT,
+            OrderIntentState.UNKNOWN,
+        )
+
         fun contentSha256(
             versionNumber: Long,
             author: String,
             createdAt: Instant,
             reason: String,
             budget: BudgetPolicy,
+            validFromBarOpen: Instant,
         ): String {
             val payload = listOf(
                 versionNumber.toString(),
@@ -130,6 +168,7 @@ class ConfigurationService(
                 budget.assignedBudgetMinor?.toString() ?: "",
                 budget.cashBufferMinor?.toString() ?: "",
                 budget.maxPositions?.toString() ?: "",
+                validFromBarOpen.toString(),
             ).joinToString("\n")
             val digest = MessageDigest.getInstance("SHA-256").digest(payload.toByteArray(Charsets.UTF_8))
             return digest.joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
