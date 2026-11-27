@@ -991,7 +991,7 @@ components:
               nullable: true
             rule_orderable:
               type: boolean
-              enum: [false]
+              description: Vero solo quando closed-bar-trend/1 marca un ingresso nuovo come inviabile.
             closed_bar_count:
               type: integer
               minimum: 0
@@ -1004,6 +1004,18 @@ components:
               nullable: true
             loss_blocks_entries:
               type: boolean
+            demo_entry_status:
+              type: string
+              enum: [NOT_SENT, ACCEPTED, REJECTED]
+            demo_entry_reason:
+              type: string
+            demo_entry_http_status:
+              type: integer
+              nullable: true
+            demo_entry_order_id:
+              type: string
+              nullable: true
+              description: Identificativo numerico dell'ordine Demo. Non è un token.
         meta:
           $ref: "#/components/schemas/Meta"
         warnings:

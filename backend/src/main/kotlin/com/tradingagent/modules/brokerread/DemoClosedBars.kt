@@ -81,6 +81,20 @@ object DemoClosedBars {
         )
     }
 
+    fun barsFor(
+        transport: HttpGet,
+        material: DemoKeyMaterial,
+        id: String,
+        now: Instant,
+        sleep: (Duration) -> Unit = {},
+    ): List<ObservedBar> {
+        if (!validId(id)) {
+            return emptyList()
+        }
+        val body = fetch(transport, material, id, sleep) ?: return emptyList()
+        return select(parse(body), now)
+    }
+
     fun candlesUri(id: String): URI {
         require(validId(id)) { "instrument id is not a positive integer" }
         val uri = URI.create(CANDLES.format(id))

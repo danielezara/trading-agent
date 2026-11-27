@@ -15,6 +15,7 @@ data class EconomicParameters(
     val allowlistDirection: String,
     val allowlistLeverage: Int,
     val allowlistInstrumentIds: List<String>,
+    val entrySymbols: List<String> = emptyList(),
     val benchmarkName: String,
     val benchmarkReturnBasis: String,
     val cashBufferMinor: Long?,
@@ -47,6 +48,7 @@ data class EconomicParameters(
         "allowlist_direction=$allowlistDirection",
         "allowlist_leverage=$allowlistLeverage",
         "allowlist_instrument_ids=${allowlistInstrumentIds.joinToString(",")}",
+        "entry_symbols=${entrySymbols.joinToString(",")}",
         "benchmark_name=$benchmarkName",
         "benchmark_return_basis=$benchmarkReturnBasis",
         "cash_buffer_minor=${cashBufferMinor ?: ""}",
@@ -165,7 +167,8 @@ private object TradingParametersLoader {
         "cooldown_seconds",
         "max_holding_count",
     )
-    private val allowlistKeys = setOf("universe", "direction", "leverage", "instrument_ids")
+    private val allowlistKeys = setOf("universe", "direction", "leverage", "instrument_ids", "entry_symbols")
+    private val entrySymbol = Regex("[A-Z0-9.]{1,16}")
     private val benchmarkKeys = setOf("name", "return_basis")
     private val technicalIntKeys = listOf(
         "price_poll_seconds",
@@ -334,6 +337,7 @@ private object TradingParametersLoader {
             allowlistDirection = direction,
             allowlistLeverage = leverage,
             allowlistInstrumentIds = stringList(allowlist.getValue("instrument_ids"), "instrument_ids"),
+            entrySymbols = entrySymbols(allowlist.getValue("entry_symbols")),
             benchmarkName = requireText(benchmark.getValue("name"), "benchmark.name"),
             benchmarkReturnBasis = requireText(benchmark.getValue("return_basis"), "benchmark.return_basis"),
             cashBufferMinor = optionalLong(node["cash_buffer_minor"], "cash_buffer_minor"),
@@ -442,6 +446,16 @@ private object TradingParametersLoader {
             long
         }
         else -> throw IllegalArgumentException("$key must be an integer or null")
+    }
+
+    private fun entrySymbols(value: Any?): List<String> {
+        val symbols = stringList(value, "entry_symbols")
+        require(symbols.size <= 8) { "entry_symbols cannot exceed 8" }
+        require(symbols.distinct().size == symbols.size) { "entry_symbols must be unique" }
+        symbols.forEach { symbol ->
+            require(entrySymbol.matches(symbol)) { "entry_symbols contains an invalid symbol" }
+        }
+        return symbols
     }
 
     private fun stringList(value: Any?, key: String): List<String> {

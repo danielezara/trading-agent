@@ -74,6 +74,7 @@ object MandateControl {
     const val EXPOSURE_LIMIT: String = "EXPOSURE_LIMIT"
     const val SIZE: String = "SIZE"
     const val SECTOR_UNKNOWN: String = "SECTOR_UNKNOWN"
+    const val EXISTING_POSITION: String = "EXISTING_POSITION"
     const val COOLDOWN: String = "COOLDOWN"
     const val WARMUP: String = "WARMUP"
     const val SCORE: String = "SCORE"
@@ -291,7 +292,7 @@ object ClosedBarPolicy {
             instrumentId = input.instrumentId,
             direction = "LONG",
             notionalMinor = notional,
-            orderable = false,
+            orderable = true,
             reason = MandateControl.OK,
         )
     }

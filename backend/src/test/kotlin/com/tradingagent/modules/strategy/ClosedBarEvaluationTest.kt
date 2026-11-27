@@ -49,6 +49,39 @@ class ClosedBarEvaluationTest {
     }
 
     @Test
+    fun `a new stock with no program exposure is orderable and a held instrument is not`() {
+        val fresh = ClosedBarEvaluation.decide(
+            now,
+            BarBook(
+                0,
+                listOf(InstrumentBars("1001", "stock", bars(21, step = 10))),
+                sectorInvestedMinor = 0,
+            ),
+            parameters.economic,
+            parameters.technical,
+        )
+        assertEquals("ENTER", fresh.action)
+        assertEquals("1001", fresh.instrumentId)
+        assertTrue(fresh.orderable)
+
+        val held = ClosedBarEvaluation.decide(
+            now,
+            BarBook(
+                0,
+                listOf(InstrumentBars("1001", "stock", bars(21, step = 10))),
+                sectorInvestedMinor = 0,
+                heldInstrumentIds = setOf("1001"),
+            ),
+            parameters.economic,
+            parameters.technical,
+        )
+        assertEquals("NO-TRADE", held.action)
+        assertEquals("EXISTING_POSITION", held.reason)
+        assertFalse(held.orderable)
+        assertEquals(null, held.instrumentId)
+    }
+
+    @Test
     fun `a stock entry check is reported ahead of a non stock instrument`() {
         val decision = ClosedBarEvaluation.decide(
             now,

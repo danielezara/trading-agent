@@ -28,6 +28,7 @@ class TradingParametersTest {
         assertEquals("long_only", loaded.economic.allowlistDirection)
         assertEquals(1, loaded.economic.allowlistLeverage)
         assertTrue(loaded.economic.allowlistInstrumentIds.isEmpty())
+        assertEquals(listOf("AAPL", "MSFT", "GOOG", "NVDA", "META", "JPM", "SPY", "SWDA.L"), loaded.economic.entrySymbols)
         assertEquals("MSCI World", loaded.economic.benchmarkName)
         assertEquals("total_return", loaded.economic.benchmarkReturnBasis)
         assertEquals(10_000L, loaded.economic.cashBufferMinor)

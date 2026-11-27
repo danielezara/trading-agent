@@ -5,7 +5,12 @@ import com.tradingagent.kernel.ReasonCode
 import com.tradingagent.modules.audit.AuditLog
 import com.tradingagent.modules.brokerread.CapabilityProbe
 import com.tradingagent.modules.brokerread.ClosedBarSource
+import com.tradingagent.modules.brokerread.DemoEntrySubmit
 import com.tradingagent.modules.brokerread.DemoKeyMaterial
+import com.tradingagent.modules.brokerread.DemoOpenResult
+import com.tradingagent.modules.brokerread.EntryCandidates
+import com.tradingagent.modules.brokerread.ReportedRate
+import com.tradingagent.modules.brokerread.ReportedRateSource
 import com.tradingagent.modules.brokerread.HttpGet
 import com.tradingagent.modules.brokerread.InboundHttp
 import com.tradingagent.modules.brokerread.ObservedBar
@@ -136,17 +141,105 @@ class DecisionCycleTest {
             },
         )
         val recorded = cycle.record()
-        assertEquals(21, recorded.closedBarCount)
+        assertEquals(0, recorded.closedBarCount)
         assertEquals(21, cycle.storedBars().single().bars.size)
         assertEquals("NO-TRADE", recorded.outcome.action)
         assertEquals("NONE", recorded.outcome.signal.direction)
         assertFalse(recorded.outcome.signal.orderable)
         assertEquals("NO-TRADE", recorded.rule.action)
-        assertEquals("SECTOR_UNKNOWN", recorded.rule.reason)
-        assertEquals("1001", recorded.rule.instrumentId)
+        assertEquals("WARMUP", recorded.rule.reason)
         assertFalse(recorded.rule.orderable)
+        assertEquals("NOT_SENT", recorded.demoEntry.status)
+        assertEquals("WARMUP", recorded.demoEntry.reason)
         assertFalse(recorded.policy.accepted)
         assertFalse(recorded.policy.brokerCalled)
+    }
+
+    @Test
+    fun `sixteen broker positions do not block one new orderable entry`() {
+        val origin = Instant.parse("2026-11-27T10:00:00Z")
+        val at = origin.plusSeconds(300L * 20)
+        val sender = RecordingEntry()
+        val cycle = cycleWith(
+            at = at,
+            brokerPositions = 16,
+            held = ObservedInstrumentBars("1005", "stock", emptyList()),
+            candidate = ObservedInstrumentBars("1001", "stock", risingBars(origin)),
+            sender = sender,
+            rate = "1.09626",
+        )
+        val recorded = cycle.record()
+        assertEquals("ENTER", recorded.rule.action)
+        assertEquals("LONG", recorded.rule.direction)
+        assertEquals("1001", recorded.rule.instrumentId)
+        assertEquals(7_500L, recorded.rule.notionalMinor)
+        assertTrue(recorded.rule.orderable)
+        assertEquals("NO-TRADE", recorded.outcome.action)
+        assertFalse(recorded.outcome.signal.orderable)
+        assertFalse(recorded.policy.brokerCalled)
+        assertEquals(1, sender.calls.size)
+        assertEquals("1001", sender.calls.single().first)
+        assertEquals(BigDecimal("82.21"), sender.calls.single().second)
+        assertEquals(setOf("1005"), sender.calls.single().third)
+        assertEquals("ACCEPTED", recorded.demoEntry.status)
+        assertEquals(200, recorded.demoEntry.httpStatus)
+        assertEquals("9001", recorded.demoEntry.orderId)
+    }
+
+    @Test
+    fun `a no trade rule and a held instrument do not send`() {
+        val origin = Instant.parse("2026-11-27T10:00:00Z")
+        val at = origin.plusSeconds(300L * 20)
+        val flat = RecordingEntry()
+        val flatCycle = cycleWith(
+            at = at,
+            brokerPositions = 16,
+            held = ObservedInstrumentBars("1005", "stock", emptyList()),
+            candidate = ObservedInstrumentBars("1001", "stock", flatBars(origin)),
+            sender = flat,
+            rate = "1.09626",
+        )
+        val noTrade = flatCycle.record()
+        assertEquals("NO-TRADE", noTrade.rule.action)
+        assertFalse(noTrade.rule.orderable)
+        assertEquals("NOT_SENT", noTrade.demoEntry.status)
+        assertEquals(0, flat.calls.size)
+
+        val heldSender = RecordingEntry()
+        val heldCycle = cycleWith(
+            at = at,
+            brokerPositions = 16,
+            held = ObservedInstrumentBars("1001", "stock", emptyList()),
+            candidate = ObservedInstrumentBars("1001", "stock", risingBars(origin)),
+            sender = heldSender,
+            rate = "1.09626",
+        )
+        val held = heldCycle.record()
+        assertEquals("NO-TRADE", held.rule.action)
+        assertEquals("EXISTING_POSITION", held.rule.reason)
+        assertEquals("NOT_SENT", held.demoEntry.status)
+        assertEquals(0, heldSender.calls.size)
+    }
+
+    @Test
+    fun `a missing eur usd rate does not invent an amount`() {
+        val origin = Instant.parse("2026-11-27T10:00:00Z")
+        val at = origin.plusSeconds(300L * 20)
+        val sender = RecordingEntry()
+        val cycle = cycleWith(
+            at = at,
+            brokerPositions = 0,
+            held = ObservedInstrumentBars("1005", "stock", emptyList()),
+            candidate = ObservedInstrumentBars("1001", "stock", risingBars(origin)),
+            sender = sender,
+            rate = null,
+        )
+        val recorded = cycle.record()
+        assertEquals("ENTER", recorded.rule.action)
+        assertTrue(recorded.rule.orderable)
+        assertEquals("NOT_SENT", recorded.demoEntry.status)
+        assertEquals("RATE_MISSING", recorded.demoEntry.reason)
+        assertEquals(0, sender.calls.size)
     }
 
     @Test
@@ -513,6 +606,52 @@ class DecisionCycleTest {
           ]
         }
     """.trimIndent()
+
+    private fun cycleWith(
+        at: Instant,
+        brokerPositions: Int,
+        held: ObservedInstrumentBars,
+        candidate: ObservedInstrumentBars,
+        sender: RecordingEntry,
+        rate: String?,
+    ): DecisionCycle = DecisionCycle(
+        strategyEngine = StrategyEngine(),
+        ingestionPipeline = IngestionPipeline.fromClasspath(),
+        evidenceGate = EvidenceGate(),
+        operationalStateService = OperationalStateService(clock = { at }),
+        configurationService = ConfigurationService(),
+        auditLog = AuditLog(),
+        policyGate = PolicyGate(),
+        clock = { at },
+        closedBars = ClosedBarSource { ObservedBars(brokerPositions, listOf(held)) },
+        reportedRates = ReportedRateSource {
+            if (rate == null) emptyList() else listOf(ReportedRate("EUR", "USD", rate))
+        },
+        entryCandidates = EntryCandidates { _, _ -> listOf(candidate) },
+        demoEntries = sender,
+    )
+
+    private fun risingBars(origin: Instant): List<ObservedBar> = (0 until 20).map { index ->
+        val close = 10_000L + if (index >= 18) (index - 17) * 50L else 0L
+        val start = origin.plusSeconds(300L * index)
+        ObservedBar(start, start.plusSeconds(300), close, close + 50, close - 50)
+    }
+
+    private fun flatBars(origin: Instant): List<ObservedBar> = (0 until 20).map { index ->
+        val start = origin.plusSeconds(300L * index)
+        ObservedBar(start, start.plusSeconds(300), 10_000L, 10_050L, 9_950L)
+    }
+
+    private class RecordingEntry(
+        private val result: DemoOpenResult = DemoOpenResult("ACCEPTED", "OK", 200, "9001"),
+    ) : DemoEntrySubmit {
+        val calls = mutableListOf<Triple<String, BigDecimal, Set<String>>>()
+
+        override fun submit(instrumentId: String, amount: BigDecimal, heldInstrumentIds: Set<String>): DemoOpenResult {
+            calls += Triple(instrumentId, amount, heldInstrumentIds)
+            return result
+        }
+    }
 
     private fun payload(recorded: RecordedDecision, assessment: IngestionAssessment): String {
         fun channel(name: String) = assessment.channels.first { it.channel == name }

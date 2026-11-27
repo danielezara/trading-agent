@@ -26,7 +26,9 @@ allowed_broker_url() {
     https://public-api.etoro.com/api/v1/market-data/instruments/rates|\
     https://public-api.etoro.com/api/v1/market-data/instruments/*/history/candles/desc/FiveMinutes/*|\
     https://public-api.etoro.com/api/v1/market-data/instruments|\
-    https://public-api.etoro.com/api/v1/market-data/instrument-types)
+    https://public-api.etoro.com/api/v1/market-data/instrument-types|\
+    https://public-api.etoro.com/api/v1/market-data/search|\
+    https://public-api.etoro.com/api/v1/trading/execution/demo/market-open-orders/by-amount)
       return 0
       ;;
   esac

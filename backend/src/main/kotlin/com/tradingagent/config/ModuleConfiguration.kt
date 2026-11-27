@@ -11,6 +11,9 @@ import com.tradingagent.modules.brokerread.DemoInstrumentNameRead
 import com.tradingagent.modules.brokerread.DemoMarketRatesLookup
 import com.tradingagent.modules.brokerread.ClosedTradeRead
 import com.tradingagent.modules.brokerread.DemoClosedBarRead
+import com.tradingagent.modules.brokerread.DemoEntryBarRead
+import com.tradingagent.modules.brokerread.DemoEntryDispatch
+import com.tradingagent.modules.brokerread.JdkHttpPost
 import com.tradingagent.modules.brokerread.DemoClosedTradeRead
 import com.tradingagent.modules.brokerread.DemoInstrumentClassRead
 import com.tradingagent.modules.brokerread.EcbEuroFx
@@ -150,6 +153,16 @@ class ModuleConfiguration {
                 transport = JdkHttpGet(),
             ),
             entriesBlocked = { killSwitch.armed() },
+            entryCandidates = DemoEntryBarRead(
+                symbols = { configurationService.active().parameters.economic.entrySymbols },
+                keys = { DemoKeyMaterial.fromEnvironment(System.getenv()) },
+                transport = JdkHttpGet(),
+                sleep = { duration -> Thread.sleep(duration.toMillis()) },
+            ),
+            demoEntries = DemoEntryDispatch(
+                transport = JdkHttpPost(),
+                keys = { DemoKeyMaterial.fromEnvironment(System.getenv()) },
+            ),
         )
         val recorded = cycle.record()
         auditLog.sealDay(LocalDate.ofInstant(recorded.outcome.evaluatedAt, ZoneOffset.UTC))

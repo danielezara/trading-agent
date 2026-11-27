@@ -309,6 +309,10 @@ class SystemStatusController(
         bookLossMinor = recorded.bookLossMinor,
         bookLossCurrency = recorded.bookLossCurrency,
         lossBlocksEntries = recorded.lossBlocksEntries,
+        demoEntryStatus = recorded.demoEntry.status,
+        demoEntryReason = recorded.demoEntry.reason,
+        demoEntryHttpStatus = recorded.demoEntry.httpStatus,
+        demoEntryOrderId = recorded.demoEntry.orderId,
     )
 
     private fun signalData(signal: ObservationSignal) = SignalData(
@@ -532,6 +536,10 @@ data class DecisionData(
     val bookLossMinor: Long?,
     val bookLossCurrency: String?,
     val lossBlocksEntries: Boolean,
+    val demoEntryStatus: String,
+    val demoEntryReason: String,
+    val demoEntryHttpStatus: Int?,
+    val demoEntryOrderId: String?,
 )
 
 data class SignalData(

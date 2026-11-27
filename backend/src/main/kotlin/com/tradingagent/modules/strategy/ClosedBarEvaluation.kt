@@ -17,6 +17,9 @@ data class BarBook(
     val reportedLossCurrency: String? = null,
     val payloadRates: List<PayloadRate> = emptyList(),
     val entriesBlocked: Boolean = false,
+    val investedMinor: Long = 0,
+    val sectorInvestedMinor: Long? = null,
+    val heldInstrumentIds: Set<String> = emptySet(),
 )
 
 object ClosedBarEvaluation {
@@ -27,13 +30,24 @@ object ClosedBarEvaluation {
         technical: TechnicalParameters,
     ): RuleDecision {
         val instruments = book.instruments.sortedBy { it.instrumentId }
-        if (instruments.isEmpty()) {
+        val fresh = instruments.filter { it.instrumentId !in book.heldInstrumentIds }
+        if (instruments.isNotEmpty() && fresh.isEmpty()) {
+            return RuleDecision(
+                action = "NO-TRADE",
+                instrumentId = null,
+                direction = "NONE",
+                notionalMinor = null,
+                orderable = false,
+                reason = MandateControl.EXISTING_POSITION,
+            )
+        }
+        if (fresh.isEmpty()) {
             return ClosedBarPolicy.decide(
                 input(now, null, "unknown", emptyList(), book, economic, technical),
                 book.entriesBlocked,
             )
         }
-        val pairs = instruments.map { instrument ->
+        val pairs = fresh.map { instrument ->
             instrument to ClosedBarPolicy.decide(
                 input(now, instrument.instrumentId, instrument.assetClass, instrument.bars, book, economic, technical),
                 book.entriesBlocked,
@@ -63,8 +77,8 @@ object ClosedBarEvaluation {
         position = null,
         assetClass = assetClass,
         leverage = economic.allowlistLeverage,
-        investedMinor = 0,
-        sectorInvestedMinor = null,
+        investedMinor = book.investedMinor,
+        sectorInvestedMinor = book.sectorInvestedMinor,
         lossMinor = BudgetLoss.entryLossMinor(
             book.reportedLossMinor,
             book.reportedLossCurrency,

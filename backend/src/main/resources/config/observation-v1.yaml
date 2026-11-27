@@ -17,6 +17,16 @@ economic:
     direction: long_only
     leverage: 1
     instrument_ids: []
+    # Simboli nuovi, fuori dalle posizioni già aperte. La regola decide se uno è ordinabile.
+    entry_symbols:
+      - AAPL
+      - MSFT
+      - GOOG
+      - NVDA
+      - META
+      - JPM
+      - SPY
+      - SWDA.L
   benchmark:
     name: MSCI World
     return_basis: total_return

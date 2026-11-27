@@ -4,6 +4,9 @@ import com.tradingagent.modules.audit.AuditEvent
 import com.tradingagent.modules.audit.AuditLog
 import com.tradingagent.modules.brokerread.CapabilityProbe
 import com.tradingagent.modules.brokerread.ClosedBarSource
+import com.tradingagent.modules.brokerread.DemoEntrySubmit
+import com.tradingagent.modules.brokerread.DemoOpenResult
+import com.tradingagent.modules.brokerread.EntryCandidates
 import com.tradingagent.modules.brokerread.EuroFxRead
 import com.tradingagent.modules.brokerread.ObservedBars
 import com.tradingagent.modules.brokerread.ReportedRateSource
@@ -31,6 +34,7 @@ import com.tradingagent.modules.strategy.RuleDecision
 import com.tradingagent.modules.strategy.DecisionInput
 import com.tradingagent.modules.strategy.StrategyEngine
 import com.tradingagent.modules.strategy.StrategyOutcome
+import com.tradingagent.modules.strategy.TradingAmount
 import java.time.Instant
 
 data class RecordedDecision(
@@ -43,6 +47,7 @@ data class RecordedDecision(
     val bookLossMinor: Long? = null,
     val bookLossCurrency: String? = null,
     val lossBlocksEntries: Boolean = false,
+    val demoEntry: DemoOpenResult = DemoOpenResult("NOT_SENT", "WARMUP"),
 )
 
 class DecisionCycle(
@@ -61,6 +66,9 @@ class DecisionCycle(
     private val closedBars: ClosedBarSource = ClosedBarSource { null },
     private val reportedRates: ReportedRateSource = ReportedRateSource { emptyList() },
     private val entriesBlocked: () -> Boolean = { false },
+    private val entryCandidates: EntryCandidates = EntryCandidates { _, _ -> emptyList() },
+    private val demoEntries: DemoEntrySubmit = DemoEntrySubmit { _, _, _ -> DemoOpenResult("NOT_SENT", "UNWIRED") },
+    private val programPositions: ProgramPositions = ProgramPositions(),
 ) {
     private var recorded: RecordedDecision? = null
     private var storedBars: List<ObservedInstrumentBars> = emptyList()
@@ -92,12 +100,18 @@ class DecisionCycle(
                 fx = fx,
             ),
         )
+        val candidates = try {
+            entryCandidates.load(at, emptySet())
+        } catch (_: Exception) {
+            emptyList()
+        }
         val observed = try {
             closedBars.load(at)
         } catch (_: Exception) {
             null
         } ?: ObservedBars(0, emptyList())
         storedBars = observed.instruments
+        val held = observed.instruments.map { it.instrumentId }.filter { it.isNotBlank() }.toSet()
         val rates = try {
             reportedRates.load().map { rate ->
                 PayloadRate(rate.currency, rate.displayCurrency, rate.rate)
@@ -105,9 +119,10 @@ class DecisionCycle(
         } catch (_: Exception) {
             emptyList()
         }
+        val programInvested = programPositions.investedMinor()
         val book = BarBook(
-            openPositions = observed.openPositions,
-            instruments = observed.instruments.map { instrument ->
+            openPositions = programPositions.count(),
+            instruments = candidates.map { instrument ->
                 InstrumentBars(
                     instrumentId = instrument.instrumentId,
                     assetClass = instrument.assetClass,
@@ -120,6 +135,9 @@ class DecisionCycle(
             reportedLossCurrency = observed.bookLossCurrency,
             payloadRates = rates,
             entriesBlocked = entriesBlocked(),
+            investedMinor = programInvested,
+            sectorInvestedMinor = programInvested,
+            heldInstrumentIds = held,
         )
         val lossBlocksEntries = BudgetLoss.blocksNewEntries(
             observed.bookLossMinor,
@@ -133,8 +151,14 @@ class DecisionCycle(
             configuration.parameters.economic,
             configuration.parameters.technical,
         )
-        val closedBarCount = book.instruments.maxOfOrNull { it.bars.size } ?: 0
-        check(!rule.orderable) { "una valutazione sulle barre non è un ordine" }
+        val closedBarCount = book.instruments
+            .filter { it.instrumentId !in held }
+            .maxOfOrNull { it.bars.size } ?: 0
+        if (rule.action == "ENTER") {
+            check(rule.orderable && rule.direction == "LONG") { "un ingresso della regola è long e inviabile" }
+        } else {
+            check(!rule.orderable) { "solo un ingresso nuovo può essere inviabile" }
+        }
         if (closedBarCount < configuration.parameters.technical.int("regime_atr_bars")) {
             check(rule.action == "NO-TRADE") {
                 "senza abbastanza barre chiuse il ciclo non può proporre un ingresso"
@@ -165,6 +189,10 @@ class DecisionCycle(
         val news = assessment.channels.firstOrNull { it.channel == "news" }
         val macro = assessment.channels.firstOrNull { it.channel == "macro" }
         val fundamentals = assessment.channels.firstOrNull { it.channel == "fundamentals" }
+        val demoEntry = demoEntry(rule, rates, held)
+        if (demoEntry.status == "ACCEPTED" && rule.instrumentId != null && rule.notionalMinor != null) {
+            programPositions.note(rule.instrumentId, rule.notionalMinor)
+        }
         val payload = decisionPayload(
             outcome,
             prices,
@@ -179,6 +207,10 @@ class DecisionCycle(
             bookLossMinor = observed.bookLossMinor,
             bookLossCurrency = observed.bookLossCurrency.orEmpty(),
             lossBlocksEntries = lossBlocksEntries,
+            demoStatus = demoEntry.status,
+            demoReason = demoEntry.reason,
+            demoHttpStatus = demoEntry.httpStatus,
+            demoOrderId = demoEntry.orderId.orEmpty(),
         )
         val auditEvent = auditLog.append(
             occurredAt = at,
@@ -201,9 +233,25 @@ class DecisionCycle(
             observed.bookLossMinor,
             observed.bookLossCurrency,
             lossBlocksEntries,
+            demoEntry,
         )
         recorded = result
         return result
+    }
+
+    private fun demoEntry(rule: RuleDecision, rates: List<PayloadRate>, held: Set<String>): DemoOpenResult {
+        if (rule.action != "ENTER" || !rule.orderable || rule.instrumentId == null || rule.notionalMinor == null) {
+            return DemoOpenResult("NOT_SENT", rule.reason)
+        }
+        if (rule.instrumentId in held) {
+            return DemoOpenResult("NOT_SENT", "EXISTING_POSITION")
+        }
+        val amount = TradingAmount.usd(rule.notionalMinor, rates)
+            ?: return DemoOpenResult("NOT_SENT", "RATE_MISSING")
+        if (!TradingAmount.acceptable(amount)) {
+            return DemoOpenResult("NOT_SENT", "AMOUNT")
+        }
+        return demoEntries.submit(rule.instrumentId, amount, held)
     }
 
     companion object {
@@ -223,6 +271,10 @@ class DecisionCycle(
             bookLossMinor: Long? = null,
             bookLossCurrency: String = "",
             lossBlocksEntries: Boolean = false,
+            demoStatus: String = "NOT_SENT",
+            demoReason: String = "WARMUP",
+            demoHttpStatus: Int? = null,
+            demoOrderId: String = "",
         ): String = listOf(
             "action=${outcome.action}",
             "reasons=${outcome.reasonCodes.joinToString(",") { it.name }}",
@@ -265,6 +317,22 @@ class DecisionCycle(
             "book_loss_minor=${bookLossMinor ?: ""}",
             "book_loss_currency=$bookLossCurrency",
             "loss_blocks_entries=$lossBlocksEntries",
+            "demo_entry_status=$demoStatus",
+            "demo_entry_reason=$demoReason",
+            "demo_entry_http_status=${demoHttpStatus ?: ""}",
+            "demo_entry_order_id=$demoOrderId",
         ).joinToString("\n")
+    }
+}
+
+class ProgramPositions {
+    private val notionals = linkedMapOf<String, Long>()
+
+    fun count(): Int = notionals.size
+
+    fun investedMinor(): Long = notionals.values.sum()
+
+    fun note(instrumentId: String, notionalMinor: Long) {
+        notionals.putIfAbsent(instrumentId, notionalMinor)
     }
 }

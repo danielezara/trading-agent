@@ -4,6 +4,7 @@ import com.tradingagent.modules.configuration.TradingParameters
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.Instant
 
@@ -12,14 +13,14 @@ class ClosedBarPolicyTest {
     private val origin = Instant.parse("2026-11-27T10:00:00Z")
 
     @Test
-    fun `two rising closed bars enter long inside the 500 eur caps and stay unorderable`() {
+    fun `two rising closed bars enter long inside the 500 eur caps and are orderable`() {
         val decision = ClosedBarPolicy.decide(input(bars = rising()))
         assertEquals("ENTER", decision.action)
         assertEquals("LONG", decision.direction)
         assertEquals("1001", decision.instrumentId)
         assertEquals(7_500L, decision.notionalMinor)
         assertEquals(MandateControl.OK, decision.reason)
-        assertFalse(decision.orderable)
+        assertTrue(decision.orderable)
     }
 
     @Test
@@ -35,7 +36,7 @@ class ClosedBarPolicyTest {
             input(bars = rising() + bar(20, 10_200, endAfterSeconds = 600), now = origin.plusSeconds(300L * 20)),
         )
         assertEquals("ENTER", withClosed.action)
-        assertFalse(withClosed.orderable)
+        assertTrue(withClosed.orderable)
     }
 
     @Test
