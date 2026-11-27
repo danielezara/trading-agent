@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { DEMO_ACCOUNT_FALLBACK, DEMO_PORTFOLIO_URL, formatCash, readDemoOverview, readProgramBook } from "./demo-read.ts";
-import { changeBps, formatBps, parseBenchmarkId, parseReferenceClose, selectProgramPositions, tick } from "./program-book.ts";
+import { changeBps, formatBps, missingValueSentence, parseBenchmarkId, parseReferenceClose, selectProgramPositions, tick } from "./program-book.ts";
 
 const keys = {
   ETORO_DEMO_API_KEY: "test-api",
@@ -193,9 +193,10 @@ describe("demo read", () => {
   it("ships no browser secret prefix and no order method", () => {
     const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
     const bot = readFileSync(new URL("../app/bot-portfolio.tsx", import.meta.url), "utf8");
+    const rules = readFileSync(new URL("../app/regole/page.tsx", import.meta.url), "utf8");
     const route = readFileSync(new URL("../app/api/overview/route.ts", import.meta.url), "utf8");
     const botRoute = readFileSync(new URL("../app/api/bot-portfolio/route.ts", import.meta.url), "utf8");
-    const source = `${page}\n${bot}\n${route}\n${botRoute}\n${readFileSync(new URL("./demo-read.ts", import.meta.url), "utf8")}\n${readFileSync(new URL("./program-book.ts", import.meta.url), "utf8")}`;
+    const source = `${page}\n${bot}\n${rules}\n${route}\n${botRoute}\n${readFileSync(new URL("./demo-read.ts", import.meta.url), "utf8")}\n${readFileSync(new URL("./program-book.ts", import.meta.url), "utf8")}`;
     assert.equal(source.includes("VITE_"), false);
     assert.equal(source.includes("NEXT_PUBLIC_"), false);
     assert.equal(source.includes("ETORO_DEMO_API_KEY="), false);
@@ -211,6 +212,21 @@ describe("demo read", () => {
     assert.equal(bot.includes("Nessuna posizione del programma"), true);
     assert.equal(bot.includes("Confronto non disponibile"), true);
     assert.equal(page.includes("Posizioni Demo"), false);
+    assert.equal(rules.includes("due chiusure al rialzo"), true);
+    assert.equal(rules.includes("due chiusure al ribasso"), true);
+    assert.equal(rules.includes("2×ATR"), true);
+    assert.equal(rules.includes("390 barre"), true);
+    assert.equal(rules.includes("500 EUR"), true);
+    assert.equal(rules.includes("2,50 EUR"), true);
+    assert.equal(rules.includes("75 EUR"), true);
+    assert.equal(rules.includes("8 posizioni"), true);
+    assert.equal(rules.includes("50 EUR"), true);
+    assert.equal(rules.includes("solo long"), true);
+    assert.equal(rules.includes("leva 1"), true);
+    assert.equal(rules.includes("azioni e ETF"), true);
+    assert.equal(rules.includes("15 secondi"), true);
+    assert.equal(rules.includes("non invia vendite"), true);
+    assert.equal(rules.includes("use client"), false);
     assert.equal(page.includes("Storico operazioni vuoto"), true);
     assert.equal(page.includes("Registro movimenti"), true);
   });
@@ -343,7 +359,9 @@ describe("demo read", () => {
     assert.equal(book.positions?.[1]?.valueEurMinor, null);
     assert.equal(book.positions?.[2]?.symbol, "NVDA");
     assert.equal(book.positions?.[2]?.orderId, "880000001");
-    assert.equal(book.valueEurMinor, null);
+    assert.equal(book.valueEurMinor, 7523);
+    assert.deepEqual(book.missingValues, ["GOOG", "NVDA"]);
+    assert.equal(missingValueSentence(book.missingValues), "Manca il valore di GOOG e NVDA");
     assert.equal(book.benchmark.resolved, true);
     assert.equal(book.benchmark.instrumentId, "3040");
     assert.equal(book.benchmark.referencePrice, "110");

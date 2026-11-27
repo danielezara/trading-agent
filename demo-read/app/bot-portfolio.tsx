@@ -10,6 +10,7 @@ import {
   formatBps,
   formatMinor,
   formatSignedMinor,
+  missingValueSentence,
   tick,
 } from "../lib/program-book";
 
@@ -80,9 +81,9 @@ export function BotPortfolio({ initial }: { initial: ProgramBook }) {
       ) : (
         <>
           <div className="metrics">
-            <Metric label="Valore" value={formatMinor(book.valueEurMinor, "EUR")} detail={formatMinor(book.valueUsdMinor, "USD")} tone={toneOf(book.changeEurMinor)} />
-            <Metric label="Variazione" value={formatSignedMinor(book.changeEurMinor, "EUR")} detail={formatSignedMinor(book.changeUsdMinor, "USD")} tone={toneOf(book.changeEurMinor)} />
-            <Metric label="Perdita sul budget" value={formatMinor(book.lossEurMinor, "EUR")} detail={book.lossBpsOfBudget === null ? "non disponibile" : `${formatBps(book.lossBpsOfBudget)} di ${formatMinor(BUDGET_EUR_MINOR, "EUR")}`} tone={lossClass} />
+            <Metric label="Valore" value={formatMinor(book.valueEurMinor, "EUR")} detail={valueDetail(book)} tone={book.missingValues.length > 0 ? "flat" : toneOf(book.changeEurMinor)} />
+            <Metric label="Variazione" value={book.missingValues.length > 0 ? "non disponibile" : formatSignedMinor(book.changeEurMinor, "EUR")} detail={book.missingValues.length > 0 ? missingValueSentence(book.missingValues) ?? "non disponibile" : formatSignedMinor(book.changeUsdMinor, "USD")} tone={book.missingValues.length > 0 ? "missing" : toneOf(book.changeEurMinor)} />
+            <Metric label="Perdita sul budget" value={book.missingValues.length > 0 ? "non disponibile" : formatMinor(book.lossEurMinor, "EUR")} detail={book.missingValues.length > 0 ? missingValueSentence(book.missingValues) ?? "non disponibile" : book.lossBpsOfBudget === null ? "non disponibile" : `${formatBps(book.lossBpsOfBudget)} di ${formatMinor(BUDGET_EUR_MINOR, "EUR")}`} tone={book.missingValues.length > 0 ? "missing" : lossClass} />
           </div>
           {book.positions.length === 0 ? <p className="missing">Nessuna posizione del programma</p> : book.positions.map((position) => (
             <PositionCard key={position.orderId} position={position} live={liveTicks[position.orderId] ?? null} />
@@ -178,8 +179,17 @@ function Metric({ label, value, detail, tone }: { label: string; value: string; 
   );
 }
 
+function valueDetail(book: ProgramBook): string {
+  const missing = missingValueSentence(book.missingValues);
+  const usd = formatMinor(book.valueUsdMinor, "USD");
+  if (!missing) {
+    return usd;
+  }
+  return book.valueUsdMinor === null ? missing : `${missing}. Sommati ${usd}`;
+}
+
 function bookMove(book: ProgramBook): number | null {
-  if (book.valueUsdMinor === null || book.changeUsdMinor === null) {
+  if (book.missingValues.length > 0 || book.valueUsdMinor === null || book.changeUsdMinor === null) {
     return null;
   }
   const cost = book.valueUsdMinor - book.changeUsdMinor;

@@ -31,6 +31,10 @@ export default async function Page() {
       <p className="product">Agente trading</p>
       <h1>Panoramica</h1>
       <p>Lettura Demo sul server. Nessun ordine in questa pagina.</p>
+      <nav className="nav">
+        <a href="/">Portafoglio</a>
+        <a href="/regole">Regole</a>
+      </nav>
       <BotPortfolio initial={book} />
       <dl>
         {rows.map(([label, value]) => (

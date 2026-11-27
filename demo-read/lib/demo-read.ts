@@ -732,6 +732,7 @@ function closedBook(at: Date, errorClass: string): ProgramBook {
     changeEurMinor: null,
     lossEurMinor: null,
     lossBpsOfBudget: null,
+    missingValues: [],
     eurUsdRate: null,
     benchmark: missingBenchmark(),
     readAt: at.toISOString(),

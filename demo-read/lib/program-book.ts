@@ -45,6 +45,7 @@ export type ProgramBook = {
   changeEurMinor: number | null;
   lossEurMinor: number | null;
   lossBpsOfBudget: number | null;
+  missingValues: string[];
   eurUsdRate: string | null;
   benchmark: BenchmarkQuote;
   readAt: string;
@@ -315,22 +316,40 @@ export function buildPosition(
   };
 }
 
-export function summarize(positions: ProgramPosition[] | null, eurUsdRate: string | null): Pick<ProgramBook, "valueUsdMinor" | "valueEurMinor" | "changeUsdMinor" | "changeEurMinor" | "lossEurMinor" | "lossBpsOfBudget"> {
+export function summarize(positions: ProgramPosition[] | null, eurUsdRate: string | null): Pick<ProgramBook, "valueUsdMinor" | "valueEurMinor" | "changeUsdMinor" | "changeEurMinor" | "lossEurMinor" | "lossBpsOfBudget" | "missingValues"> {
   if (!positions) {
-    return { valueUsdMinor: null, valueEurMinor: null, changeUsdMinor: null, changeEurMinor: null, lossEurMinor: null, lossBpsOfBudget: null };
+    return { valueUsdMinor: null, valueEurMinor: null, changeUsdMinor: null, changeEurMinor: null, lossEurMinor: null, lossBpsOfBudget: null, missingValues: [] };
   }
   if (positions.length === 0) {
-    return { valueUsdMinor: 0, valueEurMinor: 0, changeUsdMinor: 0, changeEurMinor: 0, lossEurMinor: 0, lossBpsOfBudget: 0 };
+    return { valueUsdMinor: 0, valueEurMinor: 0, changeUsdMinor: 0, changeEurMinor: 0, lossEurMinor: 0, lossBpsOfBudget: 0, missingValues: [] };
   }
-  const values = positions.map((position) => position.valueUsdMinor);
-  const changes = positions.map((position) => position.changeUsdMinor);
-  const valueUsdMinor = values.every((value) => value !== null) ? values.reduce<number>((sum, value) => sum + (value ?? 0), 0) : null;
-  const changeUsdMinor = changes.every((value) => value !== null) ? changes.reduce<number>((sum, value) => sum + (value ?? 0), 0) : null;
+  const missingValues = positions.filter((position) => position.valueUsdMinor === null).map(positionLabel);
+  const knownValues = positions.map((position) => position.valueUsdMinor).filter((value): value is number => value !== null);
+  const knownChanges = positions.filter((position) => position.valueUsdMinor !== null).map((position) => position.changeUsdMinor);
+  const valueUsdMinor = knownValues.length === 0 ? null : knownValues.reduce((sum, value) => sum + value, 0);
+  const changeUsdMinor = knownChanges.length === knownValues.length && knownChanges.every((value) => value !== null)
+    ? knownChanges.reduce<number>((sum, value) => sum + (value ?? 0), 0)
+    : null;
   const valueEurMinor = valueUsdMinor === null ? null : usdToEurMinor(valueUsdMinor, eurUsdRate);
   const changeEurMinor = changeUsdMinor === null ? null : usdToEurMinor(changeUsdMinor, eurUsdRate);
-  const lossEurMinor = changeEurMinor === null ? null : Math.max(0, -changeEurMinor);
+  const lossEurMinor = changeEurMinor === null || missingValues.length > 0 ? null : Math.max(0, -changeEurMinor);
   const lossBpsOfBudget = lossEurMinor === null ? null : Math.floor((lossEurMinor * 10_000) / BUDGET_EUR_MINOR);
-  return { valueUsdMinor, valueEurMinor, changeUsdMinor, changeEurMinor, lossEurMinor, lossBpsOfBudget };
+  return { valueUsdMinor, valueEurMinor, changeUsdMinor, changeEurMinor, lossEurMinor, lossBpsOfBudget, missingValues };
+}
+
+export function missingValueSentence(labels: string[]): string | null {
+  if (labels.length === 0) {
+    return null;
+  }
+  if (labels.length === 1) {
+    return `Manca il valore di ${labels[0]}`;
+  }
+  const rest = labels.slice(0, -1).join(", ");
+  return `Manca il valore di ${rest} e ${labels[labels.length - 1]}`;
+}
+
+function positionLabel(position: ProgramPosition): string {
+  return position.symbol || position.name || position.orderId;
 }
 
 export function missingBenchmark(): BenchmarkQuote {
