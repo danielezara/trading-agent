@@ -15,6 +15,8 @@ data class ProbeSnapshot(
     val positionCount: Int?,
     val accountLabel: String?,
     val positions: List<ObservedPosition>? = null,
+    val orders: List<ObservedOrder>? = null,
+    val executions: List<ObservedOrder>? = null,
 )
 
 class CapabilityProbe(
@@ -68,6 +70,8 @@ class CapabilityProbe(
                         positionCount = outcome.account.positionCount,
                         accountLabel = outcome.account.accountLabel,
                         positions = outcome.account.positions,
+                        orders = outcome.account.orders,
+                        executions = outcome.account.executions,
                     )
                 }
                 is ReadOutcome.Failed -> {

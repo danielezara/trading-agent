@@ -14,6 +14,15 @@ export type DemoPosition = {
   value: Money;
 };
 
+export type DemoOrder = {
+  order_id: string;
+  instrument_id: string | null;
+  side: "BUY" | "SELL" | null;
+  quantity: string | null;
+  value: Money;
+  opened_at: string | null;
+};
+
 export type Overview = {
   operational_state: string;
   trading_enabled: boolean;
@@ -32,6 +41,8 @@ export type Overview = {
   probe_error_class: string | null;
   account_label: string | null;
   positions: DemoPosition[] | null;
+  orders: DemoOrder[] | null;
+  executions: DemoOrder[] | null;
   configuration_version_id: string;
   configuration_version_number: number;
 };

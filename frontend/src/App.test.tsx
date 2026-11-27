@@ -20,6 +20,8 @@ const overview = {
     probe_error_class: "KEYS_MISSING",
     account_label: null,
     positions: null,
+    orders: null,
+    executions: null,
     configuration_version_id: "11111111-1111-1111-1111-111111111111",
     configuration_version_number: 1,
   },
@@ -178,6 +180,8 @@ describe("dashboard skeleton", () => {
     expect(screen.getByTestId("account-card")).toHaveTextContent("no");
     expect(screen.getByTestId("account-card")).toHaveTextContent("Conto Demo delle chiavi in backend/.env");
     expect(screen.getByTestId("positions")).toHaveTextContent("Posizioni non disponibili");
+    expect(screen.getByTestId("orders")).toHaveTextContent("Ordini non disponibili");
+    expect(screen.getByTestId("executions")).toHaveTextContent("Esecuzioni non disponibili");
     expect(screen.getByTestId("account-card")).toHaveTextContent("Cassa broker");
     expect(screen.getByTestId("account-card")).toHaveTextContent("non disponibile");
     expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
@@ -197,6 +201,26 @@ describe("dashboard skeleton", () => {
         account_label: "demo.user",
         positions: [
           { instrument_id: "1002", quantity: "0.049485", value: { minor_units: 10000, currency: "USD" } },
+        ],
+        orders: [
+          {
+            order_id: "5669649",
+            instrument_id: "100043",
+            side: "BUY",
+            quantity: "688.231246",
+            value: { minor_units: 10000, currency: "USD" },
+            opened_at: "2024-06-06T08:07:25.083Z",
+          },
+        ],
+        executions: [
+          {
+            order_id: "88",
+            instrument_id: "1002",
+            side: null,
+            quantity: "0.049485",
+            value: null,
+            opened_at: "2024-06-07T09:00:00Z",
+          },
         ],
       },
     };
@@ -220,6 +244,16 @@ describe("dashboard skeleton", () => {
     expect(positions).toHaveTextContent("0.049485");
     expect(positions).toHaveTextContent("100,00 USD");
     expect(positions).not.toHaveTextContent("Nessuna posizione");
+    const orders = screen.getByTestId("orders");
+    expect(orders).toHaveTextContent("5669649");
+    expect(orders).toHaveTextContent("100043");
+    expect(orders).toHaveTextContent("acquisto");
+    expect(orders).toHaveTextContent("688.231246");
+    expect(orders).toHaveTextContent("100,00 USD");
+    const executions = screen.getByTestId("executions");
+    expect(executions).toHaveTextContent("88");
+    expect(executions).toHaveTextContent("0.049485");
+    expect(executions).toHaveTextContent("non disponibile");
     expect(screen.getByTestId("cash-alignment")).toHaveTextContent("cassa USD, budget EUR");
     expect(screen.getByTestId("cash-alignment")).toHaveTextContent("Nessun cambio configurato");
     expect(screen.getByText("50000 EUR")).toBeInTheDocument();
@@ -229,7 +263,7 @@ describe("dashboard skeleton", () => {
   it("shows an empty demo position list when the read has none", async () => {
     const empty = {
       ...overview,
-      data: { ...overview.data, broker_connected: true, positions: [] },
+      data: { ...overview.data, broker_connected: true, positions: [], orders: [], executions: [] },
     };
     vi.stubGlobal("fetch", (input: string) => Promise.resolve({
       ok: true,
@@ -242,6 +276,8 @@ describe("dashboard skeleton", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByTestId("positions")).toHaveTextContent("Nessuna posizione");
+    expect(screen.getByTestId("orders")).toHaveTextContent("Nessun ordine Demo");
+    expect(screen.getByTestId("executions")).toHaveTextContent("Nessuna esecuzione Demo");
     expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
   });
 

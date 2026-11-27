@@ -175,6 +175,67 @@ class DemoPortfolioReadTest {
         val none = DemoPortfolioRead.parse("""{"clientPortfolio":{"credit":10,"positions":[]}}""")
         assertEquals(0, none?.positionCount)
         assertEquals(emptyList<ObservedPosition>(), none?.positions)
+        assertEquals(emptyList<ObservedOrder>(), none?.orders)
+        assertEquals(emptyList<ObservedOrder>(), none?.executions)
+    }
+
+    @Test
+    fun `orders and close executions come from the same portfolio read`() {
+        val parsed = DemoPortfolioRead.parse(
+            """
+            {"clientPortfolio":{
+              "credit":10,
+              "accountCurrencyId":1,
+              "positions":[
+                {"positionID":1,"orderID":555,"CID":7765437,"instrumentID":1002,"isBuy":true,"units":0.049485,"amount":100,"openDateTime":"2024-06-01T00:00:00Z"},
+                {"instrumentID":1003,"units":1,"amount":5}
+              ],
+              "orders":[
+                {"orderID":5669649,"CID":7765437,"instrumentID":100043,"isBuy":true,"units":688.231246,"amount":100,"openDateTime":"2024-06-06T08:07:25.083Z","executionType":0},
+                "skip",
+                {"instrumentID":1,"isBuy":true}
+              ],
+              "ordersForOpen":[
+                {"orderId":5669649,"instrumentId":100043,"isBuy":true,"amountInUnits":1},
+                {"orderID":77,"instrumentID":8,"isBuy":false,"amount":12.5,"openDateTime":"not-a-date"}
+              ],
+              "ordersForClose":[
+                {"orderID":88,"instrumentID":1002,"unitsToDeduct":0.049485,"openDateTime":"2024-06-07T09:00:00Z","CID":7765437}
+              ],
+              "exitOrders":"obsolete",
+              "mirrors":[{"orders":[{"orderID":9,"instrumentID":3,"isBuy":true,"amount":50}],"positions":[{"orderID":42,"instrumentID":7,"isBuy":true,"units":1,"amount":20}]}]
+            }}
+            """.trimIndent(),
+        )
+        assertEquals(2, parsed?.orders?.size)
+        val open = parsed?.orders?.get(0)
+        assertEquals("5669649", open?.orderId)
+        assertEquals("100043", open?.instrumentId)
+        assertEquals("BUY", open?.side)
+        assertEquals("688.231246", open?.quantity)
+        assertEquals(10_000L, open?.value?.minorUnits)
+        assertEquals("2024-06-06T08:07:25.083Z", open?.openedAt)
+        val second = parsed?.orders?.get(1)
+        assertEquals("77", second?.orderId)
+        assertEquals("SELL", second?.side)
+        assertEquals(1_250L, second?.value?.minorUnits)
+        assertNull(second?.openedAt)
+        assertEquals(2, parsed?.executions?.size)
+        val opened = parsed?.executions?.get(0)
+        assertEquals("555", opened?.orderId)
+        assertEquals("1002", opened?.instrumentId)
+        assertEquals("BUY", opened?.side)
+        assertEquals("0.049485", opened?.quantity)
+        assertEquals(10_000L, opened?.value?.minorUnits)
+        assertEquals("2024-06-01T00:00:00Z", opened?.openedAt)
+        val close = parsed?.executions?.get(1)
+        assertEquals("88", close?.orderId)
+        assertEquals("1002", close?.instrumentId)
+        assertEquals("0.049485", close?.quantity)
+        assertNull(close?.side)
+        assertEquals("2024-06-07T09:00:00Z", close?.openedAt)
+        assertEquals(false, parsed?.orders?.any { it.orderId == "9" || it.orderId == "7765437" || it.orderId == "42" })
+        assertEquals(false, parsed?.executions?.any { it.orderId == "7765437" || it.orderId == "42" || it.orderId == "9" })
     }
 
     private fun keys(): DemoKeyMaterial = DemoKeyMaterial.fromEnvironment(

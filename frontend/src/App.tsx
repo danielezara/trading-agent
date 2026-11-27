@@ -160,6 +160,64 @@ function PositionsTable({ positions }: { positions: Overview["positions"] | unde
   );
 }
 
+function sideLabel(side: string | null | undefined): string {
+  if (side === "BUY") {
+    return "acquisto";
+  }
+  if (side === "SELL") {
+    return "vendita";
+  }
+  return "non disponibile";
+}
+
+function ActivityTable({
+  rows,
+  title,
+  empty,
+  unavailable,
+  testId,
+}: {
+  rows: Overview["orders"] | undefined;
+  title: string;
+  empty: string;
+  unavailable: string;
+  testId: string;
+}) {
+  if (rows == null) {
+    return <p data-testid={testId}>{unavailable}</p>;
+  }
+  if (rows.length === 0) {
+    return <p data-testid={testId}>{empty}</p>;
+  }
+  return (
+    <table className="data-table" data-testid={testId}>
+      <caption>{title}</caption>
+      <thead>
+        <tr>
+          <th>Ordine</th>
+          <th>Strumento</th>
+          <th>Lato</th>
+          <th>Quantità</th>
+          <th>Valore</th>
+          <th>Data</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.order_id}>
+            <td>{row.order_id}</td>
+            <td>{row.instrument_id ?? "non disponibile"}</td>
+            <td>{sideLabel(row.side)}</td>
+            <td>{row.quantity ?? "non disponibile"}</td>
+            <td>{cashAmount(row.value)}</td>
+            <td>{row.opened_at ?? "non disponibile"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function cashAmount(money: Money): string {
   if (!money) {
     return "non disponibile";
@@ -189,6 +247,20 @@ function OverviewPage({ loaded }: { loaded: LoadState }) {
               <p data-testid="cash-alignment">{`Disponibile non calcolato: cassa ${loaded.data.overview.broker_cash?.currency ?? "non osservata"}, budget ${loaded.data.overview.assigned_budget?.currency ?? "non osservato"}. Nessun cambio configurato.`}</p>
             ) : null}
             <PositionsTable positions={loaded.data.overview.positions} />
+            <ActivityTable
+              rows={loaded.data.overview.orders}
+              title="Ordini Demo"
+              empty="Nessun ordine Demo"
+              unavailable="Ordini non disponibili"
+              testId="orders"
+            />
+            <ActivityTable
+              rows={loaded.data.overview.executions}
+              title="Esecuzioni Demo"
+              empty="Nessuna esecuzione Demo"
+              unavailable="Esecuzioni non disponibili"
+              testId="executions"
+            />
             <dl className="facts" data-testid="account-card">
               <div><dt>Piattaforma</dt><dd>Demo eToro</dd></div>
               <div><dt>Connessa</dt><dd>{loaded.data.overview.broker_connected ? "sì" : "no"}</dd></div>

@@ -3,6 +3,7 @@ package com.tradingagent.api
 import com.tradingagent.kernel.Money
 import com.tradingagent.modules.identity.AccessModel
 import com.tradingagent.modules.identity.Role
+import com.tradingagent.modules.brokerread.ObservedOrder
 import com.tradingagent.modules.brokerread.ObservedPosition
 import com.tradingagent.modules.ledger.Ledger
 import com.tradingagent.modules.readmodel.DashboardReadModel
@@ -67,6 +68,8 @@ class DashboardController(
                 probeErrorClass = snapshot.probeErrorClass,
                 accountLabel = snapshot.accountLabel,
                 positions = snapshot.positions?.map { position -> positionData(position) },
+                orders = snapshot.orders?.map { order -> orderData(order) },
+                executions = snapshot.executions?.map { order -> orderData(order) },
             ),
             meta = ApiMeta(schemaVersion = "portfolio-snapshot/1"),
             warnings = buildList {
@@ -128,6 +131,8 @@ data class OverviewData(
     val probeErrorClass: String?,
     val accountLabel: String?,
     val positions: List<PositionData>?,
+    val orders: List<OrderData>?,
+    val executions: List<OrderData>?,
 )
 
 data class PositionData(
@@ -136,8 +141,26 @@ data class PositionData(
     val value: Money?,
 )
 
+data class OrderData(
+    val orderId: String,
+    val instrumentId: String?,
+    val side: String?,
+    val quantity: String?,
+    val value: Money?,
+    val openedAt: String?,
+)
+
 private fun positionData(position: ObservedPosition) = PositionData(
     instrumentId = position.instrumentId,
     quantity = position.quantity,
     value = position.value,
+)
+
+private fun orderData(order: ObservedOrder) = OrderData(
+    orderId = order.orderId,
+    instrumentId = order.instrumentId,
+    side = order.side,
+    quantity = order.quantity,
+    value = order.value,
+    openedAt = order.openedAt,
 )

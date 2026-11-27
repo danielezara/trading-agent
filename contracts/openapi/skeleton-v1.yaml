@@ -534,12 +534,45 @@ components:
                     nullable: true
                   value:
                     nullable: true
+            orders:
+              type: array
+              nullable: true
+              description: Pending Demo orders already present on the portfolio read. Empty when the account has none.
+              items:
+                $ref: "#/components/schemas/DemoOrder"
+            executions:
+              type: array
+              nullable: true
+              description: Open executions and close orders already present on the portfolio read. Empty when the account has none.
+              items:
+                $ref: "#/components/schemas/DemoOrder"
         meta:
           $ref: "#/components/schemas/Meta"
         warnings:
           type: array
           items:
             $ref: "#/components/schemas/Warning"
+    DemoOrder:
+      type: object
+      required: [order_id]
+      properties:
+        order_id:
+          type: string
+        instrument_id:
+          type: string
+          nullable: true
+        side:
+          type: string
+          nullable: true
+          enum: [BUY, SELL]
+        quantity:
+          type: string
+          nullable: true
+        value:
+          nullable: true
+        opened_at:
+          type: string
+          nullable: true
     Problem:
       type: object
       required: [status, code]

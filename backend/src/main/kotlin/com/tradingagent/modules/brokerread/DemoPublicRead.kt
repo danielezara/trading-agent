@@ -80,12 +80,23 @@ data class ObservedPosition(
     val value: Money?,
 )
 
+data class ObservedOrder(
+    val orderId: String,
+    val instrumentId: String?,
+    val side: String?,
+    val quantity: String?,
+    val value: Money?,
+    val openedAt: String?,
+)
+
 data class ObservedAccount(
     val brokerCash: Money?,
     val equity: Money?,
     val positionCount: Int?,
     val accountLabel: String?,
     val positions: List<ObservedPosition>? = emptyList(),
+    val orders: List<ObservedOrder>? = emptyList(),
+    val executions: List<ObservedOrder>? = emptyList(),
 )
 
 sealed interface ReadOutcome {
@@ -167,7 +178,95 @@ object DemoPortfolioRead {
             parsedPositions?.size,
             accountLabel(root, portfolio),
             parsedPositions,
+            orders(portfolio, currency, openOrderKeys, openQuantityKeys),
+            executions(portfolio, currency),
         )
+    }
+
+    private fun executions(portfolio: JsonNode, currency: String?): List<ObservedOrder> {
+        val rows = linkedMapOf<String, ObservedOrder>()
+        val opened = portfolio.get("positions")
+        if (opened != null && opened.isArray) {
+            for (item in opened) {
+                if (!item.isObject) {
+                    continue
+                }
+                val orderId = instrumentId(field(item, listOf("orderID", "orderId"))) ?: continue
+                val amount = minor(field(item, listOf("amount")))
+                rows[orderId] = ObservedOrder(
+                    orderId = orderId,
+                    instrumentId = instrumentId(field(item, listOf("instrumentID", "instrumentId"))),
+                    side = side(field(item, listOf("isBuy"))),
+                    quantity = quantity(field(item, listOf("units"))),
+                    value = if (currency != null && amount != null && amount >= 0) Money(amount, currency) else null,
+                    openedAt = openedAt(field(item, listOf("openDateTime"))),
+                )
+            }
+        }
+        for (order in orders(portfolio, currency, closeOrderKeys, closeQuantityKeys)) {
+            if (!rows.containsKey(order.orderId)) {
+                rows[order.orderId] = order
+            }
+        }
+        return rows.values.toList()
+    }
+
+    private fun orders(
+        portfolio: JsonNode,
+        currency: String?,
+        keys: List<String>,
+        quantityKeys: List<String>,
+    ): List<ObservedOrder> {
+        val rows = linkedMapOf<String, ObservedOrder>()
+        for (key in keys) {
+            val node = portfolio.get(key) ?: continue
+            if (!node.isArray) {
+                continue
+            }
+            for (item in node) {
+                if (!item.isObject) {
+                    continue
+                }
+                val orderId = instrumentId(field(item, listOf("orderID", "orderId"))) ?: continue
+                if (rows.containsKey(orderId)) {
+                    continue
+                }
+                val amount = minor(field(item, listOf("amount")))
+                rows[orderId] = ObservedOrder(
+                    orderId = orderId,
+                    instrumentId = instrumentId(field(item, listOf("instrumentID", "instrumentId"))),
+                    side = side(field(item, listOf("isBuy"))),
+                    quantity = quantityKeys.firstNotNullOfOrNull { name -> quantity(field(item, listOf(name))) },
+                    value = if (currency != null && amount != null && amount >= 0) Money(amount, currency) else null,
+                    openedAt = openedAt(field(item, listOf("openDateTime"))),
+                )
+            }
+        }
+        return rows.values.toList()
+    }
+
+    private fun field(node: JsonNode, names: List<String>): JsonNode? {
+        for (name in names) {
+            val value = node.get(name) ?: continue
+            if (!value.isNull && !value.isMissingNode) {
+                return value
+            }
+        }
+        return null
+    }
+
+    private fun side(node: JsonNode?): String? = when {
+        node == null || !node.isBoolean -> null
+        node.booleanValue() -> "BUY"
+        else -> "SELL"
+    }
+
+    private fun openedAt(node: JsonNode?): String? {
+        if (node == null || !node.isTextual) {
+            return null
+        }
+        val text = node.asText().trim()
+        return if (openedAtPattern.matches(text)) text else null
     }
 
     private fun positions(node: JsonNode?, currency: String?): List<ObservedPosition>? {
@@ -199,6 +298,12 @@ object DemoPortfolioRead {
         }
         return text
     }
+
+    private val openOrderKeys: List<String> = listOf("orders", "ordersForOpen", "stockOrders", "entryOrders")
+    private val closeOrderKeys: List<String> = listOf("ordersForClose", "ordersForCloseMultiple", "exitOrders")
+    private val openQuantityKeys: List<String> = listOf("units", "amountInUnits")
+    private val closeQuantityKeys: List<String> = listOf("unitsToDeduct", "lotsToDeduct", "units")
+    private val openedAtPattern: Regex = Regex("""\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z""")
 
     private fun quantity(node: JsonNode?): String? {
         if (node == null || node.isNull || !node.isNumber) {
