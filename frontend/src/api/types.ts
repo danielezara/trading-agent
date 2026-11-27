@@ -12,6 +12,8 @@ export type DemoPosition = {
   instrument_id: string;
   quantity: string | null;
   value: Money;
+  quote_price?: string | null;
+  quote_time?: string | null;
 };
 
 export type DemoOrder = {

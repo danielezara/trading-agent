@@ -92,6 +92,63 @@ class DemoMarketRatesTest {
     }
 
     @Test
+    fun `a display quote uses bid, otherwise last, and does not invent zero`() {
+        val quotes = DemoMarketRates.displayQuotes(
+            """
+            {"rates":[
+              {"instrumentID":6270,"bid":1.25,"lastExecution":1.20,"date":"2026-11-27T09:30:00Z"},
+              {"instrumentID":100032,"lastExecution":2.5,"date":"2026-11-27T09:31:00Z"},
+              {"instrumentID":1155,"ask":3,"date":"2026-11-27T09:32:00Z"},
+              {"instrumentID":1005}
+            ]}
+            """.trimIndent(),
+        )
+        assertEquals(0, quotes.getValue("6270").price!!.compareTo(BigDecimal("1.25")))
+        assertEquals(Instant.parse("2026-11-27T09:30:00Z"), quotes.getValue("6270").quotedAt)
+        assertEquals(0, quotes.getValue("100032").price!!.compareTo(BigDecimal("2.5")))
+        assertNull(quotes.getValue("1155").price)
+        assertEquals(Instant.parse("2026-11-27T09:32:00Z"), quotes.getValue("1155").quotedAt)
+        assertNull(quotes["1005"])
+        assertTrue(quotes.values.none { it.price == BigDecimal.ZERO })
+    }
+
+    @Test
+    fun `display quotes use the rates get and do not call news`() {
+        val calls = mutableListOf<URI>()
+        val quotes = DemoMarketRates.readDisplay(
+            HttpGet { uri, _ ->
+                calls += uri
+                InboundHttp(
+                    status = 200,
+                    retryAfterSeconds = null,
+                    body = """{"rates":[{"instrumentID":6270,"bid":1.1,"date":"2026-11-27T09:30:00Z"}]}""",
+                )
+            },
+            keys(),
+            listOf("6270"),
+        )
+        assertEquals("/api/v1/market-data/instruments/rates", calls.single().path)
+        assertFalse(calls.single().toString().contains("news"))
+        assertFalse(calls.single().toString().contains("/feeds"))
+        assertFalse(calls.single().path.contains("/real"))
+        assertEquals(0, quotes.getValue("6270").price!!.compareTo(BigDecimal("1.1")))
+    }
+
+    @Test
+    fun `position quotes are not requested without keys`() {
+        var calls = 0
+        val read = DemoPositionQuotes(
+            keys = { null },
+            transport = HttpGet { _, _ ->
+                calls += 1
+                InboundHttp(200, null, """{"rates":[]}""")
+            },
+        )
+        assertNull(read.read(listOf("6270")))
+        assertEquals(0, calls)
+    }
+
+    @Test
     fun `a long rate limit does not retry`() {
         var calls = 0
         val slept = mutableListOf<Duration>()

@@ -3,6 +3,7 @@ package com.tradingagent.api
 import com.tradingagent.kernel.Money
 import com.tradingagent.modules.identity.AccessModel
 import com.tradingagent.modules.identity.Role
+import com.tradingagent.modules.brokerread.DisplayQuote
 import com.tradingagent.modules.brokerread.ObservedOrder
 import com.tradingagent.modules.brokerread.ObservedPosition
 import com.tradingagent.modules.configuration.ConfigurationService
@@ -94,7 +95,7 @@ class DashboardController(
                 lastProbeAt = snapshot.lastProbeAt,
                 probeErrorClass = snapshot.probeErrorClass,
                 accountLabel = snapshot.accountLabel,
-                positions = snapshot.positions?.map { position -> positionData(position) },
+                positions = snapshot.positions?.map { position -> positionData(position, snapshot.quotes) },
                 orders = snapshot.orders?.map { order -> orderData(order) },
                 executions = snapshot.executions?.map { order -> orderData(order) },
                 reconciliation = reconciliationData(report),
@@ -168,6 +169,8 @@ data class PositionData(
     val instrumentId: String,
     val quantity: String?,
     val value: Money?,
+    val quotePrice: String?,
+    val quoteTime: Instant?,
 )
 
 data class OrderData(
@@ -179,10 +182,12 @@ data class OrderData(
     val openedAt: String?,
 )
 
-private fun positionData(position: ObservedPosition) = PositionData(
+private fun positionData(position: ObservedPosition, quotes: Map<String, DisplayQuote>?) = PositionData(
     instrumentId = position.instrumentId,
     quantity = position.quantity,
     value = position.value,
+    quotePrice = quotes?.get(position.instrumentId)?.price?.toPlainString(),
+    quoteTime = quotes?.get(position.instrumentId)?.quotedAt,
 )
 
 private fun orderData(order: ObservedOrder) = OrderData(

@@ -397,6 +397,56 @@ describe("dashboard skeleton", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
+  it("shows a live quote beside a position and leaves a missing quote blank", async () => {
+    const calls: string[] = [];
+    const withQuotes = {
+      ...overview,
+      data: {
+        ...overview.data,
+        broker_connected: true,
+        positions: [
+          {
+            instrument_id: "6270",
+            quantity: "1",
+            value: null,
+            quote_price: "1.25",
+            quote_time: "2026-11-27T09:30:00Z",
+          },
+          {
+            instrument_id: "100032",
+            quantity: "2",
+            value: null,
+            quote_price: null,
+            quote_time: null,
+          },
+        ],
+      },
+    };
+    vi.stubGlobal("fetch", (input: string) => {
+      calls.push(String(input));
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => (String(input).includes("overview") ? withQuotes : jsonFor(String(input))),
+      });
+    });
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <AppRoutes />
+      </MemoryRouter>,
+    );
+    const prices = await screen.findAllByTestId("quote-price");
+    const times = screen.getAllByTestId("quote-time");
+    expect(prices[0]).toHaveTextContent("1.25");
+    expect(times[0]).toHaveTextContent("2026-11-27T09:30:00Z");
+    expect(prices[1].textContent).toBe("");
+    expect(times[1].textContent).toBe("");
+    expect(screen.getByTestId("positions")).toHaveTextContent("6270");
+    expect(screen.getByTestId("positions")).toHaveTextContent("100032");
+    expect(calls.some((path) => path.includes("news") || path.includes("feeds"))).toBe(false);
+    expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
+  });
+
   it("keeps a stale live price as no trade and leaves news on the fixture", async () => {
     const liveHealth = {
       ...health,

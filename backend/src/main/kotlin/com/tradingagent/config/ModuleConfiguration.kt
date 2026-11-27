@@ -4,7 +4,9 @@ import com.tradingagent.modules.audit.AuditLog
 import com.tradingagent.modules.brokerread.CapabilityProbe
 import com.tradingagent.modules.brokerread.DemoKeyMaterial
 import com.tradingagent.modules.brokerread.DemoMarketRatesLookup
+import com.tradingagent.modules.brokerread.DemoPositionQuotes
 import com.tradingagent.modules.brokerread.JdkHttpGet
+import com.tradingagent.modules.brokerread.PositionQuoteRead
 import com.tradingagent.modules.chat.ChatQuery
 import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.configuration.EvidenceGate
@@ -127,12 +129,25 @@ class ModuleConfiguration {
     }
 
     @Bean
+    fun positionQuoteRead(): PositionQuoteRead = DemoPositionQuotes(
+        keys = { DemoKeyMaterial.fromEnvironment(System.getenv()) },
+        transport = JdkHttpGet(),
+    )
+
+    @Bean
     fun dashboardReadModel(
         operationalStateService: OperationalStateService,
         ledger: Ledger,
         configurationService: ConfigurationService,
         capabilityProbe: CapabilityProbe,
-    ) = DashboardReadModel(operationalStateService, ledger, configurationService, capabilityProbe)
+        positionQuoteRead: PositionQuoteRead,
+    ) = DashboardReadModel(
+        operationalStateService,
+        ledger,
+        configurationService,
+        capabilityProbe,
+        positionQuoteRead,
+    )
 
     @Bean fun chatQuery() = ChatQuery()
 

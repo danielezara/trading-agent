@@ -145,6 +145,8 @@ function PositionsTable({ positions }: { positions: Overview["positions"] | unde
           <th>Strumento</th>
           <th>Quantità</th>
           <th>Valore</th>
+          <th>Quotazione</th>
+          <th>Ora</th>
         </tr>
       </thead>
       <tbody>
@@ -153,6 +155,8 @@ function PositionsTable({ positions }: { positions: Overview["positions"] | unde
             <td>{position.instrument_id}</td>
             <td>{position.quantity ?? "non disponibile"}</td>
             <td>{cashAmount(position.value)}</td>
+            <td data-testid="quote-price">{position.quote_price ?? ""}</td>
+            <td data-testid="quote-time">{position.quote_time ?? ""}</td>
           </tr>
         ))}
       </tbody>

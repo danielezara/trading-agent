@@ -1,10 +1,13 @@
 package com.tradingagent.modules.readmodel
 
 import com.tradingagent.kernel.EvidenceStatus
+import com.tradingagent.kernel.OperationalState
 import com.tradingagent.modules.brokerread.CapabilityProbe
 import com.tradingagent.modules.brokerread.DemoKeyMaterial
+import com.tradingagent.modules.brokerread.DisplayQuote
 import com.tradingagent.modules.brokerread.HttpGet
 import com.tradingagent.modules.brokerread.InboundHttp
+import com.tradingagent.modules.brokerread.PositionQuoteRead
 import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.configuration.EvidenceGate
 import com.tradingagent.modules.ledger.Ledger
@@ -13,6 +16,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
+import java.math.BigDecimal
 import java.time.Instant
 
 class DashboardReadModelTest {
@@ -94,4 +98,54 @@ class DashboardReadModelTest {
         assertEquals(listOf("1", "2"), model.portfolio().positions?.map { it.instrumentId })
         assertEquals(2, calls)
     }
+
+    @Test
+    fun `a missing quote stays blank and a present bid is kept`() {
+        val asked = mutableListOf<List<String>>()
+        val snapshot = model(
+            """{"clientPortfolio":{"credit":10,"accountCurrencyId":1,"positions":[{"instrumentID":6270,"units":1,"amount":1},{"instrumentID":100032,"units":2,"amount":2}]}}""",
+            PositionQuoteRead { ids ->
+                asked += ids
+                mapOf("6270" to DisplayQuote("6270", BigDecimal("1.25"), Instant.parse("2026-11-27T09:30:00Z")))
+            },
+        ).portfolio()
+        assertEquals(listOf(listOf("6270", "100032")), asked)
+        assertEquals(0, snapshot.quotes?.get("6270")?.price?.compareTo(BigDecimal("1.25")))
+        assertEquals(Instant.parse("2026-11-27T09:30:00Z"), snapshot.quotes?.get("6270")?.quotedAt)
+        assertNull(snapshot.quotes?.get("100032"))
+        assertEquals(OperationalState.OBSERVATION, snapshot.operationalState)
+        assertFalse(snapshot.tradingEnabled)
+    }
+
+    @Test
+    fun `quotes are not requested when there are no positions`() {
+        var calls = 0
+        val snapshot = model(
+            """{"clientPortfolio":{"credit":10,"accountCurrencyId":1,"positions":[]}}""",
+            PositionQuoteRead {
+                calls += 1
+                emptyMap()
+            },
+        ).portfolio()
+        assertEquals(0, calls)
+        assertNull(snapshot.quotes)
+        assertEquals(emptyList<Any>(), snapshot.positions)
+    }
+
+    private fun model(body: String, quotes: PositionQuoteRead) = DashboardReadModel(
+        operationalStateService = OperationalStateService(clock = { Instant.parse("2026-11-27T00:00:00Z") }),
+        ledger = Ledger(),
+        configurationService = ConfigurationService(),
+        capabilityProbe = CapabilityProbe(
+            evidenceGate = EvidenceGate(),
+            keys = {
+                DemoKeyMaterial.fromEnvironment(
+                    mapOf("ETORO_DEMO_API_KEY" to "test-api-key", "ETORO_DEMO_USER_KEY" to "test-user-key"),
+                )
+            },
+            transport = HttpGet { _, _ -> InboundHttp(200, null, body) },
+            clock = { Instant.parse("2026-11-27T00:00:00Z") },
+        ),
+        positionQuotes = quotes,
+    )
 }

@@ -4,8 +4,10 @@ import com.tradingagent.kernel.Money
 import com.tradingagent.kernel.OperationalState
 import java.time.Instant
 import com.tradingagent.modules.brokerread.CapabilityProbe
+import com.tradingagent.modules.brokerread.DisplayQuote
 import com.tradingagent.modules.brokerread.ObservedOrder
 import com.tradingagent.modules.brokerread.ObservedPosition
+import com.tradingagent.modules.brokerread.PositionQuoteRead
 import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.ledger.CashInputs
 import com.tradingagent.modules.ledger.Ledger
@@ -34,6 +36,7 @@ data class PortfolioSnapshot(
     val probeErrorClass: String?,
     val accountLabel: String?,
     val positions: List<ObservedPosition>?,
+    val quotes: Map<String, DisplayQuote>?,
     val orders: List<ObservedOrder>?,
     val executions: List<ObservedOrder>?,
 )
@@ -43,6 +46,7 @@ class DashboardReadModel(
     private val ledger: Ledger,
     private val configurationService: ConfigurationService,
     private val capabilityProbe: CapabilityProbe = CapabilityProbe.offline(),
+    private val positionQuotes: PositionQuoteRead = PositionQuoteRead { null },
 ) {
     fun portfolio(): PortfolioSnapshot {
         val configuration = configurationService.active()
@@ -83,6 +87,9 @@ class DashboardReadModel(
             probeErrorClass = observed.errorClass,
             accountLabel = observed.accountLabel,
             positions = observed.positions,
+            quotes = observed.positions?.takeIf { it.isNotEmpty() }?.let { rows ->
+                positionQuotes.read(rows.map { it.instrumentId })
+            },
             orders = observed.orders,
             executions = observed.executions,
         )

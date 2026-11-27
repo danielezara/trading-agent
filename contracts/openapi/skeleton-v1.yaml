@@ -561,6 +561,14 @@ components:
                     nullable: true
                   value:
                     nullable: true
+                  quote_price:
+                    type: string
+                    nullable: true
+                    description: Bid when present, otherwise last execution. Null when that instrument has no quote. A missing quote is not zero.
+                  quote_time:
+                    type: string
+                    format: date-time
+                    nullable: true
             orders:
               type: array
               nullable: true
