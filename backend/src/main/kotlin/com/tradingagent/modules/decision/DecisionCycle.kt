@@ -20,6 +20,7 @@ import com.tradingagent.modules.risk.DispatchPreconditions
 import com.tradingagent.modules.risk.PolicyGate
 import com.tradingagent.modules.risk.PolicyVerdict
 import com.tradingagent.modules.strategy.BarBook
+import com.tradingagent.modules.strategy.BudgetLoss
 import com.tradingagent.modules.strategy.ChannelObservation
 import com.tradingagent.modules.strategy.ClosedBarEvaluation
 import com.tradingagent.modules.strategy.InstrumentBars
@@ -37,6 +38,9 @@ data class RecordedDecision(
     val policy: PolicyVerdict,
     val rule: RuleDecision,
     val closedBarCount: Int,
+    val bookLossMinor: Long? = null,
+    val bookLossCurrency: String? = null,
+    val lossBlocksEntries: Boolean = false,
 )
 
 class DecisionCycle(
@@ -101,6 +105,13 @@ class DecisionCycle(
                     },
                 )
             },
+            reportedLossMinor = observed.bookLossMinor,
+            reportedLossCurrency = observed.bookLossCurrency,
+        )
+        val lossBlocksEntries = BudgetLoss.blocksNewEntries(
+            observed.bookLossMinor,
+            observed.bookLossCurrency,
+            configuration.parameters.economic,
         )
         val rule = ClosedBarEvaluation.decide(
             at,
@@ -151,6 +162,9 @@ class DecisionCycle(
             ruleInstrument = rule.instrumentId.orEmpty(),
             ruleOrderable = rule.orderable,
             closedBars = closedBarCount,
+            bookLossMinor = observed.bookLossMinor,
+            bookLossCurrency = observed.bookLossCurrency.orEmpty(),
+            lossBlocksEntries = lossBlocksEntries,
         )
         val auditEvent = auditLog.append(
             occurredAt = at,
@@ -163,7 +177,17 @@ class DecisionCycle(
         )
         val policy = policyGate.evaluate(DispatchPreconditions())
         check(!policy.accepted && !policy.brokerCalled) { "la policy non può accettare un invio" }
-        val result = RecordedDecision(outcome, configuration, auditEvent, policy, rule, closedBarCount)
+        val result = RecordedDecision(
+            outcome,
+            configuration,
+            auditEvent,
+            policy,
+            rule,
+            closedBarCount,
+            observed.bookLossMinor,
+            observed.bookLossCurrency,
+            lossBlocksEntries,
+        )
         recorded = result
         return result
     }
@@ -182,6 +206,9 @@ class DecisionCycle(
             ruleInstrument: String = "",
             ruleOrderable: Boolean = false,
             closedBars: Int = 0,
+            bookLossMinor: Long? = null,
+            bookLossCurrency: String = "",
+            lossBlocksEntries: Boolean = false,
         ): String = listOf(
             "action=${outcome.action}",
             "reasons=${outcome.reasonCodes.joinToString(",") { it.name }}",
@@ -221,6 +248,9 @@ class DecisionCycle(
             "rule_instrument=$ruleInstrument",
             "rule_orderable=$ruleOrderable",
             "closed_bars=$closedBars",
+            "book_loss_minor=${bookLossMinor ?: ""}",
+            "book_loss_currency=$bookLossCurrency",
+            "loss_blocks_entries=$lossBlocksEntries",
         ).joinToString("\n")
     }
 }

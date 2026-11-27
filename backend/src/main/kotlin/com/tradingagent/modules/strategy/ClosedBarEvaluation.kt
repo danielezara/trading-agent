@@ -13,6 +13,8 @@ data class InstrumentBars(
 data class BarBook(
     val openPositions: Int,
     val instruments: List<InstrumentBars>,
+    val reportedLossMinor: Long? = null,
+    val reportedLossCurrency: String? = null,
 )
 
 object ClosedBarEvaluation {
@@ -57,7 +59,11 @@ object ClosedBarEvaluation {
         leverage = economic.allowlistLeverage,
         investedMinor = 0,
         sectorInvestedMinor = null,
-        lossMinor = 0,
+        lossMinor = BudgetLoss.entryLossMinor(
+            book.reportedLossMinor,
+            book.reportedLossCurrency,
+            economic,
+        ),
         openPositions = book.openPositions,
         lastExitAt = null,
         economic = economic,

@@ -79,6 +79,7 @@ data class ObservedPosition(
     val instrumentId: String,
     val quantity: String?,
     val value: Money?,
+    val initialDollarsMinor: Long? = null,
 )
 
 data class ObservedOrder(
@@ -285,7 +286,8 @@ object DemoPortfolioRead {
             val units = quantity(item.get("units"))
             val amount = minor(item.get("amount"))
             val value = if (currency != null && amount != null && amount >= 0) Money(amount, currency) else null
-            ObservedPosition(instrumentId, units, value)
+            val opened = minor(item.get("initialAmountInDollars"))?.takeIf { it >= 0 }
+            ObservedPosition(instrumentId, units, value, opened)
         }
     }
 

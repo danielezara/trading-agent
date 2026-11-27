@@ -25,6 +25,8 @@ data class ObservedInstrumentBars(
 data class ObservedBars(
     val openPositions: Int,
     val instruments: List<ObservedInstrumentBars>,
+    val bookLossMinor: Long? = null,
+    val bookLossCurrency: String? = null,
 )
 
 fun interface ClosedBarSource {
@@ -70,7 +72,13 @@ object DemoClosedBars {
             val assetClass = classes[id]?.assetClass ?: "unknown"
             ObservedInstrumentBars(id, assetClass, bars)
         }
-        return ObservedBars(account.positionCount ?: ids.size, instruments)
+        val loss = OpenBookLoss.of(account.positions)
+        return ObservedBars(
+            account.positionCount ?: ids.size,
+            instruments,
+            loss?.minorUnits,
+            loss?.currency,
+        )
     }
 
     fun candlesUri(id: String): URI {

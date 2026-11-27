@@ -306,6 +306,9 @@ class SystemStatusController(
         ruleInstrumentId = recorded.rule.instrumentId,
         ruleOrderable = recorded.rule.orderable,
         closedBarCount = recorded.closedBarCount,
+        bookLossMinor = recorded.bookLossMinor,
+        bookLossCurrency = recorded.bookLossCurrency,
+        lossBlocksEntries = recorded.lossBlocksEntries,
     )
 
     private fun signalData(signal: ObservationSignal) = SignalData(
@@ -526,6 +529,9 @@ data class DecisionData(
     val ruleInstrumentId: String?,
     val ruleOrderable: Boolean,
     val closedBarCount: Int,
+    val bookLossMinor: Long?,
+    val bookLossCurrency: String?,
+    val lossBlocksEntries: Boolean,
 )
 
 data class SignalData(

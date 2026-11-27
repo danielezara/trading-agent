@@ -128,6 +128,21 @@ class ClosedBarPolicyTest {
     }
 
     @Test
+    fun `a loss at ten percent holds an open position instead of closing it`() {
+        val held = ClosedBarPolicy.decide(
+            input(
+                bars = falling(),
+                position = HeldPosition(entryCloseMinor = 10_100, barsHeld = 3),
+                lossMinor = 5_000,
+            ),
+        )
+        assertEquals("HOLD", held.action)
+        assertEquals(MandateControl.LOSS_LIMIT, held.reason)
+        assertFalse(held.orderable)
+        assertNull(held.notionalMinor)
+    }
+
+    @Test
     fun `missing closed bars and a missing sector do not invent an entry`() {
         val empty = ClosedBarPolicy.decide(input(bars = emptyList()))
         assertEquals("NO-TRADE", empty.action)

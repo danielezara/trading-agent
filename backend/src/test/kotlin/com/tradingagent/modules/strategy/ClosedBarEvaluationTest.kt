@@ -3,6 +3,7 @@ package com.tradingagent.modules.strategy
 import com.tradingagent.modules.configuration.ConfigurationService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.Instant
 
@@ -65,6 +66,45 @@ class ClosedBarEvaluationTest {
         assertEquals("1001", decision.instrumentId)
         assertEquals("SCORE", decision.reason)
         assertFalse(decision.orderable)
+    }
+
+    @Test
+    fun `an eur loss at ten percent blocks a new entry and a dollar loss does not`() {
+        val breached = ClosedBarEvaluation.decide(
+            now,
+            BarBook(
+                0,
+                listOf(InstrumentBars("1001", "stock", bars(21, step = 10))),
+                reportedLossMinor = 5_000,
+                reportedLossCurrency = "EUR",
+            ),
+            parameters.economic,
+            parameters.technical,
+        )
+        assertEquals("NO-TRADE", breached.action)
+        assertEquals("LOSS_LIMIT", breached.reason)
+        assertEquals("1001", breached.instrumentId)
+        assertFalse(breached.orderable)
+        assertTrue(
+            BudgetLoss.blocksNewEntries(5_000, "EUR", parameters.economic),
+        )
+
+        val dollars = ClosedBarEvaluation.decide(
+            now,
+            BarBook(
+                0,
+                listOf(InstrumentBars("1001", "stock", bars(21, step = 10))),
+                reportedLossMinor = 5_000,
+                reportedLossCurrency = "USD",
+            ),
+            parameters.economic,
+            parameters.technical,
+        )
+        assertEquals("NO-TRADE", dollars.action)
+        assertEquals("SECTOR_UNKNOWN", dollars.reason)
+        assertFalse(dollars.orderable)
+        assertFalse(BudgetLoss.blocksNewEntries(5_000, "USD", parameters.economic))
+        assertFalse(BudgetLoss.blocksNewEntries(4_999, "EUR", parameters.economic))
     }
 
     @Test

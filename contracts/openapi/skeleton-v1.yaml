@@ -988,6 +988,15 @@ components:
             closed_bar_count:
               type: integer
               minimum: 0
+            book_loss_minor:
+              type: integer
+              minimum: 0
+              nullable: true
+            book_loss_currency:
+              type: string
+              nullable: true
+            loss_blocks_entries:
+              type: boolean
         meta:
           $ref: "#/components/schemas/Meta"
         warnings:

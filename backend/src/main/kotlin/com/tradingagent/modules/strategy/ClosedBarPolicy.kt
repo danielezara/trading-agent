@@ -206,6 +206,10 @@ object ClosedBarPolicy {
         if (position != null && input.assetClass != "stock" && input.assetClass != "etf") {
             return hold(input, MandateControl.UNIVERSE)
         }
+        val maxLoss = input.economic.maxLossMinor()
+        if (position != null && maxLoss != null && input.lossMinor >= maxLoss) {
+            return hold(input, MandateControl.LOSS_LIMIT)
+        }
         val atrBars = input.technical.int("regime_atr_bars")
         val atr = averageRange(closed, atrBars)
         val lastClose = closed.last().closeMinor
@@ -236,7 +240,6 @@ object ClosedBarPolicy {
         if (input.assetClass != "stock" && input.assetClass != "etf") {
             return none(MandateControl.UNIVERSE)
         }
-        val maxLoss = input.economic.maxLossMinor()
         if (maxLoss != null && input.lossMinor >= maxLoss) {
             return none(MandateControl.LOSS_LIMIT)
         }

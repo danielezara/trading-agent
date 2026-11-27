@@ -238,6 +238,31 @@ class DemoPortfolioReadTest {
         assertEquals(false, parsed?.executions?.any { it.orderId == "7765437" || it.orderId == "42" || it.orderId == "9" })
     }
 
+    @Test
+    fun `open book loss uses the dollar amounts etoro already reports`() {
+        val outcome = DemoPortfolioRead.execute(
+            HttpGet { _, _ ->
+                InboundHttp(
+                    200,
+                    null,
+                    """
+                    {"clientPortfolio":{"credit":100,"positions":[
+                      {"instrumentID":1001,"units":1,"amount":40.00,"initialAmountInDollars":50.00},
+                      {"instrumentID":1002,"units":1,"amount":30.00,"initialAmountInDollars":25.00}
+                    ]}}
+                    """.trimIndent(),
+                )
+            },
+            keys(),
+        )
+        val positions = (outcome as ReadOutcome.Pass).account.positions
+        val loss = OpenBookLoss.of(positions)
+        assertEquals(500L, loss?.minorUnits)
+        assertEquals("USD", loss?.currency)
+        assertEquals(null, OpenBookLoss.of(positions?.map { it.copy(initialDollarsMinor = null) }))
+        assertEquals(0L, OpenBookLoss.of(emptyList())?.minorUnits)
+    }
+
     private fun keys(): DemoKeyMaterial = DemoKeyMaterial.fromEnvironment(
         mapOf("ETORO_DEMO_API_KEY" to apiKey, "ETORO_DEMO_USER_KEY" to userKey),
     )!!
