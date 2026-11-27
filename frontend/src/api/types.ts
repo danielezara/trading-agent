@@ -103,6 +103,10 @@ export type DataChannel = {
   conflict: boolean;
   quality_millis: number;
   status: string;
+  category?: string | null;
+  event_time?: string | null;
+  ingested_at?: string | null;
+  license?: string | null;
 };
 
 export type DataHealth = {

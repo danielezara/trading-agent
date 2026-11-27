@@ -114,7 +114,7 @@ const health = {
     quarantined_count: 1,
     channels: [
       { channel: "orders", source: "not-wired", accepted_count: 0, rejected_count: 0, duplicate_count: 0, stale: false, conflict: false, quality_millis: 0, status: "NOT_WIRED" },
-      { channel: "prices", source: "fixture-market-data", accepted_count: 2, rejected_count: 1, duplicate_count: 1, stale: false, conflict: true, quality_millis: 0, status: "CONFLICT" },
+      { channel: "prices", source: "fixture-market-data", accepted_count: 2, rejected_count: 1, duplicate_count: 1, stale: true, conflict: true, quality_millis: 0, status: "CONFLICT", category: "market-data", event_time: "2026-11-27T00:00:10Z", ingested_at: "2026-11-27T00:00:11Z", license: "fixture-unverified" },
     ],
   },
   meta: { environment: "DEMO", base_currency: null },
@@ -308,6 +308,12 @@ describe("dashboard skeleton", () => {
     expect(screen.getByText("CONFLICT")).toBeInTheDocument();
     expect(screen.getByText("NOT_WIRED")).toBeInTheDocument();
     expect(screen.getByText(/Rete: no/)).toBeInTheDocument();
+    const market = screen.getByTestId("market-data");
+    expect(market).toHaveTextContent("Fixture prezzi stale");
+    expect(market).toHaveTextContent("fixture-market-data");
+    expect(market).toHaveTextContent("2026-11-27T00:00:10Z");
+    expect(market).toHaveTextContent("fixture-unverified");
+    expect(market).toHaveTextContent("NO-TRADE");
     expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
   });
 

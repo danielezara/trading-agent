@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { getJson } from "./api/client";
 import { assertSkeletonApiBase } from "./api/policy";
-import type { AuditChain, Configuration, DataHealth, Decision, Envelope, Money, OperationalState, Overview } from "./api/types";
+import type { AuditChain, Configuration, DataChannel, DataHealth, Decision, Envelope, Money, OperationalState, Overview } from "./api/types";
 import "./styles.css";
 
 const NAV = [
@@ -394,8 +394,31 @@ function DataPage({ loaded }: { loaded: LoadState }) {
       <h1>Dati e agente</h1>
       <p>I canali arrivano da una fixture locale. Nessuna rete e nessuna chiamata al broker.</p>
       <LoadNotice loaded={loaded} />
-      {loaded.status === "ready" ? <ChannelTable health={loaded.data.health} /> : null}
+      {loaded.status === "ready" ? (
+        <>
+          <MarketFixture channel={loaded.data.health.channels.find((channel) => channel.channel === "prices")} />
+          <ChannelTable health={loaded.data.health} />
+        </>
+      ) : null}
     </section>
+  );
+}
+
+function MarketFixture({ channel }: { channel: DataChannel | undefined }) {
+  if (!channel || channel.accepted_count === 0) {
+    return <p data-testid="market-data">Canale prezzi assente. La decisione resta NO-TRADE.</p>;
+  }
+  if (channel.stale) {
+    return (
+      <p data-testid="market-data">
+        {`Fixture prezzi stale (${channel.source}, ${channel.event_time ?? "senza orario"}, licenza ${channel.license ?? "non verificata"}). La decisione resta NO-TRADE.`}
+      </p>
+    );
+  }
+  return (
+    <p data-testid="market-data">
+      {`Fixture prezzi ${channel.source}. Evento ${channel.event_time ?? "non disponibile"}. Licenza ${channel.license ?? "non verificata"}.`}
+    </p>
   );
 }
 

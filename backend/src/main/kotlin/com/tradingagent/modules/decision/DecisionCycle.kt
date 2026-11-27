@@ -6,6 +6,7 @@ import com.tradingagent.modules.brokerread.CapabilityProbe
 import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.configuration.ConfigurationVersion
 import com.tradingagent.modules.configuration.EvidenceGate
+import com.tradingagent.modules.ingestion.ChannelHealth
 import com.tradingagent.modules.ingestion.IngestionPipeline
 import com.tradingagent.modules.ledger.CashInputs
 import com.tradingagent.modules.ledger.Ledger
@@ -78,7 +79,8 @@ class DecisionCycle(
         check(!outcome.signal.orderable && outcome.signal.direction == "NONE" && outcome.signal.instrumentId == null) {
             "un segnale di osservazione non è eseguibile"
         }
-        val payload = decisionPayload(outcome)
+        val prices = assessment.channels.firstOrNull { it.channel == "prices" }
+        val payload = decisionPayload(outcome, prices)
         val auditEvent = auditLog.append(
             occurredAt = at,
             correlationId = outcome.inputHash,
@@ -98,12 +100,19 @@ class DecisionCycle(
     companion object {
         const val COMPONENT_VERSION: String = "observation-decision/1"
 
-        fun decisionPayload(outcome: StrategyOutcome): String = listOf(
+        fun decisionPayload(outcome: StrategyOutcome, prices: ChannelHealth? = null): String = listOf(
             "action=${outcome.action}",
             "reasons=${outcome.reasonCodes.joinToString(",") { it.name }}",
             "input_hash=${outcome.inputHash}",
             "signal_id=${outcome.signal.signalId}",
             "signal_orderable=${outcome.signal.orderable}",
+            "prices_source=${prices?.source.orEmpty()}",
+            "prices_category=${prices?.category.orEmpty()}",
+            "prices_event_time=${prices?.eventTime ?: ""}",
+            "prices_ingested_at=${prices?.ingestedAt ?: ""}",
+            "prices_license=${prices?.license.orEmpty()}",
+            "prices_stale=${prices?.stale ?: false}",
+            "prices_accepted=${prices?.acceptedCount ?: 0}",
         ).joinToString("\n")
     }
 }

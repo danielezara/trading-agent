@@ -231,6 +231,10 @@ class SystemStatusController(
         conflict = channel.conflict,
         qualityMillis = channel.qualityMillis,
         status = channel.status,
+        category = channel.category,
+        eventTime = channel.eventTime,
+        ingestedAt = channel.ingestedAt,
+        license = channel.license,
     )
 
     private fun decisionData(recorded: RecordedDecision) = DecisionData(
@@ -426,6 +430,10 @@ data class ChannelHealthData(
     val conflict: Boolean,
     val qualityMillis: Int,
     val status: String,
+    val category: String?,
+    val eventTime: Instant?,
+    val ingestedAt: Instant?,
+    val license: String?,
 )
 
 data class DecisionData(

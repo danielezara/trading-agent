@@ -125,6 +125,9 @@ class ApiSkeletonTest(
             .andExpect(jsonPath("$.data.source").value("classpath-fixture"))
             .andExpect(jsonPath("$.data.network").value(false))
             .andExpect(jsonPath("$.data.channels[?(@.channel == 'prices')].status", contains("CONFLICT")))
+            .andExpect(jsonPath("$.data.channels[?(@.channel == 'prices')].category", contains("market-data")))
+            .andExpect(jsonPath("$.data.channels[?(@.channel == 'prices')].license", contains("fixture-unverified")))
+            .andExpect(jsonPath("$.data.channels[?(@.channel == 'prices')].event_time", contains("2026-11-27T00:00:10Z")))
             .andExpect(jsonPath("$.data.channels[?(@.channel == 'orders')].status", contains("NOT_WIRED")))
 
         val firstDecision = mockMvc.perform(get("/api/v1/decisions/latest"))

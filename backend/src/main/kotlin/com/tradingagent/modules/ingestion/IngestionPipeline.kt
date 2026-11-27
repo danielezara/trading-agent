@@ -18,6 +18,10 @@ data class ChannelHealth(
     val qualityMillis: Int,
     val status: String,
     val providerClass: String,
+    val category: String? = null,
+    val eventTime: Instant? = null,
+    val ingestedAt: Instant? = null,
+    val license: String? = null,
 )
 
 data class IngestionAssessment(
@@ -115,7 +119,7 @@ class IngestionPipeline private constructor(
         }
         return ChannelHealth(
             channel = channel,
-            source = rows.firstOrNull()?.sourceName ?: "classpath-fixture",
+            source = newest?.sourceName ?: "classpath-fixture",
             acceptedCount = rows.size,
             rejectedCount = rejected,
             duplicateCount = duplicates,
@@ -124,6 +128,10 @@ class IngestionPipeline private constructor(
             qualityMillis = quality,
             status = status,
             providerClass = "deterministic",
+            category = newest?.category,
+            eventTime = newest?.eventTime,
+            ingestedAt = newest?.ingestedAt,
+            license = newest?.license,
         )
     }
 
@@ -213,9 +221,11 @@ class IngestionPipeline private constructor(
                 AcceptedRecord(
                     recordId = recordId,
                     channel = channel!!,
+                    category = category,
                     sourceName = sourceName,
                     eventTime = eventTime,
                     ingestedAt = ingestedAt,
+                    license = license,
                     licenseVerified = licenseVerified,
                     contractVerified = contractVerified,
                     instrumentId = instrumentId,
@@ -302,9 +312,11 @@ class IngestionPipeline private constructor(
 private data class AcceptedRecord(
     val recordId: String,
     val channel: String,
+    val category: String,
     val sourceName: String,
     val eventTime: Instant,
     val ingestedAt: Instant,
+    val license: String,
     val licenseVerified: Boolean,
     val contractVerified: Boolean,
     val instrumentId: String,

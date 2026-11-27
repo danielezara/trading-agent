@@ -26,6 +26,11 @@ class IngestionPipelineTest {
         assertFalse(prices.stale)
         assertEquals(0, prices.qualityMillis)
         assertEquals("CONFLICT", prices.status)
+        assertEquals("market-data", prices.category)
+        assertEquals("fixture-market-crosscheck", prices.source)
+        assertEquals(Instant.parse("2026-11-27T00:00:10Z"), prices.eventTime)
+        assertEquals(Instant.parse("2026-11-27T00:00:11Z"), prices.ingestedAt)
+        assertEquals("fixture-unverified", prices.license)
         assertTrue(health.channels.none { it.status == "HEALTHY" })
         assertEquals("NOT_WIRED", health.channels.first { it.channel == "orders" }.status)
         assertEquals("NOT_WIRED", health.channels.first { it.channel == "positions" }.status)
@@ -94,6 +99,19 @@ class IngestionPipelineTest {
         assertEquals(1000, prices.qualityMillis)
         assertEquals("HEALTHY", prices.status)
         assertTrue(prices.qualityMillis >= QualityScale.THRESHOLD_MILLIS)
+    }
+
+    @Test
+    fun `a missing prices fixture is unusable and not stale`() {
+        val prices = IngestionPipeline.fromJson(
+            """{"connector_version":"fixture-empty","records":[]}""",
+        ).assess(Instant.parse("2026-11-27T00:00:30Z")).channels.first { it.channel == "prices" }
+        assertEquals(0, prices.acceptedCount)
+        assertFalse(prices.stale)
+        assertEquals("UNUSABLE", prices.status)
+        assertEquals(null, prices.eventTime)
+        assertEquals(null, prices.license)
+        assertFalse(IngestionPipeline.fromClasspath().assess(Instant.parse("2026-11-27T00:00:30Z")).network)
     }
 
     @Test

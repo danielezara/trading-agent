@@ -628,6 +628,20 @@ components:
                     type: boolean
                   conflict:
                     type: boolean
+                  category:
+                    type: string
+                    nullable: true
+                  event_time:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  ingested_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  license:
+                    type: string
+                    nullable: true
         meta:
           $ref: "#/components/schemas/Meta"
         warnings:

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.security.MessageDigest
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -99,4 +100,85 @@ class DecisionCycleTest {
         assertEquals(EvidenceStatus.UNVERIFIED, gate.rows().first { it.controlId == "RF-059" }.status)
         assertFalse(gate.allowsActive())
     }
+
+    @Test
+    fun `a stale prices fixture stays no trade and records its provenance`() {
+        val at = Instant.parse("2026-11-27T00:02:01Z")
+        val pipeline = IngestionPipeline.fromJson(pricesJson("2026-11-27T00:00:00Z"))
+        val recorded = cycle(pricesJson("2026-11-27T00:00:00Z"), at).record()
+        val prices = pipeline.assess(at).channels.first { it.channel == "prices" }
+        val text = DecisionCycle.decisionPayload(recorded.outcome, prices)
+        assertEquals("NO-TRADE", recorded.outcome.action)
+        assertTrue(prices.stale)
+        assertEquals("fixture-market-data", prices.source)
+        assertEquals("market-data", prices.category)
+        assertEquals("fixture-unverified", prices.license)
+        assertTrue(recorded.outcome.reasonCodes.contains(ReasonCode.DATA_STALE))
+        assertFalse(recorded.outcome.signal.orderable)
+        assertFalse(recorded.policy.accepted)
+        assertFalse(recorded.policy.brokerCalled)
+        assertFalse(pipeline.assess(at).network)
+        assertTrue(text.contains("prices_source=fixture-market-data"))
+        assertTrue(text.contains("prices_event_time=2026-11-27T00:00:00Z"))
+        assertTrue(text.contains("prices_license=fixture-unverified"))
+        assertTrue(text.contains("prices_stale=true"))
+        assertEquals(sha256(text), recorded.auditEvent.payloadSha256)
+    }
+
+    @Test
+    fun `a missing prices fixture stays no trade without calling a vendor`() {
+        val json = """{"connector_version":"fixture-empty","records":[]}"""
+        val at = Instant.parse("2026-11-27T00:00:30Z")
+        val pipeline = IngestionPipeline.fromJson(json)
+        val recorded = cycle(json, at).record()
+        val prices = pipeline.assess(at).channels.first { it.channel == "prices" }
+        assertEquals(0, prices.acceptedCount)
+        assertFalse(prices.stale)
+        assertEquals(null, prices.license)
+        assertFalse(pipeline.assess(at).network)
+        assertEquals("NO-TRADE", recorded.outcome.action)
+        assertTrue(recorded.outcome.reasonCodes.contains(ReasonCode.DATA_MISSING))
+        assertFalse(recorded.outcome.reasonCodes.contains(ReasonCode.DATA_STALE))
+        assertFalse(recorded.policy.brokerCalled)
+        assertEquals(EvidenceStatus.UNVERIFIED, EvidenceGate().rows().first { it.controlId == "RF-045" }.status)
+        assertEquals(EvidenceStatus.UNVERIFIED, EvidenceGate().rows().first { it.controlId == "RF-059" }.status)
+    }
+
+    private fun cycle(json: String, at: Instant): DecisionCycle = DecisionCycle(
+        strategyEngine = StrategyEngine(),
+        ingestionPipeline = IngestionPipeline.fromJson(json),
+        evidenceGate = EvidenceGate(),
+        operationalStateService = OperationalStateService(clock = { at }),
+        configurationService = ConfigurationService(),
+        auditLog = AuditLog(),
+        policyGate = PolicyGate(),
+        clock = { at },
+    )
+
+    private fun sha256(payload: String): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(payload.toByteArray(Charsets.UTF_8))
+        return digest.joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+    }
+
+    private fun pricesJson(eventTime: String) = """
+        {
+          "connector_version": "fixture-prices",
+          "records": [
+            {
+              "record_id": "price-one",
+              "channel": "prices",
+              "category": "market-data",
+              "provider_class": "deterministic",
+              "source_name": "fixture-market-data",
+              "event_time": "$eventTime",
+              "ingested_at": "2026-11-27T00:00:01Z",
+              "license": "fixture-unverified",
+              "license_verified": false,
+              "contract_verified": false,
+              "instrument_id": "INST-1",
+              "value": "100.00"
+            }
+          ]
+        }
+    """.trimIndent()
 }
