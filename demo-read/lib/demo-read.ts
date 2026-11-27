@@ -1,6 +1,9 @@
 export const DEMO_PORTFOLIO_URL = "https://public-api.etoro.com/api/v1/trading/info/demo/portfolio";
 export const DEMO_RATES_URL = "https://public-api.etoro.com/api/v1/market-data/instruments/rates";
 export const DEMO_INSTRUMENTS_URL = "https://public-api.etoro.com/api/v1/market-data/instruments";
+export const DEMO_BALANCES_URL = "https://public-api.etoro.com/api/v1/balances?accountTypes=Trading,Cash&expand=equityDetails&includeZeroBalances=true";
+export const DEMO_HISTORY_URL = "https://public-api.etoro.com/api/v1/trading/info/trade/demo/history";
+const CASH_TRANSACTIONS_PREFIX = "https://public-api.etoro.com/api/v1/money/accounts/cash/";
 export const DEMO_ACCOUNT_FALLBACK = "Conto Demo delle chiavi in backend/.env";
 
 const LABEL_KEYS = ["username", "userName", "accountId", "account_id"] as const;
@@ -19,6 +22,23 @@ export type DemoPosition = {
   quoteTime: string | null;
 };
 
+export type CashMovement = {
+  direction: "credit" | "debit";
+  status: string;
+  kind: string;
+  minorUnits: number;
+  currency: string;
+  postedAt: string | null;
+};
+
+export type ClosedTrade = {
+  instrumentId: string | null;
+  side: string | null;
+  quantity: string | null;
+  netProfit: string | null;
+  closedAt: string | null;
+};
+
 export type DemoOverview = {
   platform: "Demo eToro";
   operationalState: "OBSERVATION";
@@ -27,6 +47,8 @@ export type DemoOverview = {
   accountLabel: string | null;
   brokerCash: BrokerCash | null;
   positions: DemoPosition[] | null;
+  cashMovements: CashMovement[] | null;
+  closedTrades: ClosedTrade[] | null;
   lastProbeAt: string | null;
   probeErrorClass: string | null;
 };
@@ -49,14 +71,17 @@ export async function readDemoOverview(options: ReadOptions): Promise<DemoOvervi
   const apiKey = options.env.ETORO_DEMO_API_KEY?.trim() ?? "";
   const userKey = options.env.ETORO_DEMO_USER_KEY?.trim() ?? "";
   if (!apiKey || !userKey) {
-    return view(false, null, null, null, now(), "KEYS_MISSING");
+    return view(false, null, null, null, null, null, now(), "KEYS_MISSING");
   }
   const outcome = await readOnce(options.fetchImpl, apiKey, userKey, options.sleep ?? defaultSleep);
   if (outcome.kind === "pass") {
-    const positions = await enrichPositions(outcome.positions, options.fetchImpl, apiKey, userKey, options.sleep ?? defaultSleep);
-    return view(true, outcome.accountLabel, outcome.brokerCash, positions, now(), null);
+    const sleep = options.sleep ?? defaultSleep;
+    const positions = await enrichPositions(outcome.positions, options.fetchImpl, apiKey, userKey, sleep);
+    const cashMovements = await readCashMovements(options.fetchImpl, apiKey, userKey, sleep);
+    const closedTrades = await readClosedTrades(options.fetchImpl, apiKey, userKey, sleep, now());
+    return view(true, outcome.accountLabel, outcome.brokerCash, positions, cashMovements, closedTrades, now(), null);
   }
-  return view(false, null, null, null, now(), outcome.errorClass);
+  return view(false, null, null, null, null, null, now(), outcome.errorClass);
 }
 
 function view(
@@ -64,6 +89,8 @@ function view(
   accountLabel: string | null,
   brokerCash: BrokerCash | null,
   positions: DemoPosition[] | null,
+  cashMovements: CashMovement[] | null,
+  closedTrades: ClosedTrade[] | null,
   at: Date,
   probeErrorClass: string | null,
 ): DemoOverview {
@@ -75,6 +102,8 @@ function view(
     accountLabel,
     brokerCash,
     positions,
+    cashMovements,
+    closedTrades,
     lastProbeAt: at.toISOString(),
     probeErrorClass,
   };
@@ -404,6 +433,165 @@ function quoteTime(value: unknown): string | null {
     return null;
   }
   return value.trim();
+}
+
+async function readCashMovements(
+  fetchImpl: FetchLike,
+  apiKey: string,
+  userKey: string,
+  sleep: (ms: number) => Promise<void>,
+): Promise<CashMovement[] | null> {
+  const balances = await readBody(fetchImpl, DEMO_BALANCES_URL, apiKey, userKey, sleep);
+  if (balances === null) {
+    return null;
+  }
+  const ids = cashAccountIds(balances);
+  if (ids === null) {
+    return null;
+  }
+  const rows: CashMovement[] = [];
+  for (const id of ids) {
+    const body = await readBody(fetchImpl, cashTransactionsUrl(id), apiKey, userKey, sleep);
+    if (body === null) {
+      return null;
+    }
+    const page = parseCashMovements(body);
+    if (page === null) {
+      return null;
+    }
+    rows.push(...page);
+  }
+  return rows;
+}
+
+async function readClosedTrades(
+  fetchImpl: FetchLike,
+  apiKey: string,
+  userKey: string,
+  sleep: (ms: number) => Promise<void>,
+  now: Date,
+): Promise<ClosedTrade[] | null> {
+  const minDate = new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), now.getUTCDate() + 1));
+  const day = minDate.toISOString().slice(0, 10);
+  const body = await readBody(fetchImpl, `${DEMO_HISTORY_URL}?minDate=${day}&page=1&pageSize=100`, apiKey, userKey, sleep);
+  if (body === null) {
+    return null;
+  }
+  return parseClosedTrades(body);
+}
+
+function cashTransactionsUrl(id: string): string {
+  if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id)) {
+    throw new Error("cash account id is not a uuid");
+  }
+  const url = `${CASH_TRANSACTIONS_PREFIX}${id}/transactions?pageSize=50`;
+  if (url.includes("/real")) {
+    throw new Error("real trading path is forbidden");
+  }
+  return url;
+}
+
+export function cashAccountIds(body: string): string[] | null {
+  let root: unknown;
+  try {
+    root = JSON.parse(body);
+  } catch {
+    return null;
+  }
+  if (!isRecord(root) || !Array.isArray(root.balances)) {
+    return null;
+  }
+  const ids: string[] = [];
+  for (const row of root.balances) {
+    if (!isRecord(row) || row.accountType !== "Cash" || typeof row.accountId !== "string") {
+      continue;
+    }
+    if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(row.accountId) && !ids.includes(row.accountId)) {
+      ids.push(row.accountId);
+    }
+  }
+  return ids;
+}
+
+export function parseCashMovements(body: string): CashMovement[] | null {
+  let root: unknown;
+  try {
+    root = JSON.parse(body);
+  } catch {
+    return null;
+  }
+  if (!isRecord(root) || !Array.isArray(root.results)) {
+    return null;
+  }
+  const rows: CashMovement[] = [];
+  for (const item of root.results) {
+    if (!isRecord(item)) {
+      continue;
+    }
+    const direction = item.direction === "credit" || item.direction === "debit" ? item.direction : null;
+    const status = token(item.status);
+    const kind = token(item.transactionType);
+    const currency = typeof item.currency === "string" && /^[A-Z]{3}$/.test(item.currency) ? item.currency : null;
+    const minorUnits = signedMinor(item.amount);
+    if (!direction || !status || !kind || !currency || minorUnits === null) {
+      continue;
+    }
+    rows.push({
+      direction,
+      status,
+      kind,
+      minorUnits,
+      currency,
+      postedAt: quoteTime(item.postedAt),
+    });
+  }
+  return rows;
+}
+
+export function parseClosedTrades(body: string): ClosedTrade[] | null {
+  let root: unknown;
+  try {
+    root = JSON.parse(body);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(root)) {
+    return null;
+  }
+  const rows: ClosedTrade[] = [];
+  for (const item of root) {
+    if (!isRecord(item) || !positiveId(item.positionId)) {
+      continue;
+    }
+    rows.push({
+      instrumentId: positiveId(item.instrumentId),
+      side: item.isBuy === true ? "BUY" : item.isBuy === false ? "SELL" : null,
+      quantity: quantity(item.units),
+      netProfit: decimalText(item.netProfit),
+      closedAt: quoteTime(item.closeTimestamp),
+    });
+  }
+  return rows;
+}
+
+function positiveId(value: unknown): string | null {
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    return null;
+  }
+  return String(value);
+}
+
+function token(value: unknown): string | null {
+  return typeof value === "string" && /^[A-Za-z]{1,64}$/.test(value) ? value : null;
+}
+
+function signedMinor(value: unknown): number | null {
+  const numeric = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  const cents = Math.trunc(numeric * 100);
+  return Number.isSafeInteger(cents) ? cents : null;
 }
 
 export function formatCash(cash: BrokerCash | null): string {

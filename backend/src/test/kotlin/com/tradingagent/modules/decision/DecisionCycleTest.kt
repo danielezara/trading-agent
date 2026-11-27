@@ -4,9 +4,13 @@ import com.tradingagent.kernel.EvidenceStatus
 import com.tradingagent.kernel.ReasonCode
 import com.tradingagent.modules.audit.AuditLog
 import com.tradingagent.modules.brokerread.CapabilityProbe
+import com.tradingagent.modules.brokerread.ClosedBarSource
 import com.tradingagent.modules.brokerread.DemoKeyMaterial
 import com.tradingagent.modules.brokerread.HttpGet
 import com.tradingagent.modules.brokerread.InboundHttp
+import com.tradingagent.modules.brokerread.ObservedBar
+import com.tradingagent.modules.brokerread.ObservedBars
+import com.tradingagent.modules.brokerread.ObservedInstrumentBars
 import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.configuration.EvidenceGate
 import com.tradingagent.modules.ingestion.IngestionAssessment
@@ -104,6 +108,45 @@ class DecisionCycleTest {
         assertEquals(EvidenceStatus.UNVERIFIED, gate.rows().first { it.controlId == "RF-045" }.status)
         assertEquals(EvidenceStatus.UNVERIFIED, gate.rows().first { it.controlId == "RF-059" }.status)
         assertFalse(gate.allowsActive())
+        assertEquals("NO-TRADE", recorded.rule.action)
+        assertEquals("WARMUP", recorded.rule.reason)
+        assertFalse(recorded.rule.orderable)
+        assertEquals(0, recorded.closedBarCount)
+    }
+
+    @Test
+    fun `saved five minute bars are evaluated and still cannot send an order`() {
+        val at = Instant.parse("2026-11-27T10:30:00Z")
+        val origin = at.minusSeconds(300L * 21)
+        val bars = (0 until 21).map { index ->
+            val close = 10_000_000_000L + index * 10
+            ObservedBar(origin.plusSeconds(300L * index), origin.plusSeconds(300L * (index + 1)), close, close + 1, close - 1)
+        }
+        val cycle = DecisionCycle(
+            strategyEngine = StrategyEngine(),
+            ingestionPipeline = IngestionPipeline.fromClasspath(),
+            evidenceGate = EvidenceGate(),
+            operationalStateService = OperationalStateService(clock = { at }),
+            configurationService = ConfigurationService(),
+            auditLog = AuditLog(),
+            policyGate = PolicyGate(),
+            clock = { at },
+            closedBars = ClosedBarSource {
+                ObservedBars(0, listOf(ObservedInstrumentBars("1001", "stock", bars)))
+            },
+        )
+        val recorded = cycle.record()
+        assertEquals(21, recorded.closedBarCount)
+        assertEquals(21, cycle.storedBars().single().bars.size)
+        assertEquals("NO-TRADE", recorded.outcome.action)
+        assertEquals("NONE", recorded.outcome.signal.direction)
+        assertFalse(recorded.outcome.signal.orderable)
+        assertEquals("NO-TRADE", recorded.rule.action)
+        assertEquals("SECTOR_UNKNOWN", recorded.rule.reason)
+        assertEquals("1001", recorded.rule.instrumentId)
+        assertFalse(recorded.rule.orderable)
+        assertFalse(recorded.policy.accepted)
+        assertFalse(recorded.policy.brokerCalled)
     }
 
     @Test

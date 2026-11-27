@@ -301,6 +301,11 @@ class SystemStatusController(
             brokerCalled = recorded.policy.brokerCalled,
         ),
         signal = signalData(recorded.outcome.signal),
+        ruleAction = recorded.rule.action,
+        ruleReason = recorded.rule.reason,
+        ruleInstrumentId = recorded.rule.instrumentId,
+        ruleOrderable = recorded.rule.orderable,
+        closedBarCount = recorded.closedBarCount,
     )
 
     private fun signalData(signal: ObservationSignal) = SignalData(
@@ -516,6 +521,11 @@ data class DecisionData(
     val auditEventHash: String,
     val policy: PolicyData,
     val signal: SignalData,
+    val ruleAction: String,
+    val ruleReason: String,
+    val ruleInstrumentId: String?,
+    val ruleOrderable: Boolean,
+    val closedBarCount: Int,
 )
 
 data class SignalData(

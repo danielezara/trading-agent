@@ -10,6 +10,7 @@ import com.tradingagent.modules.brokerread.DemoKeyMaterial
 import com.tradingagent.modules.brokerread.DemoInstrumentNameRead
 import com.tradingagent.modules.brokerread.DemoMarketRatesLookup
 import com.tradingagent.modules.brokerread.ClosedTradeRead
+import com.tradingagent.modules.brokerread.DemoClosedBarRead
 import com.tradingagent.modules.brokerread.DemoClosedTradeRead
 import com.tradingagent.modules.brokerread.DemoInstrumentClassRead
 import com.tradingagent.modules.brokerread.EcbEuroFx
@@ -135,6 +136,10 @@ class ModuleConfiguration {
             capabilityProbe = capabilityProbe,
             assess = { observationPrices.assess(it) },
             euroFx = euroFxRead(),
+            closedBars = DemoClosedBarRead(
+                keys = { DemoKeyMaterial.fromEnvironment(System.getenv()) },
+                transport = JdkHttpGet(),
+            ),
         )
         val recorded = cycle.record()
         auditLog.sealDay(LocalDate.ofInstant(recorded.outcome.evaluatedAt, ZoneOffset.UTC))

@@ -41,8 +41,8 @@ describe("demo read", () => {
         });
       },
     });
-    assert.equal(calls.length, 1);
     assert.equal(calls[0]?.url, DEMO_PORTFOLIO_URL);
+    assert.equal(calls.some((call) => call.url.includes("/real")), false);
     assert.equal(calls[0]?.method, "GET");
     assert.equal(calls[0]?.cache, "no-store");
     assert.equal(calls[0]?.url.includes("/real/"), false);
@@ -202,6 +202,64 @@ describe("demo read", () => {
     assert.equal(route.includes("fetchCache = \"force-no-store\""), true);
     assert.equal(page.includes("Posizioni Demo"), true);
     assert.equal(page.includes("Nessuna posizione"), true);
+    assert.equal(page.includes("Storico operazioni vuoto"), true);
+    assert.equal(page.includes("Registro movimenti"), true);
+  });
+
+  it("shows an empty operation history and a native cash movement", async () => {
+    const view = await readDemoOverview({
+      env: keys,
+      now: () => new Date("2026-11-27T10:30:00Z"),
+      fetchImpl: async (url) => {
+        if (url.includes("/real")) {
+          throw new Error("real path");
+        }
+        if (url.startsWith("https://public-api.etoro.com/api/v1/balances")) {
+          return json(200, {
+            balances: [
+              { accountType: "Cash", accountId: "f0995efc-25a1-465e-bec3-d309aaf00ede", currency: "EUR" },
+              { accountType: "Trading", accountId: "12345678", currency: "USD" },
+            ],
+          });
+        }
+        if (url.includes("/money/accounts/cash/") && url.includes("/transactions")) {
+          assert.equal(url.includes("12345678"), false);
+          return json(200, {
+            results: [
+              {
+                id: "m1",
+                direction: "credit",
+                status: "settled",
+                transactionType: "internalTransfer",
+                amount: "100.00",
+                currency: "EUR",
+                postedAt: "2026-05-03T10:16:12Z",
+                originalAmount: "90",
+                originalCurrency: "USD",
+                conversionRate: "1.1111",
+              },
+            ],
+          });
+        }
+        if (url.startsWith("https://public-api.etoro.com/api/v1/trading/info/trade/demo/history")) {
+          return json(200, []);
+        }
+        return json(200, { clientPortfolio: { credit: 10, accountCurrencyId: 1, positions: [] } });
+      },
+    });
+    assert.equal(view.tradingEnabled, false);
+    assert.equal(view.operationalState, "OBSERVATION");
+    assert.deepEqual(view.closedTrades, []);
+    assert.deepEqual(view.cashMovements, [
+      {
+        direction: "credit",
+        status: "settled",
+        kind: "internalTransfer",
+        minorUnits: 10000,
+        currency: "EUR",
+        postedAt: "2026-05-03T10:16:12Z",
+      },
+    ]);
   });
 });
 

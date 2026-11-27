@@ -24,6 +24,7 @@ allowed_broker_url() {
     https://public-api.etoro.com/api/v1/balances|\
     https://public-api.etoro.com/api/v1/money/accounts/cash/*|\
     https://public-api.etoro.com/api/v1/market-data/instruments/rates|\
+    https://public-api.etoro.com/api/v1/market-data/instruments/*/history/candles/desc/FiveMinutes/*|\
     https://public-api.etoro.com/api/v1/market-data/instruments|\
     https://public-api.etoro.com/api/v1/market-data/instrument-types)
       return 0

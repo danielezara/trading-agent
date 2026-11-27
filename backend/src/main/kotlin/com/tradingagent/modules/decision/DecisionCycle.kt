@@ -3,7 +3,10 @@ package com.tradingagent.modules.decision
 import com.tradingagent.modules.audit.AuditEvent
 import com.tradingagent.modules.audit.AuditLog
 import com.tradingagent.modules.brokerread.CapabilityProbe
+import com.tradingagent.modules.brokerread.ClosedBarSource
 import com.tradingagent.modules.brokerread.EuroFxRead
+import com.tradingagent.modules.brokerread.ObservedBars
+import com.tradingagent.modules.brokerread.ObservedInstrumentBars
 import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.configuration.ConfigurationVersion
 import com.tradingagent.modules.configuration.EvidenceGate
@@ -16,9 +19,12 @@ import com.tradingagent.modules.operational.OperationalStateService
 import com.tradingagent.modules.risk.DispatchPreconditions
 import com.tradingagent.modules.risk.PolicyGate
 import com.tradingagent.modules.risk.PolicyVerdict
+import com.tradingagent.modules.strategy.BarBook
 import com.tradingagent.modules.strategy.ChannelObservation
-import com.tradingagent.modules.strategy.ClosedBarInput
-import com.tradingagent.modules.strategy.ClosedBarPolicy
+import com.tradingagent.modules.strategy.ClosedBarEvaluation
+import com.tradingagent.modules.strategy.InstrumentBars
+import com.tradingagent.modules.strategy.PriceBar
+import com.tradingagent.modules.strategy.RuleDecision
 import com.tradingagent.modules.strategy.DecisionInput
 import com.tradingagent.modules.strategy.StrategyEngine
 import com.tradingagent.modules.strategy.StrategyOutcome
@@ -29,6 +35,8 @@ data class RecordedDecision(
     val configuration: ConfigurationVersion,
     val auditEvent: AuditEvent,
     val policy: PolicyVerdict,
+    val rule: RuleDecision,
+    val closedBarCount: Int,
 )
 
 class DecisionCycle(
@@ -44,8 +52,12 @@ class DecisionCycle(
     private val capabilityProbe: CapabilityProbe = CapabilityProbe.offline(),
     private val assess: (Instant) -> IngestionAssessment = { instant -> ingestionPipeline.assess(instant) },
     private val euroFx: EuroFxRead = EuroFxRead { _, _, _ -> null },
+    private val closedBars: ClosedBarSource = ClosedBarSource { null },
 ) {
     private var recorded: RecordedDecision? = null
+    private var storedBars: List<ObservedInstrumentBars> = emptyList()
+
+    fun storedBars(): List<ObservedInstrumentBars> = storedBars
 
     fun latest(): RecordedDecision = recorded
         ?: throw IllegalStateException("Nessuna decisione è stata registrata.")
@@ -72,26 +84,36 @@ class DecisionCycle(
                 fx = fx,
             ),
         )
-        val rule = ClosedBarPolicy.decide(
-            ClosedBarInput(
-                now = at,
-                instrumentId = null,
-                priceSource = ClosedBarPolicy.PRICE_SOURCE,
-                bars = emptyList(),
-                position = null,
-                assetClass = "unknown",
-                leverage = configuration.parameters.economic.allowlistLeverage,
-                investedMinor = 0,
-                sectorInvestedMinor = null,
-                lossMinor = 0,
-                openPositions = 0,
-                lastExitAt = null,
-                economic = configuration.parameters.economic,
-                technical = configuration.parameters.technical,
-            ),
+        val observed = try {
+            closedBars.load(at)
+        } catch (_: Exception) {
+            null
+        } ?: ObservedBars(0, emptyList())
+        storedBars = observed.instruments
+        val book = BarBook(
+            openPositions = observed.openPositions,
+            instruments = observed.instruments.map { instrument ->
+                InstrumentBars(
+                    instrumentId = instrument.instrumentId,
+                    assetClass = instrument.assetClass,
+                    bars = instrument.bars.map { bar ->
+                        PriceBar(bar.start, bar.end, bar.closeMinor, bar.highMinor, bar.lowMinor)
+                    },
+                )
+            },
         )
-        check(!rule.orderable && rule.action == "NO-TRADE") {
-            "senza barre chiuse il ciclo non può proporre un ingresso"
+        val rule = ClosedBarEvaluation.decide(
+            at,
+            book,
+            configuration.parameters.economic,
+            configuration.parameters.technical,
+        )
+        val closedBarCount = book.instruments.maxOfOrNull { it.bars.size } ?: 0
+        check(!rule.orderable) { "una valutazione sulle barre non è un ordine" }
+        if (closedBarCount < configuration.parameters.technical.int("regime_atr_bars")) {
+            check(rule.action == "NO-TRADE") {
+                "senza abbastanza barre chiuse il ciclo non può proporre un ingresso"
+            }
         }
         val outcome = strategyEngine.evaluate(
             DecisionInput(
@@ -118,7 +140,18 @@ class DecisionCycle(
         val news = assessment.channels.firstOrNull { it.channel == "news" }
         val macro = assessment.channels.firstOrNull { it.channel == "macro" }
         val fundamentals = assessment.channels.firstOrNull { it.channel == "fundamentals" }
-        val payload = decisionPayload(outcome, prices, news, macro, fundamentals)
+        val payload = decisionPayload(
+            outcome,
+            prices,
+            news,
+            macro,
+            fundamentals,
+            ruleAction = rule.action,
+            ruleReason = rule.reason,
+            ruleInstrument = rule.instrumentId.orEmpty(),
+            ruleOrderable = rule.orderable,
+            closedBars = closedBarCount,
+        )
         val auditEvent = auditLog.append(
             occurredAt = at,
             correlationId = outcome.inputHash,
@@ -130,7 +163,7 @@ class DecisionCycle(
         )
         val policy = policyGate.evaluate(DispatchPreconditions())
         check(!policy.accepted && !policy.brokerCalled) { "la policy non può accettare un invio" }
-        val result = RecordedDecision(outcome, configuration, auditEvent, policy)
+        val result = RecordedDecision(outcome, configuration, auditEvent, policy, rule, closedBarCount)
         recorded = result
         return result
     }
@@ -144,6 +177,11 @@ class DecisionCycle(
             news: ChannelHealth? = null,
             macro: ChannelHealth? = null,
             fundamentals: ChannelHealth? = null,
+            ruleAction: String = "NO-TRADE",
+            ruleReason: String = "WARMUP",
+            ruleInstrument: String = "",
+            ruleOrderable: Boolean = false,
+            closedBars: Int = 0,
         ): String = listOf(
             "action=${outcome.action}",
             "reasons=${outcome.reasonCodes.joinToString(",") { it.name }}",
@@ -178,6 +216,11 @@ class DecisionCycle(
             "fundamentals_license=${fundamentals?.license.orEmpty()}",
             "fundamentals_stale=${fundamentals?.stale ?: false}",
             "fundamentals_accepted=${fundamentals?.acceptedCount ?: 0}",
+            "rule_action=$ruleAction",
+            "rule_reason=$ruleReason",
+            "rule_instrument=$ruleInstrument",
+            "rule_orderable=$ruleOrderable",
+            "closed_bars=$closedBars",
         ).joinToString("\n")
     }
 }

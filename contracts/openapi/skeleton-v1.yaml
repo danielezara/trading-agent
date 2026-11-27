@@ -974,6 +974,20 @@ components:
                 orderable:
                   type: boolean
                   enum: [false]
+            rule_action:
+              type: string
+              enum: [NO-TRADE, ENTER, EXIT, HOLD]
+            rule_reason:
+              type: string
+            rule_instrument_id:
+              type: string
+              nullable: true
+            rule_orderable:
+              type: boolean
+              enum: [false]
+            closed_bar_count:
+              type: integer
+              minimum: 0
         meta:
           $ref: "#/components/schemas/Meta"
         warnings:
