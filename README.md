@@ -65,8 +65,14 @@ Contratto: [`contracts/openapi/skeleton-v1.yaml`](contracts/openapi/skeleton-v1.
 - `GET /health/ready-admin` → 503, il datastore non è collegato
 - `GET /api/v1/system/status`
 - `GET /api/v1/evidence-gate`
+- `GET /api/v1/configurations` e `GET /api/v1/configurations/active`
+- `GET /api/v1/operational-state`
 - `GET /api/dashboard/v1/session`
 - `GET /api/dashboard/v1/overview`
+
+La configurazione è versionata e immutabile: autore, motivo, istante e impronta SHA-256 del contenuto. La prima versione non contiene parametri economici. Una versione nuova non diventa attiva se esiste un intent in volo; l’API HTTP non espone la scrittura. Il ledger calcola il disponibile in minor unit, `min(broker cash, budget − holdings esterni) − riservato − buffer`, e lascia `null` ciò che non è osservato. Lo stato operativo resta `OBSERVATION`.
+
+In sviluppo la dashboard interroga queste GET tramite il proxy locale di Vite verso `127.0.0.1:8080`.
 
 Gli importi assenti sono `null`, non zero. Ogni altro metodo risponde `403` con `OBSERVATION_MUTATIONS_DISABLED`.
 

@@ -54,6 +54,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SystemStatusEnvelope"
+  /api/v1/configurations:
+    get:
+      operationId: listConfigurations
+      responses:
+        "200":
+          description: Immutable configuration versions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigurationListEnvelope"
+  /api/v1/configurations/active:
+    get:
+      operationId: activeConfiguration
+      responses:
+        "200":
+          description: Active configuration version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigurationEnvelope"
+  /api/v1/operational-state:
+    get:
+      operationId: operationalState
+      responses:
+        "200":
+          description: Current operational state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationalStateEnvelope"
   /api/v1/evidence-gate:
     get:
       operationId: evidenceGate
@@ -86,6 +116,107 @@ paths:
                 $ref: "#/components/schemas/OverviewEnvelope"
 components:
   schemas:
+    ConfigurationEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          $ref: "#/components/schemas/Configuration"
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    ConfigurationListEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Configuration"
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    Configuration:
+      type: object
+      required: [version_id, version_number, author, reason, content_sha256, active, budget]
+      properties:
+        version_id:
+          type: string
+        version_number:
+          type: integer
+        author:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+        content_sha256:
+          type: string
+        active:
+          type: boolean
+        budget:
+          type: object
+          properties:
+            base_currency:
+              type: string
+              nullable: true
+            assigned_budget_minor:
+              type: integer
+              nullable: true
+            cash_buffer_minor:
+              type: integer
+              nullable: true
+            max_positions:
+              type: integer
+              nullable: true
+    OperationalStateEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [state, actions]
+          properties:
+            state:
+              type: string
+              enum: [OBSERVATION]
+            since:
+              type: string
+              format: date-time
+            reason:
+              type: string
+            generation:
+              type: integer
+            actions:
+              type: object
+              properties:
+                new_entries:
+                  type: boolean
+                  enum: [false]
+                local_exits:
+                  type: boolean
+                  enum: [false]
+                cancel:
+                  type: boolean
+                  enum: [false]
+                reconcile_permitted:
+                  type: boolean
+                reconcile_wired:
+                  type: boolean
+                  enum: [false]
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
     DownProbe:
       type: object
       required: [status, reason]

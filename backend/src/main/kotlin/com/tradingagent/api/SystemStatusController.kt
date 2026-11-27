@@ -1,6 +1,8 @@
 package com.tradingagent.api
 
 import com.tradingagent.modules.audit.AuditLog
+import com.tradingagent.modules.configuration.ConfigurationService
+import com.tradingagent.modules.configuration.ConfigurationVersion
 import com.tradingagent.modules.configuration.EvidenceGate
 import com.tradingagent.modules.ingestion.IngestionPipeline
 import com.tradingagent.modules.operational.OperationalStateService
@@ -17,6 +19,7 @@ import java.util.UUID
 @RequestMapping("/api/v1")
 class SystemStatusController(
     private val operationalStateService: OperationalStateService,
+    private val configurationService: ConfigurationService,
     private val evidenceGate: EvidenceGate,
     private val strategyEngine: StrategyEngine,
     private val ingestionPipeline: IngestionPipeline,
@@ -40,6 +43,7 @@ class SystemStatusController(
                 reconciliationArmed = reconciliationJob.armed(),
                 armedJobs = durableScheduler.armedJobs(),
                 auditWired = auditLog.wired(),
+                configurationVersionNumber = configurationService.active().versionNumber,
             ),
             meta = ApiMeta(schemaVersion = "system-status/1"),
             warnings = listOf(
@@ -67,6 +71,74 @@ class SystemStatusController(
         meta = ApiMeta(schemaVersion = "evidence-gate/1"),
         warnings = emptyList(),
     )
+
+    @GetMapping("/configurations")
+    fun configurations(): ApiEnvelope<List<ConfigurationData>> = ApiEnvelope(
+        data = configurationService.versions().map { version -> configurationData(version, configurationService.active().versionId) },
+        meta = ApiMeta(schemaVersion = "configuration-list/1"),
+        warnings = emptyList(),
+    )
+
+    @GetMapping("/configurations/active")
+    fun activeConfiguration(): ApiEnvelope<ConfigurationData> {
+        val active = configurationService.active()
+        val budgetUnset = active.budget.assignedBudgetMinor == null
+        return ApiEnvelope(
+            data = configurationData(active, active.versionId),
+            meta = ApiMeta(
+                schemaVersion = "configuration/1",
+                baseCurrency = active.budget.baseCurrency,
+            ),
+            warnings = if (budgetUnset) {
+                listOf(
+                    ApiWarning(
+                        code = "BUDGET_UNSET",
+                        detail = "La configurazione attiva non contiene parametri economici. Nessun ordine è possibile.",
+                    ),
+                )
+            } else {
+                emptyList()
+            },
+        )
+    }
+
+    @GetMapping("/operational-state")
+    fun operationalState(): ApiEnvelope<OperationalStateData> {
+        val snapshot = operationalStateService.snapshot()
+        return ApiEnvelope(
+            data = OperationalStateData(
+                state = snapshot.state.wire,
+                since = snapshot.since,
+                reason = snapshot.reason,
+                generation = snapshot.generation,
+                actions = OperationalActionsData(
+                    newEntries = snapshot.permissions.newEntries,
+                    localExits = snapshot.permissions.localExits,
+                    cancel = snapshot.permissions.cancel,
+                    reconcilePermitted = snapshot.permissions.reconcilePermitted,
+                    reconcileWired = snapshot.permissions.reconcileWired,
+                ),
+            ),
+            meta = ApiMeta(schemaVersion = "operational-state/1"),
+            warnings = emptyList(),
+        )
+    }
+
+    private fun configurationData(version: ConfigurationVersion, activeId: java.util.UUID) = ConfigurationData(
+        versionId = version.versionId.toString(),
+        versionNumber = version.versionNumber,
+        author = version.author,
+        createdAt = version.createdAt,
+        reason = version.reason,
+        contentSha256 = version.contentSha256,
+        active = version.versionId == activeId,
+        budget = BudgetData(
+            baseCurrency = version.budget.baseCurrency,
+            assignedBudgetMinor = version.budget.assignedBudgetMinor,
+            cashBufferMinor = version.budget.cashBufferMinor,
+            maxPositions = version.budget.maxPositions,
+        ),
+    )
 }
 
 data class SystemStatusData(
@@ -81,6 +153,41 @@ data class SystemStatusData(
     val reconciliationArmed: Boolean,
     val armedJobs: Int,
     val auditWired: Boolean,
+    val configurationVersionNumber: Long,
+)
+
+data class ConfigurationData(
+    val versionId: String,
+    val versionNumber: Long,
+    val author: String,
+    val createdAt: Instant,
+    val reason: String,
+    val contentSha256: String,
+    val active: Boolean,
+    val budget: BudgetData,
+)
+
+data class BudgetData(
+    val baseCurrency: String?,
+    val assignedBudgetMinor: Long?,
+    val cashBufferMinor: Long?,
+    val maxPositions: Int?,
+)
+
+data class OperationalStateData(
+    val state: String,
+    val since: Instant,
+    val reason: String,
+    val generation: Long,
+    val actions: OperationalActionsData,
+)
+
+data class OperationalActionsData(
+    val newEntries: Boolean,
+    val localExits: Boolean,
+    val cancel: Boolean,
+    val reconcilePermitted: Boolean,
+    val reconcileWired: Boolean,
 )
 
 data class EvidenceGateData(

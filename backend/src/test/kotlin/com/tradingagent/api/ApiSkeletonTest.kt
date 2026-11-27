@@ -58,8 +58,35 @@ class ApiSkeletonTest(
             .andExpect(jsonPath("$.data.trading_enabled").value(false))
             .andExpect(jsonPath("$.data.equity").value(nullValue()))
             .andExpect(jsonPath("$.data.position_count").value(nullValue()))
+            .andExpect(jsonPath("$.data.assigned_budget").value(nullValue()))
+            .andExpect(jsonPath("$.data.available_cash").value(nullValue()))
+            .andExpect(jsonPath("$.data.ledger_status").value("UNOBSERVED"))
+            .andExpect(jsonPath("$.data.configuration_version_number").value(1))
             .andExpect(jsonPath("$.meta.environment").value("DEMO"))
             .andExpect(jsonPath("$.meta.base_currency").value(nullValue()))
+    }
+
+    @Test
+    fun `configuration and operational state are readable and stay closed`() {
+        mockMvc.perform(get("/api/v1/configurations/active"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.version_number").value(1))
+            .andExpect(jsonPath("$.data.active").value(true))
+            .andExpect(jsonPath("$.data.author").value("system"))
+            .andExpect(jsonPath("$.data.budget.assigned_budget_minor").value(nullValue()))
+            .andExpect(jsonPath("$.data.content_sha256").isString())
+
+        mockMvc.perform(get("/api/v1/configurations"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.length()").value(1))
+
+        mockMvc.perform(get("/api/v1/operational-state"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.state").value("OBSERVATION"))
+            .andExpect(jsonPath("$.data.actions.new_entries").value(false))
+            .andExpect(jsonPath("$.data.actions.local_exits").value(false))
+            .andExpect(jsonPath("$.data.actions.cancel").value(false))
+            .andExpect(jsonPath("$.data.actions.reconcile_wired").value(false))
     }
 
     @Test
@@ -76,6 +103,7 @@ class ApiSkeletonTest(
         listOf(
             post("/api/v1/emergency/kill-switch"),
             post("/api/v1/orders"),
+            post("/api/v1/configurations"),
             delete("/api/dashboard/v1/conversations/1"),
         ).forEach { request ->
             mockMvc.perform(request.contentType(MediaType.APPLICATION_JSON).content("{}"))

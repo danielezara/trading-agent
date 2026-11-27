@@ -2,6 +2,7 @@ package com.tradingagent.config
 
 import com.tradingagent.modules.audit.AuditLog
 import com.tradingagent.modules.chat.ChatQuery
+import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.configuration.EvidenceGate
 import com.tradingagent.modules.corporateaction.CorporateActionRegistry
 import com.tradingagent.modules.executor.DisabledBrokerExecutor
@@ -26,6 +27,8 @@ class ModuleConfiguration {
     @Bean fun accessModel() = AccessModel()
 
     @Bean fun evidenceGate() = EvidenceGate()
+
+    @Bean fun configurationService() = ConfigurationService()
 
     @Bean fun ingestionPipeline() = IngestionPipeline()
 
@@ -55,7 +58,8 @@ class ModuleConfiguration {
     fun dashboardReadModel(
         operationalStateService: OperationalStateService,
         ledger: Ledger,
-    ) = DashboardReadModel(operationalStateService, ledger)
+        configurationService: ConfigurationService,
+    ) = DashboardReadModel(operationalStateService, ledger, configurationService)
 
     @Bean fun chatQuery() = ChatQuery()
 

@@ -11,6 +11,7 @@ import com.tradingagent.modules.configuration.EvidenceGate
 import com.tradingagent.modules.executor.DisabledBrokerExecutor
 import com.tradingagent.modules.identity.AccessModel
 import com.tradingagent.modules.identity.Role
+import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.ledger.Ledger
 import com.tradingagent.modules.oms.OrderIntentService
 import com.tradingagent.modules.operational.OperationalStateService
@@ -54,7 +55,9 @@ class SkeletonBehaviorTest {
 
     @Test
     fun `orders cannot be created or dispatched`() {
-        assertThrows(OrderCreationForbidden::class.java) { OrderIntentService().create() }
+        val orders = OrderIntentService()
+        assertEquals(0, orders.inFlightCount())
+        assertThrows(OrderCreationForbidden::class.java) { orders.create() }
         assertThrows(OrderDispatchForbidden::class.java) { DisabledBrokerExecutor().dispatch("intent-1") }
         assertThrows(OrderDispatchForbidden::class.java) { OutboxDispatcher().dispatchNext() }
         assertEquals(
@@ -91,11 +94,17 @@ class SkeletonBehaviorTest {
         val money = Money(minorUnits = 1000, currency = "EUR")
         assertEquals(1000L, money.minorUnits)
         assertThrows(IllegalArgumentException::class.java) { Money(1, "US") }
-        val snapshot = DashboardReadModel(OperationalStateService(), Ledger()).portfolio()
+        val snapshot = DashboardReadModel(
+            OperationalStateService(),
+            Ledger(),
+            ConfigurationService(),
+        ).portfolio()
         assertNull(snapshot.equity)
         assertNull(snapshot.availableCash)
         assertNull(snapshot.positionCount)
         assertFalse(snapshot.tradingEnabled)
         assertEquals(OperationalState.OBSERVATION, snapshot.operationalState)
+        assertEquals("UNOBSERVED", snapshot.ledgerStatus)
+        assertEquals(1L, snapshot.configurationVersionNumber)
     }
 }

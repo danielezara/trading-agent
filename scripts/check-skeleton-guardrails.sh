@@ -40,9 +40,12 @@ if [[ -n "$postgres_in_backend" ]]; then
   fail "backend must not read infra database settings:\n$postgres_in_backend"
 fi
 
-frontend_fetch="$(git grep -n -E '\bfetch\s*\(|XMLHttpRequest|axios' -- frontend/src || true)"
+frontend_fetch="$(git grep -n -E '\bfetch\s*\(|XMLHttpRequest|axios' -- frontend/src ':!frontend/src/api/client.ts' || true)"
 if [[ -n "$frontend_fetch" ]]; then
-  fail "frontend skeleton must not call the network:\n$frontend_fetch"
+  fail "frontend may call the local API only from frontend/src/api/client.ts:\n$frontend_fetch"
+fi
+if ! grep -q 'method: "GET"' frontend/src/api/client.ts; then
+  fail "the dashboard client must be read-only"
 fi
 
 grep -q 'operational-state: ${TRADING_OPERATIONAL_STATE:OBSERVATION}' backend/src/main/resources/application.yml \
