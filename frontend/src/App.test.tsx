@@ -19,6 +19,7 @@ const overview = {
     last_probe_at: null,
     probe_error_class: "KEYS_MISSING",
     account_label: null,
+    positions: null,
     configuration_version_id: "11111111-1111-1111-1111-111111111111",
     configuration_version_number: 1,
   },
@@ -176,6 +177,7 @@ describe("dashboard skeleton", () => {
     expect(screen.getByTestId("account-card")).toHaveTextContent("Connessa");
     expect(screen.getByTestId("account-card")).toHaveTextContent("no");
     expect(screen.getByTestId("account-card")).toHaveTextContent("Conto Demo delle chiavi in backend/.env");
+    expect(screen.getByTestId("positions")).toHaveTextContent("Posizioni non disponibili");
     expect(screen.getByTestId("account-card")).toHaveTextContent("Cassa broker");
     expect(screen.getByTestId("account-card")).toHaveTextContent("non disponibile");
     expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
@@ -193,6 +195,9 @@ describe("dashboard skeleton", () => {
         ledger_status: "FX_UNAVAILABLE",
         fx_status: "UNCONFIGURED",
         account_label: "demo.user",
+        positions: [
+          { instrument_id: "1002", quantity: "0.049485", value: { minor_units: 10000, currency: "USD" } },
+        ],
       },
     };
     vi.stubGlobal("fetch", (input: string) => Promise.resolve({
@@ -210,10 +215,34 @@ describe("dashboard skeleton", () => {
     expect(card).toHaveTextContent("sì");
     expect(card).toHaveTextContent("demo.user");
     expect(card).toHaveTextContent("280,35 USD");
+    const positions = screen.getByTestId("positions");
+    expect(positions).toHaveTextContent("1002");
+    expect(positions).toHaveTextContent("0.049485");
+    expect(positions).toHaveTextContent("100,00 USD");
+    expect(positions).not.toHaveTextContent("Nessuna posizione");
     expect(screen.getByTestId("cash-alignment")).toHaveTextContent("cassa USD, budget EUR");
     expect(screen.getByTestId("cash-alignment")).toHaveTextContent("Nessun cambio configurato");
     expect(screen.getByText("50000 EUR")).toBeInTheDocument();
     expect(card).not.toHaveTextContent("Conto Demo delle chiavi");
+  });
+
+  it("shows an empty demo position list when the read has none", async () => {
+    const empty = {
+      ...overview,
+      data: { ...overview.data, broker_connected: true, positions: [] },
+    };
+    vi.stubGlobal("fetch", (input: string) => Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => (String(input).includes("overview") ? empty : jsonFor(String(input))),
+    }));
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <AppRoutes />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId("positions")).toHaveTextContent("Nessuna posizione");
+    expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
   });
 
   it("shows the active configuration version", async () => {

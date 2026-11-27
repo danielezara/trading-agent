@@ -4,6 +4,7 @@ import com.tradingagent.kernel.Money
 import com.tradingagent.kernel.OperationalState
 import java.time.Instant
 import com.tradingagent.modules.brokerread.CapabilityProbe
+import com.tradingagent.modules.brokerread.ObservedPosition
 import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.ledger.CashInputs
 import com.tradingagent.modules.ledger.Ledger
@@ -31,6 +32,7 @@ data class PortfolioSnapshot(
     val lastProbeAt: Instant?,
     val probeErrorClass: String?,
     val accountLabel: String?,
+    val positions: List<ObservedPosition>?,
 )
 
 class DashboardReadModel(
@@ -77,6 +79,7 @@ class DashboardReadModel(
             lastProbeAt = observed.observedAt,
             probeErrorClass = observed.errorClass,
             accountLabel = observed.accountLabel,
+            positions = observed.positions,
         )
     }
 }

@@ -3,6 +3,7 @@ package com.tradingagent.api
 import com.tradingagent.kernel.Money
 import com.tradingagent.modules.identity.AccessModel
 import com.tradingagent.modules.identity.Role
+import com.tradingagent.modules.brokerread.ObservedPosition
 import com.tradingagent.modules.ledger.Ledger
 import com.tradingagent.modules.readmodel.DashboardReadModel
 import org.springframework.web.bind.annotation.GetMapping
@@ -65,6 +66,7 @@ class DashboardController(
                 lastProbeAt = snapshot.lastProbeAt,
                 probeErrorClass = snapshot.probeErrorClass,
                 accountLabel = snapshot.accountLabel,
+                positions = snapshot.positions?.map { position -> positionData(position) },
             ),
             meta = ApiMeta(schemaVersion = "portfolio-snapshot/1"),
             warnings = buildList {
@@ -125,4 +127,17 @@ data class OverviewData(
     val lastProbeAt: java.time.Instant?,
     val probeErrorClass: String?,
     val accountLabel: String?,
+    val positions: List<PositionData>?,
+)
+
+data class PositionData(
+    val instrumentId: String,
+    val quantity: String?,
+    val value: Money?,
+)
+
+private fun positionData(position: ObservedPosition) = PositionData(
+    instrumentId = position.instrumentId,
+    quantity = position.quantity,
+    value = position.value,
 )

@@ -143,6 +143,38 @@ class DemoPortfolioReadTest {
         assertNull(secret?.accountLabel)
         val absent = DemoPortfolioRead.parse("""{"clientPortfolio":{"credit":1}}""")
         assertNull(absent?.accountLabel)
+        assertEquals(emptyList<ObservedPosition>(), absent?.positions)
+    }
+
+    @Test
+    fun `positions keep instrument quantity and value and stay empty when none`() {
+        val parsed = DemoPortfolioRead.parse(
+            """
+            {"clientPortfolio":{
+              "credit":280.35,
+              "accountCurrencyId":1,
+              "positions":[
+                {"instrumentID":1002,"units":0.049485,"amount":100,"CID":7765437},
+                {"units":1,"amount":5},
+                "skip",
+                {"instrumentID":1003,"amount":12.5}
+              ],
+              "mirrors":[{"positions":[{"instrumentID":9,"units":1,"amount":50}]}]
+            }}
+            """.trimIndent(),
+        )
+        assertEquals(2, parsed?.positionCount)
+        assertEquals("1002", parsed?.positions?.get(0)?.instrumentId)
+        assertEquals("0.049485", parsed?.positions?.get(0)?.quantity)
+        assertEquals(10_000L, parsed?.positions?.get(0)?.value?.minorUnits)
+        assertEquals("USD", parsed?.positions?.get(0)?.value?.currency)
+        assertEquals("1003", parsed?.positions?.get(1)?.instrumentId)
+        assertNull(parsed?.positions?.get(1)?.quantity)
+        assertEquals(1_250L, parsed?.positions?.get(1)?.value?.minorUnits)
+
+        val none = DemoPortfolioRead.parse("""{"clientPortfolio":{"credit":10,"positions":[]}}""")
+        assertEquals(0, none?.positionCount)
+        assertEquals(emptyList<ObservedPosition>(), none?.positions)
     }
 
     private fun keys(): DemoKeyMaterial = DemoKeyMaterial.fromEnvironment(

@@ -130,6 +130,36 @@ function useDashboardData(): LoadState {
 
 const DEMO_ACCOUNT_FALLBACK = "Conto Demo delle chiavi in backend/.env";
 
+function PositionsTable({ positions }: { positions: Overview["positions"] | undefined }) {
+  if (positions == null) {
+    return <p data-testid="positions">Posizioni non disponibili</p>;
+  }
+  if (positions.length === 0) {
+    return <p data-testid="positions">Nessuna posizione</p>;
+  }
+  return (
+    <table className="data-table" data-testid="positions">
+      <caption>Posizioni Demo</caption>
+      <thead>
+        <tr>
+          <th>Strumento</th>
+          <th>Quantità</th>
+          <th>Valore</th>
+        </tr>
+      </thead>
+      <tbody>
+        {positions.map((position, index) => (
+          <tr key={`${position.instrument_id}-${index}`}>
+            <td>{position.instrument_id}</td>
+            <td>{position.quantity ?? "non disponibile"}</td>
+            <td>{cashAmount(position.value)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function cashAmount(money: Money): string {
   if (!money) {
     return "non disponibile";
@@ -158,6 +188,7 @@ function OverviewPage({ loaded }: { loaded: LoadState }) {
             {loaded.data.overview.ledger_status === "FX_UNAVAILABLE" ? (
               <p data-testid="cash-alignment">{`Disponibile non calcolato: cassa ${loaded.data.overview.broker_cash?.currency ?? "non osservata"}, budget ${loaded.data.overview.assigned_budget?.currency ?? "non osservato"}. Nessun cambio configurato.`}</p>
             ) : null}
+            <PositionsTable positions={loaded.data.overview.positions} />
             <dl className="facts" data-testid="account-card">
               <div><dt>Piattaforma</dt><dd>Demo eToro</dd></div>
               <div><dt>Connessa</dt><dd>{loaded.data.overview.broker_connected ? "sì" : "no"}</dd></div>

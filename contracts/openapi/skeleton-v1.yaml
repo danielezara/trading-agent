@@ -520,6 +520,20 @@ components:
             account_label:
               type: string
               nullable: true
+            positions:
+              type: array
+              nullable: true
+              items:
+                type: object
+                required: [instrument_id]
+                properties:
+                  instrument_id:
+                    type: string
+                  quantity:
+                    type: string
+                    nullable: true
+                  value:
+                    nullable: true
         meta:
           $ref: "#/components/schemas/Meta"
         warnings:

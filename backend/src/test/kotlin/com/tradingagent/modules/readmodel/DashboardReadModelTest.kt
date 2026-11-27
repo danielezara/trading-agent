@@ -47,6 +47,8 @@ class DashboardReadModelTest {
         assertEquals(28_035L, snapshot.brokerCash?.minorUnits)
         assertEquals("EUR", snapshot.assignedBudget?.currency)
         assertEquals(50_000L, snapshot.assignedBudget?.minorUnits)
+        assertEquals(0, snapshot.positionCount)
+        assertEquals(emptyList<com.tradingagent.modules.brokerread.ObservedPosition>(), snapshot.positions)
         assertNull(snapshot.availableCash)
         assertEquals(Ledger.STATUS_FX_UNAVAILABLE, snapshot.ledgerStatus)
         assertEquals(Ledger.FX_UNCONFIGURED, snapshot.fxStatus)

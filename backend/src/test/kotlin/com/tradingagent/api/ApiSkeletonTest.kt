@@ -67,6 +67,7 @@ class ApiSkeletonTest(
             .andExpect(jsonPath("$.data.trading_enabled").value(false))
             .andExpect(jsonPath("$.data.equity").value(nullValue()))
             .andExpect(jsonPath("$.data.position_count").value(nullValue()))
+            .andExpect(jsonPath("$.data.positions").value(nullValue()))
             .andExpect(jsonPath("$.data.assigned_budget.minor_units").value(50000))
             .andExpect(jsonPath("$.data.assigned_budget.currency").value("EUR"))
             .andExpect(jsonPath("$.data.available_cash").value(nullValue()))

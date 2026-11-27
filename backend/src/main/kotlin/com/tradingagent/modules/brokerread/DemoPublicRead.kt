@@ -74,11 +74,18 @@ class DemoKeyMaterial private constructor(
     }
 }
 
+data class ObservedPosition(
+    val instrumentId: String,
+    val quantity: String?,
+    val value: Money?,
+)
+
 data class ObservedAccount(
     val brokerCash: Money?,
     val equity: Money?,
     val positionCount: Int?,
     val accountLabel: String?,
+    val positions: List<ObservedPosition>? = emptyList(),
 )
 
 sealed interface ReadOutcome {
@@ -153,9 +160,51 @@ object DemoPortfolioRead {
         } else {
             null
         }
-        val positions = portfolio.get("positions")
-        val positionCount = if (positions != null && positions.isArray) positions.size() else null
-        return ObservedAccount(brokerCash, equity, positionCount, accountLabel(root, portfolio))
+        val parsedPositions = positions(portfolio.get("positions"), currency)
+        return ObservedAccount(
+            brokerCash,
+            equity,
+            parsedPositions?.size,
+            accountLabel(root, portfolio),
+            parsedPositions,
+        )
+    }
+
+    private fun positions(node: JsonNode?, currency: String?): List<ObservedPosition>? {
+        if (node == null || node.isNull || node.isMissingNode) {
+            return emptyList()
+        }
+        if (!node.isArray) {
+            return null
+        }
+        return node.mapNotNull { item ->
+            if (!item.isObject) {
+                return@mapNotNull null
+            }
+            val instrumentId = instrumentId(item.get("instrumentID")) ?: return@mapNotNull null
+            val units = quantity(item.get("units"))
+            val amount = minor(item.get("amount"))
+            val value = if (currency != null && amount != null && amount >= 0) Money(amount, currency) else null
+            ObservedPosition(instrumentId, units, value)
+        }
+    }
+
+    private fun instrumentId(node: JsonNode?): String? {
+        if (node == null || node.isNull || !node.isIntegralNumber || node.decimalValue().signum() < 0) {
+            return null
+        }
+        val text = node.asText().trim()
+        if (text.isEmpty() || !text.all { it.isDigit() }) {
+            return null
+        }
+        return text
+    }
+
+    private fun quantity(node: JsonNode?): String? {
+        if (node == null || node.isNull || !node.isNumber) {
+            return null
+        }
+        return node.decimalValue().stripTrailingZeros().toPlainString()
     }
 
     private fun accountLabel(root: JsonNode, portfolio: JsonNode): String? {

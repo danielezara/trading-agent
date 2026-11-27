@@ -8,6 +8,12 @@ export type Envelope<T> = {
 
 export type Money = { minor_units: number; currency: string } | null;
 
+export type DemoPosition = {
+  instrument_id: string;
+  quantity: string | null;
+  value: Money;
+};
+
 export type Overview = {
   operational_state: string;
   trading_enabled: boolean;
@@ -25,6 +31,7 @@ export type Overview = {
   last_probe_at: string | null;
   probe_error_class: string | null;
   account_label: string | null;
+  positions: DemoPosition[] | null;
   configuration_version_id: string;
   configuration_version_number: number;
 };
