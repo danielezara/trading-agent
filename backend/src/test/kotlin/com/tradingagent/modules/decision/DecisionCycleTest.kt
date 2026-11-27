@@ -9,6 +9,7 @@ import com.tradingagent.modules.brokerread.HttpGet
 import com.tradingagent.modules.brokerread.InboundHttp
 import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.configuration.EvidenceGate
+import com.tradingagent.modules.ingestion.IngestionAssessment
 import com.tradingagent.modules.ingestion.IngestionPipeline
 import com.tradingagent.modules.ledger.Ledger
 import com.tradingagent.modules.operational.OperationalStateService
@@ -108,8 +109,7 @@ class DecisionCycleTest {
         val recorded = cycle(pricesJson("2026-11-27T00:00:00Z"), at).record()
         val assessment = pipeline.assess(at)
         val prices = assessment.channels.first { it.channel == "prices" }
-        val news = assessment.channels.first { it.channel == "news" }
-        val text = DecisionCycle.decisionPayload(recorded.outcome, prices, news)
+        val text = payload(recorded, assessment)
         assertEquals("NO-TRADE", recorded.outcome.action)
         assertTrue(prices.stale)
         assertEquals("fixture-market-data", prices.source)
@@ -126,6 +126,8 @@ class DecisionCycleTest {
         assertTrue(text.contains("prices_stale=true"))
         assertTrue(text.contains("news_accepted=0"))
         assertTrue(text.contains("news_stale=false"))
+        assertTrue(text.contains("macro_accepted=0"))
+        assertTrue(text.contains("fundamentals_accepted=0"))
         assertFalse(text.contains("synthetic-headline"))
         assertEquals(sha256(text), recorded.auditEvent.payloadSha256)
     }
@@ -139,7 +141,7 @@ class DecisionCycleTest {
         val assessment = pipeline.assess(at)
         val news = assessment.channels.first { it.channel == "news" }
         val prices = assessment.channels.first { it.channel == "prices" }
-        val text = DecisionCycle.decisionPayload(recorded.outcome, prices, news)
+        val text = payload(recorded, assessment)
         assertTrue(news.stale)
         assertFalse(prices.stale)
         assertEquals("fixture-news", news.source)
@@ -158,6 +160,70 @@ class DecisionCycleTest {
         assertTrue(text.contains("news_stale=true"))
         assertFalse(text.contains("synthetic-headline"))
         assertEquals(sha256(text), recorded.auditEvent.payloadSha256)
+        assertEquals(EvidenceStatus.UNVERIFIED, EvidenceGate().rows().first { it.controlId == "RF-045" }.status)
+        assertEquals(EvidenceStatus.UNVERIFIED, EvidenceGate().rows().first { it.controlId == "RF-059" }.status)
+    }
+
+    @Test
+    fun `stale macro and fundamentals stay no trade and record provenance`() {
+        val at = Instant.parse("2026-11-27T02:00:01Z")
+        val json = slowDecisionJson()
+        val pipeline = IngestionPipeline.fromJson(json)
+        val recorded = cycle(json, at).record()
+        val assessment = pipeline.assess(at)
+        val macro = assessment.channels.first { it.channel == "macro" }
+        val fundamentals = assessment.channels.first { it.channel == "fundamentals" }
+        val text = payload(recorded, assessment)
+        assertTrue(macro.stale)
+        assertTrue(fundamentals.stale)
+        assertFalse(assessment.channels.first { it.channel == "prices" }.stale)
+        assertFalse(assessment.channels.first { it.channel == "news" }.stale)
+        assertEquals("fixture-macro", macro.source)
+        assertEquals("macro", macro.category)
+        assertEquals(Instant.parse("2026-11-01T00:00:00Z"), macro.eventTime)
+        assertEquals(Instant.parse("2026-11-27T00:00:00Z"), macro.ingestedAt)
+        assertEquals("fixture-unverified", macro.license)
+        assertEquals("fixture-fundamentals", fundamentals.source)
+        assertEquals("fundamentals", fundamentals.category)
+        assertEquals("fixture-unverified", fundamentals.license)
+        assertEquals("NO-TRADE", recorded.outcome.action)
+        assertTrue(recorded.outcome.reasonCodes.contains(ReasonCode.DATA_STALE))
+        assertTrue(recorded.outcome.reasonCodes.contains(ReasonCode.DATA_MISSING))
+        assertFalse(recorded.outcome.signal.orderable)
+        assertFalse(recorded.policy.brokerCalled)
+        assertFalse(assessment.network)
+        assertTrue(text.contains("macro_source=fixture-macro"))
+        assertTrue(text.contains("macro_event_time=2026-11-01T00:00:00Z"))
+        assertTrue(text.contains("macro_ingested_at=2026-11-27T00:00:00Z"))
+        assertTrue(text.contains("macro_stale=true"))
+        assertTrue(text.contains("fundamentals_source=fixture-fundamentals"))
+        assertTrue(text.contains("fundamentals_event_time=2026-11-01T00:00:00Z"))
+        assertTrue(text.contains("fundamentals_stale=true"))
+        assertTrue(text.contains("fundamentals_license=fixture-unverified"))
+        assertEquals(sha256(text), recorded.auditEvent.payloadSha256)
+        assertEquals(EvidenceStatus.UNVERIFIED, EvidenceGate().rows().first { it.controlId == "RF-045" }.status)
+        assertEquals(EvidenceStatus.UNVERIFIED, EvidenceGate().rows().first { it.controlId == "RF-059" }.status)
+    }
+
+    @Test
+    fun `missing macro and fundamentals stay no trade without a vendor`() {
+        val json = pricesJson("2026-11-27T00:00:00Z")
+        val at = Instant.parse("2026-11-27T00:00:30Z")
+        val recorded = cycle(json, at).record()
+        val assessment = IngestionPipeline.fromJson(json).assess(at)
+        val macro = assessment.channels.first { it.channel == "macro" }
+        val fundamentals = assessment.channels.first { it.channel == "fundamentals" }
+        assertEquals(0, macro.acceptedCount)
+        assertEquals(0, fundamentals.acceptedCount)
+        assertFalse(macro.stale)
+        assertFalse(fundamentals.stale)
+        assertEquals(null, macro.license)
+        assertEquals(null, fundamentals.license)
+        assertFalse(assessment.network)
+        assertEquals("NO-TRADE", recorded.outcome.action)
+        assertTrue(recorded.outcome.reasonCodes.contains(ReasonCode.DATA_MISSING))
+        assertFalse(recorded.outcome.reasonCodes.contains(ReasonCode.DATA_STALE))
+        assertFalse(recorded.policy.brokerCalled)
         assertEquals(EvidenceStatus.UNVERIFIED, EvidenceGate().rows().first { it.controlId == "RF-045" }.status)
         assertEquals(EvidenceStatus.UNVERIFIED, EvidenceGate().rows().first { it.controlId == "RF-059" }.status)
     }
@@ -273,4 +339,79 @@ class DecisionCycleTest {
           ]
         }
     """.trimIndent()
+
+    private fun slowDecisionJson() = """
+        {
+          "connector_version": "fixture-slow",
+          "records": [
+            {
+              "record_id": "macro-1",
+              "channel": "macro",
+              "category": "macro",
+              "provider_class": "deterministic",
+              "source_name": "fixture-macro",
+              "event_time": "2026-11-01T00:00:00Z",
+              "ingested_at": "2026-11-27T00:00:00Z",
+              "license": "fixture-unverified",
+              "license_verified": false,
+              "contract_verified": false,
+              "instrument_id": "MACRO-1",
+              "value": "1.0"
+            },
+            {
+              "record_id": "fundamentals-1",
+              "channel": "fundamentals",
+              "category": "fundamentals",
+              "provider_class": "deterministic",
+              "source_name": "fixture-fundamentals",
+              "event_time": "2026-11-01T00:00:00Z",
+              "ingested_at": "2026-11-27T00:00:00Z",
+              "license": "fixture-unverified",
+              "license_verified": false,
+              "contract_verified": false,
+              "instrument_id": "INST-1",
+              "value": "10"
+            },
+            {
+              "record_id": "price-one",
+              "channel": "prices",
+              "category": "market-data",
+              "provider_class": "deterministic",
+              "source_name": "fixture-market-data",
+              "event_time": "2026-11-27T02:00:01Z",
+              "ingested_at": "2026-11-27T02:00:01Z",
+              "license": "fixture-unverified",
+              "license_verified": false,
+              "contract_verified": false,
+              "instrument_id": "INST-1",
+              "value": "100.00"
+            },
+            {
+              "record_id": "news-1",
+              "channel": "news",
+              "category": "news",
+              "provider_class": "deterministic",
+              "source_name": "fixture-news",
+              "event_time": "2026-11-27T02:00:01Z",
+              "ingested_at": "2026-11-27T02:00:01Z",
+              "license": "fixture-unverified",
+              "license_verified": false,
+              "contract_verified": false,
+              "instrument_id": "INST-1",
+              "value": "synthetic-headline"
+            }
+          ]
+        }
+    """.trimIndent()
+
+    private fun payload(recorded: RecordedDecision, assessment: IngestionAssessment): String {
+        fun channel(name: String) = assessment.channels.first { it.channel == name }
+        return DecisionCycle.decisionPayload(
+            recorded.outcome,
+            channel("prices"),
+            channel("news"),
+            channel("macro"),
+            channel("fundamentals"),
+        )
+    }
 }

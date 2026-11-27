@@ -27,6 +27,18 @@ data class ChatContext(
     val newsLicense: String? = null,
     val newsEventTime: Instant? = null,
     val newsAccepted: Int = 0,
+    val macroStatus: String? = null,
+    val macroStale: Boolean? = null,
+    val macroSource: String? = null,
+    val macroLicense: String? = null,
+    val macroEventTime: Instant? = null,
+    val macroAccepted: Int = 0,
+    val fundamentalsStatus: String? = null,
+    val fundamentalsStale: Boolean? = null,
+    val fundamentalsSource: String? = null,
+    val fundamentalsLicense: String? = null,
+    val fundamentalsEventTime: Instant? = null,
+    val fundamentalsAccepted: Int = 0,
 ) {
     companion object {
         fun unavailable(asOf: Instant): ChatContext = ChatContext(
@@ -80,6 +92,8 @@ class ChatQuery {
             Topic.POSITIONS -> positions(context)
             Topic.DECISION -> decision(context)
             Topic.NEWS -> news(context)
+            Topic.MACRO -> slowChannel(context, "macro", context.macroAccepted, context.macroStale, context.macroSource, context.macroLicense, context.macroEventTime, "channels.macro")
+            Topic.FUNDAMENTALS -> slowChannel(context, "fondamentali", context.fundamentalsAccepted, context.fundamentalsStale, context.fundamentalsSource, context.fundamentalsLicense, context.fundamentalsEventTime, "channels.fundamentals")
             Topic.DATA -> data(context)
             Topic.STATUS -> status(context)
         }
@@ -125,6 +139,32 @@ class ChatQuery {
             context,
             "Ambiente DEMO. $body Rete: $network.",
             listOf(citation("1", "data-health", DATA_HEALTH, "Fixture news", "channels.news", context.newsEventTime ?: context.asOf)),
+        )
+    }
+
+    private fun slowChannel(
+        context: ChatContext,
+        label: String,
+        accepted: Int,
+        stale: Boolean?,
+        source: String?,
+        license: String?,
+        eventTime: Instant?,
+        field: String,
+    ): ChatAnswer {
+        val sourceName = source ?: "fonte non disponibile"
+        val licenseName = license ?: "non verificata"
+        val published = eventTime?.toString() ?: "non disponibile"
+        val body = when {
+            accepted == 0 -> "Canale $label assente. La decisione resta NO-TRADE."
+            stale == true -> "Fixture $label stale ($sourceName, pubblicazione $published, licenza $licenseName). La decisione resta NO-TRADE."
+            else -> "Fixture $label $sourceName. Pubblicazione $published. Licenza $licenseName. La decisione resta NO-TRADE."
+        }
+        val network = if (context.network) "sì" else "no"
+        return inform(
+            context,
+            "Ambiente DEMO. $body Rete: $network.",
+            listOf(citation("1", "data-health", DATA_HEALTH, "Fixture $label", field, eventTime ?: context.asOf)),
         )
     }
 
@@ -201,6 +241,8 @@ class ChatQuery {
         text.contains("posizion") || text.contains("portafoglio") -> Topic.POSITIONS
         text.contains("decision") || text.contains("motivo") || text.contains("segnale") || text.contains("perch") -> Topic.DECISION
         text.contains("news") || text.contains("notizi") -> Topic.NEWS
+        text.contains("macro") -> Topic.MACRO
+        text.contains("fondamental") -> Topic.FUNDAMENTALS
         text.contains("prezz") || text.contains("stale") || text.contains("licen") || text.contains("fixture") || text.contains("dati") || text.contains("fresch") -> Topic.DATA
         else -> Topic.STATUS
     }
@@ -215,7 +257,7 @@ class ChatQuery {
     private fun isSecret(text: String): Boolean =
         text.contains("api key") || text.contains("api-key") || text.contains("token") || text.contains("secret") || text.contains("password") || text.contains("prompt")
 
-    private enum class Topic { POSITIONS, DECISION, NEWS, DATA, STATUS }
+    private enum class Topic { POSITIONS, DECISION, NEWS, MACRO, FUNDAMENTALS, DATA, STATUS }
 
     private companion object {
         const val MAX_MESSAGE_CHARS: Int = 400

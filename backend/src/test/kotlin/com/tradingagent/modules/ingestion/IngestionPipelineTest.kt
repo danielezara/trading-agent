@@ -42,6 +42,24 @@ class IngestionPipelineTest {
         assertEquals("fixture-unverified", news.license)
         assertEquals("UNUSABLE", news.status)
         assertFalse(listOf(news.source, news.category, news.license, news.status).joinToString().contains("synthetic-headline"))
+        val macro = health.channels.first { it.channel == "macro" }
+        assertEquals(1, macro.acceptedCount)
+        assertFalse(macro.stale)
+        assertEquals("macro", macro.category)
+        assertEquals("fixture-macro", macro.source)
+        assertEquals(Instant.parse("2026-11-27T00:00:00Z"), macro.eventTime)
+        assertEquals(Instant.parse("2026-11-27T00:00:02Z"), macro.ingestedAt)
+        assertEquals("fixture-unverified", macro.license)
+        assertEquals("UNUSABLE", macro.status)
+        val fundamentals = health.channels.first { it.channel == "fundamentals" }
+        assertEquals(1, fundamentals.acceptedCount)
+        assertFalse(fundamentals.stale)
+        assertEquals("fundamentals", fundamentals.category)
+        assertEquals("fixture-fundamentals", fundamentals.source)
+        assertEquals(Instant.parse("2026-11-27T00:00:00Z"), fundamentals.eventTime)
+        assertEquals(Instant.parse("2026-11-27T00:00:02Z"), fundamentals.ingestedAt)
+        assertEquals("fixture-unverified", fundamentals.license)
+        assertEquals("UNUSABLE", fundamentals.status)
         assertTrue(health.channels.none { it.status == "HEALTHY" })
         assertEquals("NOT_WIRED", health.channels.first { it.channel == "orders" }.status)
         assertEquals("NOT_WIRED", health.channels.first { it.channel == "positions" }.status)
@@ -132,6 +150,46 @@ class IngestionPipelineTest {
     }
 
     @Test
+    fun `macro and fundamentals go stale after two missed hourly checks`() {
+        val pipeline = IngestionPipeline.fromJson(slowJson("2026-11-01T00:00:00Z", "2026-11-27T00:00:00Z"))
+        val boundary = pipeline.assess(Instant.parse("2026-11-27T02:00:00Z"))
+        val after = pipeline.assess(Instant.parse("2026-11-27T02:00:01Z"))
+        listOf("macro", "fundamentals").forEach { name ->
+            val atBoundary = boundary.channels.first { it.channel == name }
+            val stale = after.channels.first { it.channel == name }
+            assertEquals(Instant.parse("2026-11-01T00:00:00Z"), atBoundary.eventTime)
+            assertFalse(atBoundary.stale)
+            assertEquals("UNUSABLE", atBoundary.status)
+            assertTrue(stale.stale)
+            assertEquals("STALE", stale.status)
+            assertEquals("fixture-unverified", stale.license)
+            assertEquals(1, stale.acceptedCount)
+        }
+        assertFalse(after.network)
+        val checked = IngestionPipeline.fromJson(slowJson("2026-11-01T00:00:00Z", "2026-11-27T02:00:00Z"))
+            .assess(Instant.parse("2026-11-27T02:00:01Z"))
+        assertFalse(checked.channels.first { it.channel == "macro" }.stale)
+        assertFalse(checked.channels.first { it.channel == "fundamentals" }.stale)
+        assertEquals(Instant.parse("2026-11-01T00:00:00Z"), checked.channels.first { it.channel == "macro" }.eventTime)
+    }
+
+    @Test
+    fun `missing macro and fundamentals are unusable and not stale`() {
+        val health = IngestionPipeline.fromJson(
+            """{"connector_version":"fixture-empty","records":[]}""",
+        ).assess(Instant.parse("2026-11-27T00:00:30Z"))
+        listOf("macro", "fundamentals").forEach { name ->
+            val channel = health.channels.first { it.channel == name }
+            assertEquals(0, channel.acceptedCount)
+            assertFalse(channel.stale)
+            assertEquals("UNUSABLE", channel.status)
+            assertEquals(null, channel.eventTime)
+            assertEquals(null, channel.license)
+        }
+        assertFalse(health.network)
+    }
+
+    @Test
     fun `a missing news fixture is unusable and not stale`() {
         val news = IngestionPipeline.fromJson(
             """{"connector_version":"fixture-empty","records":[]}""",
@@ -186,6 +244,42 @@ class IngestionPipelineTest {
               "contract_verified": false,
               "instrument_id": "INST-1",
               "value": "synthetic-headline"
+            }
+          ]
+        }
+    """.trimIndent()
+
+    private fun slowJson(eventTime: String, ingestedAt: String) = """
+        {
+          "connector_version": "fixture-slow",
+          "records": [
+            {
+              "record_id": "macro-1",
+              "channel": "macro",
+              "category": "macro",
+              "provider_class": "deterministic",
+              "source_name": "fixture-macro",
+              "event_time": "$eventTime",
+              "ingested_at": "$ingestedAt",
+              "license": "fixture-unverified",
+              "license_verified": false,
+              "contract_verified": false,
+              "instrument_id": "MACRO-1",
+              "value": "1.0"
+            },
+            {
+              "record_id": "fundamentals-1",
+              "channel": "fundamentals",
+              "category": "fundamentals",
+              "provider_class": "deterministic",
+              "source_name": "fixture-fundamentals",
+              "event_time": "$eventTime",
+              "ingested_at": "$ingestedAt",
+              "license": "fixture-unverified",
+              "license_verified": false,
+              "contract_verified": false,
+              "instrument_id": "INST-1",
+              "value": "10"
             }
           ]
         }

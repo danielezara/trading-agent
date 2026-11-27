@@ -398,6 +398,8 @@ function DataPage({ loaded }: { loaded: LoadState }) {
         <>
           <MarketFixture channel={loaded.data.health.channels.find((channel) => channel.channel === "prices")} />
           <NewsFixture channel={loaded.data.health.channels.find((channel) => channel.channel === "news")} />
+          <SlowFixture testId="macro-data" label="macro" channel={loaded.data.health.channels.find((channel) => channel.channel === "macro")} />
+          <SlowFixture testId="fundamentals-data" label="fondamentali" channel={loaded.data.health.channels.find((channel) => channel.channel === "fundamentals")} />
           <ChannelTable health={loaded.data.health} />
         </>
       ) : null}
@@ -437,6 +439,24 @@ function NewsFixture({ channel }: { channel: DataChannel | undefined }) {
   return (
     <p data-testid="news-data">
       {`Fixture news ${channel.source}. Evento ${channel.event_time ?? "non disponibile"}. Licenza ${channel.license ?? "non verificata"}. La decisione resta NO-TRADE.`}
+    </p>
+  );
+}
+
+function SlowFixture({ testId, label, channel }: { testId: string; label: string; channel: DataChannel | undefined }) {
+  if (!channel || channel.accepted_count === 0) {
+    return <p data-testid={testId}>{`Canale ${label} assente. La decisione resta NO-TRADE.`}</p>;
+  }
+  if (channel.stale) {
+    return (
+      <p data-testid={testId}>
+        {`Fixture ${label} stale (${channel.source}, ${channel.event_time ?? "senza orario"}, licenza ${channel.license ?? "non verificata"}). La decisione resta NO-TRADE.`}
+      </p>
+    );
+  }
+  return (
+    <p data-testid={testId}>
+      {`Fixture ${label} ${channel.source}. Pubblicazione ${channel.event_time ?? "non disponibile"}. Licenza ${channel.license ?? "non verificata"}. La decisione resta NO-TRADE.`}
     </p>
   );
 }

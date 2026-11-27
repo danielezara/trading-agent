@@ -116,6 +116,8 @@ const health = {
       { channel: "orders", source: "not-wired", accepted_count: 0, rejected_count: 0, duplicate_count: 0, stale: false, conflict: false, quality_millis: 0, status: "NOT_WIRED" },
       { channel: "prices", source: "fixture-market-data", accepted_count: 2, rejected_count: 1, duplicate_count: 1, stale: true, conflict: true, quality_millis: 0, status: "CONFLICT", category: "market-data", event_time: "2026-11-27T00:00:10Z", ingested_at: "2026-11-27T00:00:11Z", license: "fixture-unverified" },
       { channel: "news", source: "fixture-news", accepted_count: 1, rejected_count: 0, duplicate_count: 0, stale: true, conflict: false, quality_millis: 0, status: "STALE", category: "news", event_time: "2026-11-27T00:00:00Z", ingested_at: "2026-11-27T00:00:02Z", license: "fixture-unverified" },
+      { channel: "macro", source: "fixture-macro", accepted_count: 1, rejected_count: 0, duplicate_count: 0, stale: true, conflict: false, quality_millis: 0, status: "STALE", category: "macro", event_time: "2026-11-01T00:00:00Z", ingested_at: "2026-11-27T00:00:00Z", license: "fixture-unverified" },
+      { channel: "fundamentals", source: "fixture-fundamentals", accepted_count: 1, rejected_count: 0, duplicate_count: 0, stale: true, conflict: false, quality_millis: 0, status: "STALE", category: "fundamentals", event_time: "2026-11-01T00:00:00Z", ingested_at: "2026-11-27T00:00:00Z", license: "fixture-unverified" },
     ],
   },
   meta: { environment: "DEMO", base_currency: null },
@@ -357,6 +359,16 @@ describe("dashboard skeleton", () => {
     expect(news).toHaveTextContent("fixture-unverified");
     expect(news).toHaveTextContent("NO-TRADE");
     expect(news).not.toHaveTextContent("synthetic-headline");
+    const macro = screen.getByTestId("macro-data");
+    expect(macro).toHaveTextContent("Fixture macro stale");
+    expect(macro).toHaveTextContent("fixture-macro");
+    expect(macro).toHaveTextContent("2026-11-01T00:00:00Z");
+    expect(macro).toHaveTextContent("NO-TRADE");
+    const fundamentals = screen.getByTestId("fundamentals-data");
+    expect(fundamentals).toHaveTextContent("Fixture fondamentali stale");
+    expect(fundamentals).toHaveTextContent("fixture-fundamentals");
+    expect(fundamentals).toHaveTextContent("fixture-unverified");
+    expect(fundamentals).toHaveTextContent("NO-TRADE");
     expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
   });
 

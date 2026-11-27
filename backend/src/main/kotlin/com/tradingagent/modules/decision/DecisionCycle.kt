@@ -81,7 +81,9 @@ class DecisionCycle(
         }
         val prices = assessment.channels.firstOrNull { it.channel == "prices" }
         val news = assessment.channels.firstOrNull { it.channel == "news" }
-        val payload = decisionPayload(outcome, prices, news)
+        val macro = assessment.channels.firstOrNull { it.channel == "macro" }
+        val fundamentals = assessment.channels.firstOrNull { it.channel == "fundamentals" }
+        val payload = decisionPayload(outcome, prices, news, macro, fundamentals)
         val auditEvent = auditLog.append(
             occurredAt = at,
             correlationId = outcome.inputHash,
@@ -105,6 +107,8 @@ class DecisionCycle(
             outcome: StrategyOutcome,
             prices: ChannelHealth? = null,
             news: ChannelHealth? = null,
+            macro: ChannelHealth? = null,
+            fundamentals: ChannelHealth? = null,
         ): String = listOf(
             "action=${outcome.action}",
             "reasons=${outcome.reasonCodes.joinToString(",") { it.name }}",
@@ -125,6 +129,20 @@ class DecisionCycle(
             "news_license=${news?.license.orEmpty()}",
             "news_stale=${news?.stale ?: false}",
             "news_accepted=${news?.acceptedCount ?: 0}",
+            "macro_source=${macro?.source.orEmpty()}",
+            "macro_category=${macro?.category.orEmpty()}",
+            "macro_event_time=${macro?.eventTime ?: ""}",
+            "macro_ingested_at=${macro?.ingestedAt ?: ""}",
+            "macro_license=${macro?.license.orEmpty()}",
+            "macro_stale=${macro?.stale ?: false}",
+            "macro_accepted=${macro?.acceptedCount ?: 0}",
+            "fundamentals_source=${fundamentals?.source.orEmpty()}",
+            "fundamentals_category=${fundamentals?.category.orEmpty()}",
+            "fundamentals_event_time=${fundamentals?.eventTime ?: ""}",
+            "fundamentals_ingested_at=${fundamentals?.ingestedAt ?: ""}",
+            "fundamentals_license=${fundamentals?.license.orEmpty()}",
+            "fundamentals_stale=${fundamentals?.stale ?: false}",
+            "fundamentals_accepted=${fundamentals?.acceptedCount ?: 0}",
         ).joinToString("\n")
     }
 }

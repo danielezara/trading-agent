@@ -94,9 +94,10 @@ class IngestionPipeline private constructor(
         val rejected = rejectedByChannel[channel] ?: 0
         val duplicates = duplicatesByChannel[channel] ?: 0
         val threshold = staleAfter(channel)
-        val freshRows = rows.filter { !isStale(it.eventTime, now, threshold) }
+        val observedAt = observedAt(channel)
+        val freshRows = rows.filter { !isStale(observedAt(it), now, threshold) }
         val newest = rows.maxByOrNull { it.eventTime }
-        val stale = newest != null && isStale(newest.eventTime, now, threshold)
+        val stale = newest != null && isStale(observedAt(newest), now, threshold)
         val conflict = channel == "prices" && materialConflict(rows)
         val licenseOk = rows.isNotEmpty() && rows.all { it.licenseVerified }
         val contractOk = rows.isNotEmpty() && rows.all { it.contractVerified }
@@ -274,8 +275,15 @@ class IngestionPipeline private constructor(
             }
         }
 
-        private fun isStale(eventTime: Instant, now: Instant, threshold: Duration): Boolean {
-            val age = Duration.between(eventTime, now)
+        private fun observedAt(channel: String): (AcceptedRecord) -> Instant =
+            if (channel == "macro" || channel == "fundamentals") {
+                { record -> record.ingestedAt }
+            } else {
+                { record -> record.eventTime }
+            }
+
+        private fun isStale(observedAt: Instant, now: Instant, threshold: Duration): Boolean {
+            val age = Duration.between(observedAt, now)
             return age.isNegative || age > threshold
         }
 

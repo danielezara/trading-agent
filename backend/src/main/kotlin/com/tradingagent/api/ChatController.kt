@@ -29,6 +29,8 @@ class ChatController(
         val health = ingestionPipeline.assess(at)
         val prices = health.channels.firstOrNull { it.channel == "prices" }
         val news = health.channels.firstOrNull { it.channel == "news" }
+        val macro = health.channels.firstOrNull { it.channel == "macro" }
+        val fundamentals = health.channels.firstOrNull { it.channel == "fundamentals" }
         val answer = chatQuery.answer(
             q,
             ChatContext(
@@ -56,6 +58,18 @@ class ChatController(
                 newsLicense = news?.license,
                 newsEventTime = news?.eventTime,
                 newsAccepted = news?.acceptedCount ?: 0,
+                macroStatus = macro?.status,
+                macroStale = macro?.stale,
+                macroSource = macro?.source,
+                macroLicense = macro?.license,
+                macroEventTime = macro?.eventTime,
+                macroAccepted = macro?.acceptedCount ?: 0,
+                fundamentalsStatus = fundamentals?.status,
+                fundamentalsStale = fundamentals?.stale,
+                fundamentalsSource = fundamentals?.source,
+                fundamentalsLicense = fundamentals?.license,
+                fundamentalsEventTime = fundamentals?.eventTime,
+                fundamentalsAccepted = fundamentals?.acceptedCount ?: 0,
             ),
         )
         check(!answer.executed) { "la chat non può eseguire un'azione" }

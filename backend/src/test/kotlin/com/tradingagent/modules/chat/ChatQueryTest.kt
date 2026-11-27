@@ -98,6 +98,33 @@ class ChatQueryTest {
         assertFalse(missing.executed)
     }
 
+    @Test
+    fun `stale macro and missing fundamentals stay no trade`() {
+        val macro = chat.answer(
+            "il dato macro è aggiornato?",
+            context().copy(
+                macroStatus = "STALE",
+                macroStale = true,
+                macroSource = "fixture-macro",
+                macroLicense = "fixture-unverified",
+                macroEventTime = Instant.parse("2026-11-01T00:00:00Z"),
+                macroAccepted = 1,
+            ),
+        )
+        assertFalse(macro.executed)
+        assertTrue(macro.text.contains("Fixture macro stale"))
+        assertTrue(macro.text.contains("2026-11-01T00:00:00Z"))
+        assertTrue(macro.text.contains("NO-TRADE"))
+        assertTrue(macro.text.contains("Rete: no"))
+        assertEquals("channels.macro", macro.citations.single().field)
+
+        val fundamentals = chat.answer("fondamentali", context())
+        assertTrue(fundamentals.text.contains("Canale fondamentali assente"))
+        assertTrue(fundamentals.text.contains("NO-TRADE"))
+        assertFalse(fundamentals.executed)
+        assertEquals("/api/v1/data-health", fundamentals.citations.single().resourceId)
+    }
+
     private fun context(positions: List<ChatPosition>? = emptyList()) = ChatContext(
         asOf = at,
         decisionAction = "NO-TRADE",
