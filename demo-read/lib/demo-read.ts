@@ -1,4 +1,6 @@
 export const DEMO_PORTFOLIO_URL = "https://public-api.etoro.com/api/v1/trading/info/demo/portfolio";
+export const DEMO_RATES_URL = "https://public-api.etoro.com/api/v1/market-data/instruments/rates";
+export const DEMO_INSTRUMENTS_URL = "https://public-api.etoro.com/api/v1/market-data/instruments";
 export const DEMO_ACCOUNT_FALLBACK = "Conto Demo delle chiavi in backend/.env";
 
 const LABEL_KEYS = ["username", "userName", "accountId", "account_id"] as const;
@@ -12,6 +14,9 @@ export type DemoPosition = {
   instrumentId: string;
   quantity: string | null;
   value: BrokerCash | null;
+  displayName: string | null;
+  quotePrice: string | null;
+  quoteTime: string | null;
 };
 
 export type DemoOverview = {
@@ -48,7 +53,8 @@ export async function readDemoOverview(options: ReadOptions): Promise<DemoOvervi
   }
   const outcome = await readOnce(options.fetchImpl, apiKey, userKey, options.sleep ?? defaultSleep);
   if (outcome.kind === "pass") {
-    return view(true, outcome.accountLabel, outcome.brokerCash, outcome.positions, now(), null);
+    const positions = await enrichPositions(outcome.positions, options.fetchImpl, apiKey, userKey, options.sleep ?? defaultSleep);
+    return view(true, outcome.accountLabel, outcome.brokerCash, positions, now(), null);
   }
   return view(false, null, null, null, now(), outcome.errorClass);
 }
@@ -74,18 +80,72 @@ function view(
   };
 }
 
+async function enrichPositions(
+  positions: DemoPosition[] | null,
+  fetchImpl: FetchLike,
+  apiKey: string,
+  userKey: string,
+  sleep: (ms: number) => Promise<void>,
+): Promise<DemoPosition[] | null> {
+  if (!positions || positions.length === 0) {
+    return positions;
+  }
+  const ids = [...new Set(positions.map((position) => position.instrumentId))]
+    .filter((id) => /^[1-9]\d{0,9}$/.test(id) && Number(id) <= 2147483647)
+    .slice(0, 100);
+  if (ids.length === 0) {
+    return positions;
+  }
+  const query = `instrumentIds=${ids.join(",")}`;
+  const [ratesBody, namesBody] = await Promise.all([
+    readBody(fetchImpl, `${DEMO_RATES_URL}?${query}`, apiKey, userKey, sleep),
+    readBody(fetchImpl, `${DEMO_INSTRUMENTS_URL}?${query}`, apiKey, userKey, sleep),
+  ]);
+  const rates = parseRates(ratesBody ?? "");
+  const names = parseInstrumentNames(namesBody ?? "");
+  return positions.map((position) => {
+    const quote = rates.get(position.instrumentId);
+    return {
+      ...position,
+      displayName: names.get(position.instrumentId) ?? null,
+      quotePrice: quote?.price ?? null,
+      quoteTime: quote?.time ?? null,
+    };
+  });
+}
+
+async function readBody(
+  fetchImpl: FetchLike,
+  url: string,
+  apiKey: string,
+  userKey: string,
+  sleep: (ms: number) => Promise<void>,
+): Promise<string | null> {
+  const first = await get(fetchImpl, url, apiKey, userKey);
+  if (first.kind === "transport") {
+    return null;
+  }
+  const response = first.status === 429 && retryDelay(first.retryAfter) !== null
+    ? await retry(fetchImpl, url, apiKey, userKey, sleep, retryDelay(first.retryAfter)!)
+    : first;
+  if (response.kind === "transport" || response.status !== 200) {
+    return null;
+  }
+  return response.body;
+}
+
 async function readOnce(
   fetchImpl: FetchLike,
   apiKey: string,
   userKey: string,
   sleep: (ms: number) => Promise<void>,
 ): Promise<{ kind: "pass"; accountLabel: string | null; brokerCash: BrokerCash | null; positions: DemoPosition[] | null } | { kind: "closed"; errorClass: string }> {
-  const first = await get(fetchImpl, apiKey, userKey);
+  const first = await get(fetchImpl, DEMO_PORTFOLIO_URL, apiKey, userKey);
   if (first.kind === "transport") {
     return { kind: "closed", errorClass: "TRANSPORT" };
   }
   const response = first.status === 429 && retryDelay(first.retryAfter) !== null
-    ? await retry(fetchImpl, apiKey, userKey, sleep, retryDelay(first.retryAfter)!)
+    ? await retry(fetchImpl, DEMO_PORTFOLIO_URL, apiKey, userKey, sleep, retryDelay(first.retryAfter)!)
     : first;
   if (response.kind === "transport") {
     return { kind: "closed", errorClass: "TRANSPORT" };
@@ -98,24 +158,26 @@ async function readOnce(
 
 async function retry(
   fetchImpl: FetchLike,
+  url: string,
   apiKey: string,
   userKey: string,
   sleep: (ms: number) => Promise<void>,
   delayMs: number,
 ) {
   await sleep(delayMs);
-  return get(fetchImpl, apiKey, userKey);
+  return get(fetchImpl, url, apiKey, userKey);
 }
 
-async function get(fetchImpl: FetchLike, apiKey: string, userKey: string) {
+async function get(fetchImpl: FetchLike, url: string, apiKey: string, userKey: string) {
   try {
-    const response = await fetchImpl(DEMO_PORTFOLIO_URL, {
+    const response = await fetchImpl(url, {
       method: "GET",
       redirect: "manual",
       cache: "no-store",
       signal: AbortSignal.timeout(5000),
       headers: {
         Accept: "application/json",
+        "User-Agent": "trading-agent-observation",
         "x-request-id": crypto.randomUUID(),
         "x-api-key": apiKey,
         "x-user-key": userKey,
@@ -204,6 +266,9 @@ function positions(portfolio: Record<string, unknown>, currency: string | null):
       instrumentId,
       quantity: quantity(item.units),
       value: currency && amount !== null && amount >= 0 ? { minorUnits: amount, currency } : null,
+      displayName: null,
+      quotePrice: null,
+      quoteTime: null,
     });
   }
   return rows;
@@ -279,6 +344,66 @@ function defaultSleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+export function parseRates(body: string): Map<string, { price: string | null; time: string | null }> {
+  const rates = arrayField(body, "rates");
+  const parsed = new Map<string, { price: string | null; time: string | null }>();
+  for (const item of rates) {
+    const instrumentId = instrumentIdOf(item.instrumentID);
+    if (!instrumentId || instrumentId === "0") {
+      continue;
+    }
+    const price = decimalText(item.bid) ?? decimalText(item.lastExecution);
+    const time = quoteTime(item.date);
+    if (price === null && time === null) {
+      continue;
+    }
+    parsed.set(instrumentId, { price, time });
+  }
+  return parsed;
+}
+
+export function parseInstrumentNames(body: string): Map<string, string> {
+  const rows = arrayField(body, "instrumentDisplayDatas");
+  const names = new Map<string, string>();
+  for (const item of rows) {
+    const instrumentId = instrumentIdOf(item.instrumentID);
+    const name = typeof item.instrumentDisplayName === "string" ? item.instrumentDisplayName.trim() : "";
+    if (!instrumentId || instrumentId === "0" || !name) {
+      continue;
+    }
+    names.set(instrumentId, name);
+  }
+  return names;
+}
+
+function arrayField(body: string, field: string): Record<string, unknown>[] {
+  let root: unknown;
+  try {
+    root = JSON.parse(body);
+  } catch {
+    return [];
+  }
+  if (!isRecord(root) || !Array.isArray(root[field])) {
+    return [];
+  }
+  return root[field].filter(isRecord);
+}
+
+function decimalText(value: unknown): string | null {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return null;
+  }
+  const text = Object.is(value, -0) ? "0" : value.toString();
+  return /^(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(text) ? text : null;
+}
+
+function quoteTime(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim() || Number.isNaN(Date.parse(value))) {
+    return null;
+  }
+  return value.trim();
 }
 
 export function formatCash(cash: BrokerCash | null): string {

@@ -112,15 +112,64 @@ describe("demo read", () => {
     assert.equal(view.connected, true);
     assert.equal(view.tradingEnabled, false);
     assert.deepEqual(view.positions, [
-      { instrumentId: "1002", quantity: "0.049485", value: { minorUnits: 10000, currency: "USD" } },
-      { instrumentId: "1003", quantity: null, value: { minorUnits: 1250, currency: "USD" } },
+      { instrumentId: "1002", quantity: "0.049485", value: { minorUnits: 10000, currency: "USD" }, displayName: null, quotePrice: null, quoteTime: null },
+      { instrumentId: "1003", quantity: null, value: { minorUnits: 1250, currency: "USD" }, displayName: null, quotePrice: null, quoteTime: null },
     ]);
+  });
+
+  it("attaches the official name and bid or last, and leaves a missing quote blank", async () => {
+    const calls: string[] = [];
+    const view = await readDemoOverview({
+      env: keys,
+      fetchImpl: async (url) => {
+        calls.push(url);
+        if (url.startsWith("https://public-api.etoro.com/api/v1/market-data/instruments/rates")) {
+          return json(200, {
+            rates: [
+              { instrumentID: 1002, bid: 1.25, lastExecution: 1.1, date: "2026-11-27T09:30:00Z" },
+              { instrumentID: 1003, lastExecution: 2.5, date: "2026-11-27T09:31:00Z" },
+            ],
+          });
+        }
+        if (url === "https://public-api.etoro.com/api/v1/market-data/instruments?instrumentIds=1002,1003" || url.startsWith("https://public-api.etoro.com/api/v1/market-data/instruments?")) {
+          return json(200, {
+            instrumentDisplayDatas: [
+              { instrumentID: 1002, instrumentDisplayName: "Apple", symbolFull: "AAPL" },
+              { instrumentID: 1003, instrumentDisplayName: "  ", symbolFull: "MSFT" },
+            ],
+          });
+        }
+        return json(200, {
+          clientPortfolio: {
+            credit: 10,
+            accountCurrencyId: 1,
+            positions: [
+              { instrumentID: 1002, units: 1, amount: 1 },
+              { instrumentID: 1003, units: 2, amount: 2 },
+            ],
+          },
+        });
+      },
+    });
+    assert.equal(view.operationalState, "OBSERVATION");
+    assert.equal(view.tradingEnabled, false);
+    assert.equal(view.positions?.[0]?.displayName, "Apple");
+    assert.equal(view.positions?.[0]?.quotePrice, "1.25");
+    assert.equal(view.positions?.[0]?.quoteTime, "2026-11-27T09:30:00Z");
+    assert.equal(view.positions?.[1]?.displayName, null);
+    assert.equal(view.positions?.[1]?.quotePrice, "2.5");
+    assert.equal(view.positions?.[1]?.quoteTime, "2026-11-27T09:31:00Z");
+    assert.equal(calls.some((url) => url.includes("/feeds") || url.includes("news") || url.includes("/real/")), false);
+    assert.equal(calls.filter((url) => url.includes("/market-data/instruments/rates")).length, 1);
+    assert.equal(calls.filter((url) => url.startsWith("https://public-api.etoro.com/api/v1/market-data/instruments?")).length, 1);
   });
 
   it("reads the portfolio again when the page asks again", async () => {
     let calls = 0;
-    const fetchImpl: Parameters<typeof readDemoOverview>[0]["fetchImpl"] = async () => {
-      calls += 1;
+    const fetchImpl: Parameters<typeof readDemoOverview>[0]["fetchImpl"] = async (url) => {
+      if (url === DEMO_PORTFOLIO_URL) {
+        calls += 1;
+      }
       return json(200, {
         clientPortfolio: {
           credit: 10,

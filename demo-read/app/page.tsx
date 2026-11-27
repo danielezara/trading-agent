@@ -49,16 +49,22 @@ function Positions({ positions }: { positions: DemoPosition[] | null }) {
       <thead>
         <tr>
           <th>Strumento</th>
+          <th>Nome</th>
           <th>Quantità</th>
           <th>Valore</th>
+          <th>Quotazione</th>
+          <th>Ora</th>
         </tr>
       </thead>
       <tbody>
         {positions.map((position, index) => (
           <tr key={`${position.instrumentId}-${index}`}>
             <td>{position.instrumentId}</td>
+            <td>{position.displayName ?? ""}</td>
             <td>{position.quantity ?? "non disponibile"}</td>
             <td>{formatCash(position.value)}</td>
+            <td>{position.quotePrice ?? ""}</td>
+            <td>{position.quoteTime ?? ""}</td>
           </tr>
         ))}
       </tbody>
