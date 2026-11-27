@@ -106,8 +106,10 @@ class DecisionCycleTest {
         val at = Instant.parse("2026-11-27T00:02:01Z")
         val pipeline = IngestionPipeline.fromJson(pricesJson("2026-11-27T00:00:00Z"))
         val recorded = cycle(pricesJson("2026-11-27T00:00:00Z"), at).record()
-        val prices = pipeline.assess(at).channels.first { it.channel == "prices" }
-        val text = DecisionCycle.decisionPayload(recorded.outcome, prices)
+        val assessment = pipeline.assess(at)
+        val prices = assessment.channels.first { it.channel == "prices" }
+        val news = assessment.channels.first { it.channel == "news" }
+        val text = DecisionCycle.decisionPayload(recorded.outcome, prices, news)
         assertEquals("NO-TRADE", recorded.outcome.action)
         assertTrue(prices.stale)
         assertEquals("fixture-market-data", prices.source)
@@ -122,7 +124,61 @@ class DecisionCycleTest {
         assertTrue(text.contains("prices_event_time=2026-11-27T00:00:00Z"))
         assertTrue(text.contains("prices_license=fixture-unverified"))
         assertTrue(text.contains("prices_stale=true"))
+        assertTrue(text.contains("news_accepted=0"))
+        assertTrue(text.contains("news_stale=false"))
+        assertFalse(text.contains("synthetic-headline"))
         assertEquals(sha256(text), recorded.auditEvent.payloadSha256)
+    }
+
+    @Test
+    fun `a stale news fixture stays no trade and records its provenance`() {
+        val at = Instant.parse("2026-11-27T00:10:01Z")
+        val json = newsJson("2026-11-27T00:00:00Z", "2026-11-27T00:10:01Z")
+        val pipeline = IngestionPipeline.fromJson(json)
+        val recorded = cycle(json, at).record()
+        val assessment = pipeline.assess(at)
+        val news = assessment.channels.first { it.channel == "news" }
+        val prices = assessment.channels.first { it.channel == "prices" }
+        val text = DecisionCycle.decisionPayload(recorded.outcome, prices, news)
+        assertTrue(news.stale)
+        assertFalse(prices.stale)
+        assertEquals("fixture-news", news.source)
+        assertEquals("news", news.category)
+        assertEquals("fixture-unverified", news.license)
+        assertEquals("NO-TRADE", recorded.outcome.action)
+        assertTrue(recorded.outcome.reasonCodes.contains(ReasonCode.DATA_STALE))
+        assertTrue(recorded.outcome.reasonCodes.contains(ReasonCode.DATA_MISSING))
+        assertFalse(recorded.outcome.signal.orderable)
+        assertFalse(recorded.policy.brokerCalled)
+        assertFalse(assessment.network)
+        assertTrue(text.contains("news_source=fixture-news"))
+        assertTrue(text.contains("news_event_time=2026-11-27T00:00:00Z"))
+        assertTrue(text.contains("news_ingested_at=2026-11-27T00:00:02Z"))
+        assertTrue(text.contains("news_license=fixture-unverified"))
+        assertTrue(text.contains("news_stale=true"))
+        assertFalse(text.contains("synthetic-headline"))
+        assertEquals(sha256(text), recorded.auditEvent.payloadSha256)
+        assertEquals(EvidenceStatus.UNVERIFIED, EvidenceGate().rows().first { it.controlId == "RF-045" }.status)
+        assertEquals(EvidenceStatus.UNVERIFIED, EvidenceGate().rows().first { it.controlId == "RF-059" }.status)
+    }
+
+    @Test
+    fun `a missing news fixture stays no trade without calling a vendor`() {
+        val json = pricesJson("2026-11-27T00:00:00Z")
+        val at = Instant.parse("2026-11-27T00:00:30Z")
+        val pipeline = IngestionPipeline.fromJson(json)
+        val recorded = cycle(json, at).record()
+        val news = pipeline.assess(at).channels.first { it.channel == "news" }
+        assertEquals(0, news.acceptedCount)
+        assertFalse(news.stale)
+        assertEquals(null, news.license)
+        assertFalse(pipeline.assess(at).network)
+        assertEquals("NO-TRADE", recorded.outcome.action)
+        assertTrue(recorded.outcome.reasonCodes.contains(ReasonCode.DATA_MISSING))
+        assertFalse(recorded.outcome.reasonCodes.contains(ReasonCode.DATA_STALE))
+        assertFalse(recorded.policy.brokerCalled)
+        assertEquals(EvidenceStatus.UNVERIFIED, EvidenceGate().rows().first { it.controlId == "RF-045" }.status)
+        assertEquals(EvidenceStatus.UNVERIFIED, EvidenceGate().rows().first { it.controlId == "RF-059" }.status)
     }
 
     @Test
@@ -172,6 +228,42 @@ class DecisionCycleTest {
               "source_name": "fixture-market-data",
               "event_time": "$eventTime",
               "ingested_at": "2026-11-27T00:00:01Z",
+              "license": "fixture-unverified",
+              "license_verified": false,
+              "contract_verified": false,
+              "instrument_id": "INST-1",
+              "value": "100.00"
+            }
+          ]
+        }
+    """.trimIndent()
+
+    private fun newsJson(newsEvent: String, priceEvent: String) = """
+        {
+          "connector_version": "fixture-news",
+          "records": [
+            {
+              "record_id": "news-1",
+              "channel": "news",
+              "category": "news",
+              "provider_class": "deterministic",
+              "source_name": "fixture-news",
+              "event_time": "$newsEvent",
+              "ingested_at": "2026-11-27T00:00:02Z",
+              "license": "fixture-unverified",
+              "license_verified": false,
+              "contract_verified": false,
+              "instrument_id": "INST-1",
+              "value": "synthetic-headline"
+            },
+            {
+              "record_id": "price-one",
+              "channel": "prices",
+              "category": "market-data",
+              "provider_class": "deterministic",
+              "source_name": "fixture-market-data",
+              "event_time": "$priceEvent",
+              "ingested_at": "2026-11-27T00:10:01Z",
               "license": "fixture-unverified",
               "license_verified": false,
               "contract_verified": false,

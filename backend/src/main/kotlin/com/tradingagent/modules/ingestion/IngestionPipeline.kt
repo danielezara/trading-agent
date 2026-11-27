@@ -207,14 +207,15 @@ class IngestionPipeline private constructor(
             val licenseVerified = bool(node, "license_verified")
             val contractVerified = bool(node, "contract_verified")
             val value = decimal(node, "value")
+            val newsChannel = channel == "news"
             if (
                 recordId == null || category == null || sourceName == null || eventTime == null ||
                 ingestedAt == null || license == null || instrumentId == null ||
-                licenseVerified == null || contractVerified == null || value == null
+                licenseVerified == null || contractVerified == null || (!newsChannel && value == null)
             ) {
                 return ParseResult.Rejected(channel)
             }
-            if (value.compareTo(BigDecimal.ZERO) < 0) {
+            if (value != null && value.compareTo(BigDecimal.ZERO) < 0) {
                 return ParseResult.Rejected(channel)
             }
             return ParseResult.Ok(
@@ -229,7 +230,7 @@ class IngestionPipeline private constructor(
                     licenseVerified = licenseVerified,
                     contractVerified = contractVerified,
                     instrumentId = instrumentId,
-                    value = value,
+                    value = if (newsChannel) null else value,
                 ),
             )
         }
@@ -286,9 +287,11 @@ class IngestionPipeline private constructor(
                     if (left.instrumentId != right.instrumentId) {
                         continue
                     }
+                    val leftValue = left.value ?: continue
+                    val rightValue = right.value ?: continue
                     val gap = Duration.between(left.eventTime, right.eventTime).abs()
                     val align = TradingParameters.current().technical.priceConflictAlignSeconds
-                    if (gap <= Duration.ofSeconds(align) && materialPriceGap(left.value, right.value)) {
+                    if (gap <= Duration.ofSeconds(align) && materialPriceGap(leftValue, rightValue)) {
                         return true
                     }
                 }
@@ -320,7 +323,7 @@ private data class AcceptedRecord(
     val licenseVerified: Boolean,
     val contractVerified: Boolean,
     val instrumentId: String,
-    val value: BigDecimal,
+    val value: BigDecimal?,
 )
 
 private sealed interface ParseResult {

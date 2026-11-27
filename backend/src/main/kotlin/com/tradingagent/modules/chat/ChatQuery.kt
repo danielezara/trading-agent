@@ -21,6 +21,12 @@ data class ChatContext(
     val pricesLicense: String?,
     val pricesEventTime: Instant?,
     val network: Boolean,
+    val newsStatus: String? = null,
+    val newsStale: Boolean? = null,
+    val newsSource: String? = null,
+    val newsLicense: String? = null,
+    val newsEventTime: Instant? = null,
+    val newsAccepted: Int = 0,
 ) {
     companion object {
         fun unavailable(asOf: Instant): ChatContext = ChatContext(
@@ -73,6 +79,7 @@ class ChatQuery {
         return when (topic(normalized)) {
             Topic.POSITIONS -> positions(context)
             Topic.DECISION -> decision(context)
+            Topic.NEWS -> news(context)
             Topic.DATA -> data(context)
             Topic.STATUS -> status(context)
         }
@@ -102,6 +109,22 @@ class ChatQuery {
             context,
             "Ambiente DEMO. Decisione ${context.decisionAction}. Motivi: $reasons. Segnale $orderable.",
             listOf(citation("1", "decision", DECISION, "Decisione registrata", "reason_codes", context.asOf)),
+        )
+    }
+
+    private fun news(context: ChatContext): ChatAnswer {
+        val source = context.newsSource ?: "fonte non disponibile"
+        val license = context.newsLicense ?: "non verificata"
+        val body = when {
+            context.newsAccepted == 0 -> "Canale news assente. La decisione resta NO-TRADE."
+            context.newsStale == true -> "Fixture news stale ($source, licenza $license). La decisione resta NO-TRADE."
+            else -> "Fixture news $source. Licenza $license. La decisione resta NO-TRADE."
+        }
+        val network = if (context.network) "sì" else "no"
+        return inform(
+            context,
+            "Ambiente DEMO. $body Rete: $network.",
+            listOf(citation("1", "data-health", DATA_HEALTH, "Fixture news", "channels.news", context.newsEventTime ?: context.asOf)),
         )
     }
 
@@ -177,6 +200,7 @@ class ChatQuery {
     private fun topic(text: String): Topic = when {
         text.contains("posizion") || text.contains("portafoglio") -> Topic.POSITIONS
         text.contains("decision") || text.contains("motivo") || text.contains("segnale") || text.contains("perch") -> Topic.DECISION
+        text.contains("news") || text.contains("notizi") -> Topic.NEWS
         text.contains("prezz") || text.contains("stale") || text.contains("licen") || text.contains("fixture") || text.contains("dati") || text.contains("fresch") -> Topic.DATA
         else -> Topic.STATUS
     }
@@ -191,7 +215,7 @@ class ChatQuery {
     private fun isSecret(text: String): Boolean =
         text.contains("api key") || text.contains("api-key") || text.contains("token") || text.contains("secret") || text.contains("password") || text.contains("prompt")
 
-    private enum class Topic { POSITIONS, DECISION, DATA, STATUS }
+    private enum class Topic { POSITIONS, DECISION, NEWS, DATA, STATUS }
 
     private companion object {
         const val MAX_MESSAGE_CHARS: Int = 400

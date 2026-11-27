@@ -3,6 +3,7 @@ package com.tradingagent.api
 import org.junit.jupiter.api.Test
 import org.hamcrest.Matchers.contains
 import org.hamcrest.Matchers.containsString
+import org.hamcrest.Matchers.not
 import org.hamcrest.Matchers.nullValue
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -12,6 +13,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -129,7 +131,13 @@ class ApiSkeletonTest(
             .andExpect(jsonPath("$.data.channels[?(@.channel == 'prices')].category", contains("market-data")))
             .andExpect(jsonPath("$.data.channels[?(@.channel == 'prices')].license", contains("fixture-unverified")))
             .andExpect(jsonPath("$.data.channels[?(@.channel == 'prices')].event_time", contains("2026-11-27T00:00:10Z")))
+            .andExpect(jsonPath("$.data.channels[?(@.channel == 'news')].category", contains("news")))
+            .andExpect(jsonPath("$.data.channels[?(@.channel == 'news')].source", contains("fixture-news")))
+            .andExpect(jsonPath("$.data.channels[?(@.channel == 'news')].license", contains("fixture-unverified")))
+            .andExpect(jsonPath("$.data.channels[?(@.channel == 'news')].event_time", contains("2026-11-27T00:00:00Z")))
+            .andExpect(jsonPath("$.data.channels[?(@.channel == 'news')].accepted_count", contains(1)))
             .andExpect(jsonPath("$.data.channels[?(@.channel == 'orders')].status", contains("NOT_WIRED")))
+            .andExpect(content().string(not(containsString("synthetic-headline"))))
 
         val firstDecision = mockMvc.perform(get("/api/v1/decisions/latest"))
             .andExpect(status().isOk)

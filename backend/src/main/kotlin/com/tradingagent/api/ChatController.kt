@@ -28,6 +28,7 @@ class ChatController(
         val probe = capabilityProbe.current()
         val health = ingestionPipeline.assess(at)
         val prices = health.channels.firstOrNull { it.channel == "prices" }
+        val news = health.channels.firstOrNull { it.channel == "news" }
         val answer = chatQuery.answer(
             q,
             ChatContext(
@@ -49,6 +50,12 @@ class ChatController(
                 pricesLicense = prices?.license,
                 pricesEventTime = prices?.eventTime,
                 network = health.network,
+                newsStatus = news?.status,
+                newsStale = news?.stale,
+                newsSource = news?.source,
+                newsLicense = news?.license,
+                newsEventTime = news?.eventTime,
+                newsAccepted = news?.acceptedCount ?: 0,
             ),
         )
         check(!answer.executed) { "la chat non può eseguire un'azione" }

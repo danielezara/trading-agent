@@ -71,6 +71,33 @@ class ChatQueryTest {
         assertFalse(prices.executed)
     }
 
+    @Test
+    fun `stale or missing news stays no trade and does not repeat a headline`() {
+        val stale = chat.answer(
+            "le notizie sono aggiornate?",
+            context().copy(
+                newsStatus = "STALE",
+                newsStale = true,
+                newsSource = "fixture-news",
+                newsLicense = "fixture-unverified",
+                newsEventTime = Instant.parse("2026-11-27T00:00:00Z"),
+                newsAccepted = 1,
+            ),
+        )
+        assertFalse(stale.executed)
+        assertTrue(stale.text.contains("Fixture news stale"))
+        assertTrue(stale.text.contains("NO-TRADE"))
+        assertTrue(stale.text.contains("Rete: no"))
+        assertFalse(stale.text.contains("synthetic-headline"))
+        assertEquals("channels.news", stale.citations.single().field)
+        assertEquals("/api/v1/data-health", stale.citations.single().resourceId)
+
+        val missing = chat.answer("news", context())
+        assertTrue(missing.text.contains("Canale news assente"))
+        assertTrue(missing.text.contains("NO-TRADE"))
+        assertFalse(missing.executed)
+    }
+
     private fun context(positions: List<ChatPosition>? = emptyList()) = ChatContext(
         asOf = at,
         decisionAction = "NO-TRADE",

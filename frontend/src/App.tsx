@@ -397,6 +397,7 @@ function DataPage({ loaded }: { loaded: LoadState }) {
       {loaded.status === "ready" ? (
         <>
           <MarketFixture channel={loaded.data.health.channels.find((channel) => channel.channel === "prices")} />
+          <NewsFixture channel={loaded.data.health.channels.find((channel) => channel.channel === "news")} />
           <ChannelTable health={loaded.data.health} />
         </>
       ) : null}
@@ -418,6 +419,24 @@ function MarketFixture({ channel }: { channel: DataChannel | undefined }) {
   return (
     <p data-testid="market-data">
       {`Fixture prezzi ${channel.source}. Evento ${channel.event_time ?? "non disponibile"}. Licenza ${channel.license ?? "non verificata"}.`}
+    </p>
+  );
+}
+
+function NewsFixture({ channel }: { channel: DataChannel | undefined }) {
+  if (!channel || channel.accepted_count === 0) {
+    return <p data-testid="news-data">Canale news assente. La decisione resta NO-TRADE.</p>;
+  }
+  if (channel.stale) {
+    return (
+      <p data-testid="news-data">
+        {`Fixture news stale (${channel.source}, ${channel.event_time ?? "senza orario"}, licenza ${channel.license ?? "non verificata"}). La decisione resta NO-TRADE.`}
+      </p>
+    );
+  }
+  return (
+    <p data-testid="news-data">
+      {`Fixture news ${channel.source}. Evento ${channel.event_time ?? "non disponibile"}. Licenza ${channel.license ?? "non verificata"}. La decisione resta NO-TRADE.`}
     </p>
   );
 }

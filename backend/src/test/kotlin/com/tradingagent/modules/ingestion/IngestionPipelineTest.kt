@@ -31,6 +31,17 @@ class IngestionPipelineTest {
         assertEquals(Instant.parse("2026-11-27T00:00:10Z"), prices.eventTime)
         assertEquals(Instant.parse("2026-11-27T00:00:11Z"), prices.ingestedAt)
         assertEquals("fixture-unverified", prices.license)
+        val news = health.channels.first { it.channel == "news" }
+        assertEquals(1, news.acceptedCount)
+        assertEquals(0, news.rejectedCount)
+        assertFalse(news.stale)
+        assertEquals("news", news.category)
+        assertEquals("fixture-news", news.source)
+        assertEquals(Instant.parse("2026-11-27T00:00:00Z"), news.eventTime)
+        assertEquals(Instant.parse("2026-11-27T00:00:02Z"), news.ingestedAt)
+        assertEquals("fixture-unverified", news.license)
+        assertEquals("UNUSABLE", news.status)
+        assertFalse(listOf(news.source, news.category, news.license, news.status).joinToString().contains("synthetic-headline"))
         assertTrue(health.channels.none { it.status == "HEALTHY" })
         assertEquals("NOT_WIRED", health.channels.first { it.channel == "orders" }.status)
         assertEquals("NOT_WIRED", health.channels.first { it.channel == "positions" }.status)
@@ -102,6 +113,38 @@ class IngestionPipelineTest {
     }
 
     @Test
+    fun `news becomes stale only after ten minutes and drops the body`() {
+        val pipeline = IngestionPipeline.fromJson(newsJson())
+        val fresh = pipeline.assess(Instant.parse("2026-11-27T00:10:00Z")).channels.first { it.channel == "news" }
+        val stale = pipeline.assess(Instant.parse("2026-11-27T00:10:01Z")).channels.first { it.channel == "news" }
+        assertFalse(fresh.stale)
+        assertEquals("UNUSABLE", fresh.status)
+        assertTrue(stale.stale)
+        assertEquals("STALE", stale.status)
+        assertEquals("fixture-news", stale.source)
+        assertEquals("news", stale.category)
+        assertEquals(Instant.parse("2026-11-27T00:00:00Z"), stale.eventTime)
+        assertEquals(Instant.parse("2026-11-27T00:00:02Z"), stale.ingestedAt)
+        assertEquals("fixture-unverified", stale.license)
+        assertEquals(1, stale.acceptedCount)
+        assertFalse(pipeline.assess(Instant.parse("2026-11-27T00:10:01Z")).network)
+        assertFalse(listOf(stale.source, stale.category, stale.license).joinToString().contains("synthetic-headline"))
+    }
+
+    @Test
+    fun `a missing news fixture is unusable and not stale`() {
+        val news = IngestionPipeline.fromJson(
+            """{"connector_version":"fixture-empty","records":[]}""",
+        ).assess(Instant.parse("2026-11-27T00:00:30Z")).channels.first { it.channel == "news" }
+        assertEquals(0, news.acceptedCount)
+        assertFalse(news.stale)
+        assertEquals("UNUSABLE", news.status)
+        assertEquals(null, news.eventTime)
+        assertEquals(null, news.license)
+        assertFalse(IngestionPipeline.fromClasspath().assess(Instant.parse("2026-11-27T00:00:30Z")).network)
+    }
+
+    @Test
     fun `a missing prices fixture is unusable and not stale`() {
         val prices = IngestionPipeline.fromJson(
             """{"connector_version":"fixture-empty","records":[]}""",
@@ -125,4 +168,26 @@ class IngestionPipelineTest {
         assertEquals(750, DeterministicQuality.millis(true, true, 1, 1, 1, 1, 0, 1))
         assertEquals(875, DeterministicQuality.millis(true, true, 1, 1, 1, 1, 1, 2))
     }
+
+    private fun newsJson() = """
+        {
+          "connector_version": "fixture-news",
+          "records": [
+            {
+              "record_id": "news-1",
+              "channel": "news",
+              "category": "news",
+              "provider_class": "deterministic",
+              "source_name": "fixture-news",
+              "event_time": "2026-11-27T00:00:00Z",
+              "ingested_at": "2026-11-27T00:00:02Z",
+              "license": "fixture-unverified",
+              "license_verified": false,
+              "contract_verified": false,
+              "instrument_id": "INST-1",
+              "value": "synthetic-headline"
+            }
+          ]
+        }
+    """.trimIndent()
 }

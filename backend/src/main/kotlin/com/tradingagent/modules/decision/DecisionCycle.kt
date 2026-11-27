@@ -80,7 +80,8 @@ class DecisionCycle(
             "un segnale di osservazione non è eseguibile"
         }
         val prices = assessment.channels.firstOrNull { it.channel == "prices" }
-        val payload = decisionPayload(outcome, prices)
+        val news = assessment.channels.firstOrNull { it.channel == "news" }
+        val payload = decisionPayload(outcome, prices, news)
         val auditEvent = auditLog.append(
             occurredAt = at,
             correlationId = outcome.inputHash,
@@ -100,7 +101,11 @@ class DecisionCycle(
     companion object {
         const val COMPONENT_VERSION: String = "observation-decision/1"
 
-        fun decisionPayload(outcome: StrategyOutcome, prices: ChannelHealth? = null): String = listOf(
+        fun decisionPayload(
+            outcome: StrategyOutcome,
+            prices: ChannelHealth? = null,
+            news: ChannelHealth? = null,
+        ): String = listOf(
             "action=${outcome.action}",
             "reasons=${outcome.reasonCodes.joinToString(",") { it.name }}",
             "input_hash=${outcome.inputHash}",
@@ -113,6 +118,13 @@ class DecisionCycle(
             "prices_license=${prices?.license.orEmpty()}",
             "prices_stale=${prices?.stale ?: false}",
             "prices_accepted=${prices?.acceptedCount ?: 0}",
+            "news_source=${news?.source.orEmpty()}",
+            "news_category=${news?.category.orEmpty()}",
+            "news_event_time=${news?.eventTime ?: ""}",
+            "news_ingested_at=${news?.ingestedAt ?: ""}",
+            "news_license=${news?.license.orEmpty()}",
+            "news_stale=${news?.stale ?: false}",
+            "news_accepted=${news?.acceptedCount ?: 0}",
         ).joinToString("\n")
     }
 }
