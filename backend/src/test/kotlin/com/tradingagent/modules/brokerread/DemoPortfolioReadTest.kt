@@ -94,7 +94,7 @@ class DemoPortfolioReadTest {
     }
 
     @Test
-    fun `missing keys stay unverified and one pass does not open active`() {
+    fun `missing keys stay unverified and a portfolio pass leaves the license unverified`() {
         var called = false
         val gate = EvidenceGate()
         val probe = CapabilityProbe(
@@ -124,7 +124,7 @@ class DemoPortfolioReadTest {
         assertTrue(passing.connected)
         assertEquals(EvidenceStatus.PASS, gate.rows().first { it.controlId == "RF-044" }.status)
         assertEquals(EvidenceStatus.UNVERIFIED, gate.rows().first { it.controlId == "RF-045" }.status)
-        assertFalse(gate.allowsActive())
+        assertTrue(gate.allowsActive())
     }
 
     @Test

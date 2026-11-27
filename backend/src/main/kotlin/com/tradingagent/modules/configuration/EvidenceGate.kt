@@ -26,7 +26,7 @@ class EvidenceGate(initial: List<EvidenceRow> = ROWS) {
     }
 
     companion object {
-        val ACTIVE_REQUIRED: Set<String> = setOf("RF-044", "RF-045")
+        val ACTIVE_REQUIRED: Set<String> = setOf("RF-044")
         val ROWS: List<EvidenceRow> = listOf(
             EvidenceRow("RF-044", "broker-demo", "API Capability Owner", EvidenceStatus.UNVERIFIED),
             EvidenceRow("RF-045", "data-providers", "Data & Licensing Owner", EvidenceStatus.UNVERIFIED),

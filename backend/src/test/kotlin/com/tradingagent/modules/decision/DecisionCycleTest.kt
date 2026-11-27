@@ -107,7 +107,7 @@ class DecisionCycleTest {
         assertFalse(recorded.policy.brokerCalled)
         assertEquals(EvidenceStatus.UNVERIFIED, gate.rows().first { it.controlId == "RF-045" }.status)
         assertEquals(EvidenceStatus.UNVERIFIED, gate.rows().first { it.controlId == "RF-059" }.status)
-        assertFalse(gate.allowsActive())
+        assertTrue(gate.allowsActive())
         assertEquals("NO-TRADE", recorded.rule.action)
         assertEquals("WARMUP", recorded.rule.reason)
         assertFalse(recorded.rule.orderable)

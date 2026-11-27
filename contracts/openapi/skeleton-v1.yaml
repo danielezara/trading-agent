@@ -426,7 +426,7 @@ components:
               nullable: true
             active_transition_allowed:
               type: boolean
-              enum: [false]
+              description: True when RF-044 is PASS. RF-045 is not required. The process still refuses to leave OBSERVATION.
             strategy_action:
               type: string
               enum: [NO-TRADE]
@@ -454,7 +454,7 @@ components:
           properties:
             allows_active:
               type: boolean
-              enum: [false]
+              description: True when RF-044 is PASS. RF-045 stays listed and is not required. A license row is not marked PASS without evidence.
             broker_connected:
               type: boolean
             last_probe_at:

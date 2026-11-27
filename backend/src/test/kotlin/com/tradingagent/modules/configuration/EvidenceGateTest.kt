@@ -8,14 +8,15 @@ import org.junit.jupiter.api.Test
 
 class EvidenceGateTest {
     @Test
-    fun `active requires the broker and license rows and ignores the removed authorization`() {
-        val ready = gate(EvidenceStatus.PASS, EvidenceStatus.PASS, EvidenceStatus.UNVERIFIED)
+    fun `active requires the broker row and ignores the license and the removed authorization`() {
+        val ready = gate(EvidenceStatus.PASS, EvidenceStatus.UNVERIFIED, EvidenceStatus.UNVERIFIED)
         assertTrue(ready.allowsActive())
+        assertEquals(EvidenceStatus.UNVERIFIED, ready.rows().first { it.controlId == "RF-045" }.status)
         assertEquals(EvidenceStatus.UNVERIFIED, ready.rows().first { it.controlId == "RF-059" }.status)
 
-        val licenseOpen = gate(EvidenceStatus.PASS, EvidenceStatus.UNVERIFIED, EvidenceStatus.PASS)
-        assertFalse(licenseOpen.allowsActive())
-        assertEquals(EvidenceStatus.UNVERIFIED, licenseOpen.rows().first { it.controlId == "RF-045" }.status)
+        val licenseOpen = gate(EvidenceStatus.PASS, EvidenceStatus.FAIL, EvidenceStatus.PASS)
+        assertTrue(licenseOpen.allowsActive())
+        assertEquals(EvidenceStatus.FAIL, licenseOpen.rows().first { it.controlId == "RF-045" }.status)
 
         val brokerOpen = gate(EvidenceStatus.UNVERIFIED, EvidenceStatus.PASS, EvidenceStatus.PASS)
         assertFalse(brokerOpen.allowsActive())

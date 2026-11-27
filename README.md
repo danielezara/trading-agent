@@ -2,7 +2,7 @@
 
 Modular monolith in **OBSERVATION**. Questo repository avvia la struttura di backend, dashboard e Postgres locale. Non parla con alcun broker, non contiene chiavi e non può inviare ordini.
 
-Lo stato operativo resta `OBSERVATION`. `allowsActive()` richiede `PASS` su RF-044 e RF-045. RF-059 non è richiesto. RF-045 resta `UNVERIFIED`, quindi `ACTIVE` resta chiuso. Strategia, rischio e portafoglio rispondono `NO-TRADE`.
+Lo stato operativo resta `OBSERVATION`. `allowsActive()` richiede `PASS` su RF-044. RF-045 e RF-059 non sono richieste. RF-045 resta `UNVERIFIED` e non blocca il gate. Strategia, rischio e portafoglio rispondono `NO-TRADE`.
 
 ## Struttura
 

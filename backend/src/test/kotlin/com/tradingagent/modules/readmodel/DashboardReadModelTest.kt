@@ -23,6 +23,7 @@ import com.tradingagent.modules.operational.OperationalStateService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.time.Instant
@@ -69,7 +70,7 @@ class DashboardReadModelTest {
         assertEquals(EvidenceStatus.PASS, gate.rows().first { it.controlId == "RF-044" }.status)
         assertEquals(EvidenceStatus.UNVERIFIED, gate.rows().first { it.controlId == "RF-045" }.status)
         assertEquals(EvidenceStatus.UNVERIFIED, gate.rows().first { it.controlId == "RF-059" }.status)
-        assertFalse(gate.allowsActive())
+        assertTrue(gate.allowsActive())
         assertFalse(snapshot.tradingEnabled)
     }
 
