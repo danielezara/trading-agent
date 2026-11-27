@@ -68,7 +68,44 @@ class ChatQueryTest {
         assertTrue(prices.text.contains("fixture-unverified"))
         assertTrue(prices.text.contains("Rete: no"))
         assertEquals("/api/v1/data-health", prices.citations.single().resourceId)
+        assertEquals("Fixture prezzi", prices.citations.single().label)
+        assertTrue(prices.text.contains("NO-TRADE"))
         assertFalse(prices.executed)
+    }
+
+    @Test
+    fun `a live price answer stays no trade and news stays a fixture`() {
+        val live = context().copy(
+            pricesStatus = "STALE",
+            pricesStale = true,
+            pricesSource = "etoro-public-api",
+            pricesLicense = "unverified",
+            pricesEventTime = Instant.parse("2026-11-27T09:00:00Z"),
+            network = true,
+            newsStatus = "STALE",
+            newsStale = true,
+            newsSource = "fixture-news",
+            newsLicense = "fixture-unverified",
+            newsEventTime = Instant.parse("2026-11-27T00:00:00Z"),
+            newsAccepted = 1,
+        )
+        val prices = chat.answer("i prezzi sono freschi?", live)
+        assertFalse(prices.executed)
+        assertTrue(prices.text.contains("NO-TRADE"))
+        assertTrue(prices.text.contains("unverified"))
+        assertTrue(prices.text.contains("Rete: sì"))
+        assertFalse(prices.text.contains("PASS"))
+        assertEquals("Prezzi di mercato", prices.citations.single().label)
+
+        val missing = chat.answer("prezzi", live.copy(pricesStatus = "UNUSABLE", pricesStale = false, pricesLicense = null))
+        assertTrue(missing.text.contains("NO-TRADE"))
+        assertFalse(missing.executed)
+
+        val news = chat.answer("le notizie sono aggiornate?", live)
+        assertTrue(news.text.contains("Fixture news stale"))
+        assertTrue(news.text.contains("NO-TRADE"))
+        assertFalse(news.text.contains("etoro-public-api"))
+        assertFalse(news.executed)
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.tradingagent.config
 import com.tradingagent.modules.audit.AuditLog
 import com.tradingagent.modules.brokerread.CapabilityProbe
 import com.tradingagent.modules.brokerread.DemoKeyMaterial
+import com.tradingagent.modules.brokerread.DemoMarketRatesLookup
 import com.tradingagent.modules.brokerread.JdkHttpGet
 import com.tradingagent.modules.chat.ChatQuery
 import com.tradingagent.modules.configuration.ConfigurationService
@@ -13,6 +14,8 @@ import com.tradingagent.modules.executor.DisabledBrokerExecutor
 import com.tradingagent.modules.features.FeatureStore
 import com.tradingagent.modules.identity.AccessModel
 import com.tradingagent.modules.ingestion.IngestionPipeline
+import com.tradingagent.modules.ingestion.LivePriceLookup
+import com.tradingagent.modules.ingestion.ObservationPrices
 import com.tradingagent.modules.ledger.Ledger
 import com.tradingagent.modules.oms.OrderIntentService
 import com.tradingagent.modules.operational.OperationalStateService
@@ -50,6 +53,25 @@ class ModuleConfiguration {
 
     @Bean fun ingestionPipeline() = IngestionPipeline()
 
+    @Bean
+    fun livePriceLookup(): LivePriceLookup = DemoMarketRatesLookup(
+        keys = { DemoKeyMaterial.fromEnvironment(System.getenv()) },
+        transport = JdkHttpGet(),
+    )
+
+    @Bean
+    fun observationPrices(
+        ingestionPipeline: IngestionPipeline,
+        capabilityProbe: CapabilityProbe,
+        livePriceLookup: LivePriceLookup,
+    ) = ObservationPrices(
+        pipeline = ingestionPipeline,
+        lookup = livePriceLookup,
+        instrumentIds = {
+            capabilityProbe.current().positions.orEmpty().map { it.instrumentId }
+        },
+    )
+
     @Bean fun featureStore() = FeatureStore()
 
     @Bean fun corporateActionRegistry() = CorporateActionRegistry()
@@ -85,6 +107,7 @@ class ModuleConfiguration {
         policyGate: PolicyGate,
         ledger: Ledger,
         capabilityProbe: CapabilityProbe,
+        observationPrices: ObservationPrices,
     ): DecisionCycle {
         val cycle = DecisionCycle(
             strategyEngine = strategyEngine,
@@ -96,6 +119,7 @@ class ModuleConfiguration {
             policyGate = policyGate,
             ledger = ledger,
             capabilityProbe = capabilityProbe,
+            assess = { observationPrices.assess(it) },
         )
         val recorded = cycle.record()
         auditLog.sealDay(LocalDate.ofInstant(recorded.outcome.evaluatedAt, ZoneOffset.UTC))

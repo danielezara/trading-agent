@@ -7,6 +7,7 @@ import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.configuration.ConfigurationVersion
 import com.tradingagent.modules.configuration.EvidenceGate
 import com.tradingagent.modules.ingestion.ChannelHealth
+import com.tradingagent.modules.ingestion.IngestionAssessment
 import com.tradingagent.modules.ingestion.IngestionPipeline
 import com.tradingagent.modules.ledger.CashInputs
 import com.tradingagent.modules.ledger.Ledger
@@ -38,6 +39,7 @@ class DecisionCycle(
     private val clock: () -> Instant = Instant::now,
     private val ledger: Ledger = Ledger(),
     private val capabilityProbe: CapabilityProbe = CapabilityProbe.offline(),
+    private val assess: (Instant) -> IngestionAssessment = { instant -> ingestionPipeline.assess(instant) },
 ) {
     private var recorded: RecordedDecision? = null
 
@@ -46,7 +48,7 @@ class DecisionCycle(
 
     fun record(): RecordedDecision {
         val at = clock()
-        val assessment = ingestionPipeline.assess(at)
+        val assessment = assess(at)
         val configuration = configurationService.active()
         val brokerCash = capabilityProbe.current().brokerCash
         val quote = ledger.quote(

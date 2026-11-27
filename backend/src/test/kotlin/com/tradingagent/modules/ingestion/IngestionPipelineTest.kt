@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.math.BigDecimal
 import java.time.Instant
 
 class IngestionPipelineTest {
@@ -225,6 +226,56 @@ class IngestionPipelineTest {
         assertEquals(0, DeterministicQuality.millis(true, false, 1, 1, 1, 1, 1, 1))
         assertEquals(750, DeterministicQuality.millis(true, true, 1, 1, 1, 1, 0, 1))
         assertEquals(875, DeterministicQuality.millis(true, true, 1, 1, 1, 1, 1, 2))
+    }
+
+    @Test
+    fun `a live price batch replaces only prices and stays unverified`() {
+        val at = Instant.parse("2026-11-27T00:10:00Z")
+        val pipeline = IngestionPipeline.fromClasspath()
+        val fresh = pipeline.assess(
+            at,
+            LivePriceBatch(
+                rates = listOf(LiveRate("6270", BigDecimal("10.5"), at.minusSeconds(30))),
+                rejectedCount = 0,
+            ),
+        )
+        assertEquals("mixed", fresh.source)
+        assertTrue(fresh.network)
+        val prices = fresh.channels.first { it.channel == "prices" }
+        assertEquals("etoro-public-api", prices.source)
+        assertEquals("market-data", prices.category)
+        assertEquals("unverified", prices.license)
+        assertEquals(0, prices.qualityMillis)
+        assertFalse(prices.stale)
+        assertFalse(prices.conflict)
+        assertEquals(1, prices.acceptedCount)
+        assertEquals("UNUSABLE", prices.status)
+        assertEquals(at, prices.ingestedAt)
+        val news = fresh.channels.first { it.channel == "news" }
+        assertEquals("fixture-news", news.source)
+        assertEquals("fixture-unverified", news.license)
+        assertEquals(1, news.acceptedCount)
+
+        val stale = pipeline.assess(
+            at,
+            LivePriceBatch(
+                rates = listOf(LiveRate("6270", BigDecimal("10.5"), at.minusSeconds(121))),
+                rejectedCount = 0,
+            ),
+        )
+        val stalePrices = stale.channels.first { it.channel == "prices" }
+        assertTrue(stalePrices.stale)
+        assertEquals("STALE", stalePrices.status)
+        assertEquals("unverified", stalePrices.license)
+
+        val missing = pipeline.assess(at, LivePriceBatch(emptyList(), 1))
+        val missingPrices = missing.channels.first { it.channel == "prices" }
+        assertEquals(0, missingPrices.acceptedCount)
+        assertFalse(missingPrices.stale)
+        assertEquals(1, missingPrices.rejectedCount)
+        assertEquals("UNUSABLE", missingPrices.status)
+        assertTrue(missing.network)
+        assertEquals("fixture-news", missing.channels.first { it.channel == "news" }.source)
     }
 
     private fun newsJson() = """

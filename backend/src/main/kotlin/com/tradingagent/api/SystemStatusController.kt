@@ -11,6 +11,7 @@ import com.tradingagent.modules.strategy.ObservationSignal
 import com.tradingagent.modules.ingestion.ChannelHealth
 import com.tradingagent.modules.ingestion.IngestionAssessment
 import com.tradingagent.modules.ingestion.IngestionPipeline
+import com.tradingagent.modules.ingestion.ObservationPrices
 import com.tradingagent.kernel.OperationalState
 import com.tradingagent.modules.ledger.Ledger
 import com.tradingagent.modules.operational.OperationalStateService
@@ -33,6 +34,7 @@ class SystemStatusController(
     private val evidenceGate: EvidenceGate,
     private val decisionCycle: DecisionCycle,
     private val ingestionPipeline: IngestionPipeline,
+    private val observationPrices: ObservationPrices,
     private val reconciliationJob: ReconciliationJob,
     private val ledger: Ledger,
     private val durableScheduler: DurableScheduler,
@@ -189,16 +191,22 @@ class SystemStatusController(
 
     @GetMapping("/data-health")
     fun dataHealth(): ApiEnvelope<DataHealthData> {
-        val assessment = ingestionPipeline.assess(Instant.now())
+        val assessment = observationPrices.assess(Instant.now())
+        val warning = if (assessment.network) {
+            ApiWarning(
+                code = "READ_ONLY",
+                detail = "I prezzi sono una GET di mercato in sola lettura. La licenza non è verificata. Un prezzo stale o mancante resta NO-TRADE.",
+            )
+        } else {
+            ApiWarning(
+                code = "FIXTURE_ONLY",
+                detail = "I canali arrivano da una fixture sul classpath. Nessuna rete e nessun broker.",
+            )
+        }
         return ApiEnvelope(
             data = dataHealthData(assessment),
             meta = ApiMeta(schemaVersion = "data-health/1"),
-            warnings = listOf(
-                ApiWarning(
-                    code = "FIXTURE_ONLY",
-                    detail = "I canali arrivano da una fixture sul classpath. Nessuna rete e nessun broker.",
-                ),
-            ),
+            warnings = listOf(warning),
         )
     }
 

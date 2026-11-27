@@ -168,6 +168,9 @@ class ChatQuery {
         )
     }
 
+    private fun priceLabel(context: ChatContext): String =
+        if (context.pricesSource == "etoro-public-api") "Prezzi di mercato" else "Fixture prezzi"
+
     private fun data(context: ChatContext): ChatAnswer {
         val stale = when (context.pricesStale) {
             null -> "freschezza non disponibile"
@@ -178,10 +181,15 @@ class ChatQuery {
         val source = context.pricesSource ?: "fonte non disponibile"
         val status = context.pricesStatus ?: "stato non disponibile"
         val network = if (context.network) "sì" else "no"
+        val closed = if (context.pricesStale == true || context.pricesStatus != "HEALTHY") {
+            " La decisione resta NO-TRADE."
+        } else {
+            ""
+        }
         return inform(
             context,
-            "Ambiente DEMO. Canale prezzi $status, $stale, fonte $source, licenza $license. Rete: $network.",
-            listOf(citation("1", "data-health", DATA_HEALTH, "Fixture prezzi", "channels.prices", context.pricesEventTime ?: context.asOf)),
+            "Ambiente DEMO. Canale prezzi $status, $stale, fonte $source, licenza $license. Rete: $network.$closed",
+            listOf(citation("1", "data-health", DATA_HEALTH, priceLabel(context), "channels.prices", context.pricesEventTime ?: context.asOf)),
         )
     }
 
@@ -195,7 +203,7 @@ class ChatQuery {
             listOf(
                 citation("1", "decision", DECISION, "Decisione registrata", "reason_codes", context.asOf),
                 citation("2", "positions", OVERVIEW, "Posizioni Demo", "positions", context.asOf),
-                citation("3", "data-health", DATA_HEALTH, "Fixture prezzi", "channels.prices", context.pricesEventTime ?: context.asOf),
+                citation("3", "data-health", DATA_HEALTH, priceLabel(context), "channels.prices", context.pricesEventTime ?: context.asOf),
             ),
         )
     }

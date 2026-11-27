@@ -20,6 +20,10 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import com.tradingagent.kernel.OperationalState
+import com.tradingagent.modules.ingestion.LivePriceBatch
+import com.tradingagent.modules.ingestion.LiveRate
+import java.math.BigDecimal
 import java.security.MessageDigest
 import java.time.Instant
 import java.time.LocalDate
@@ -266,6 +270,69 @@ class DecisionCycleTest {
         assertEquals(EvidenceStatus.UNVERIFIED, EvidenceGate().rows().first { it.controlId == "RF-059" }.status)
     }
 
+    @Test
+    fun `live rates stay no trade when fresh stale or missing and do not verify the license`() {
+        val at = Instant.parse("2026-11-27T00:10:00Z")
+        val pipeline = IngestionPipeline.fromClasspath()
+        val freshBatch = LivePriceBatch(listOf(LiveRate("6270", BigDecimal("10.5"), at.minusSeconds(30))), 0)
+        val fresh = recordLive(pipeline, at, freshBatch)
+        val freshPayload = payload(fresh.recorded, pipeline.assess(at, freshBatch))
+        assertEquals("NO-TRADE", fresh.recorded.outcome.action)
+        assertTrue(fresh.recorded.outcome.reasonCodes.contains(ReasonCode.DATA_MISSING))
+        assertFalse(fresh.recorded.outcome.reasonCodes.contains(ReasonCode.DATA_STALE))
+        assertFalse(fresh.recorded.policy.brokerCalled)
+        assertFalse(fresh.recorded.outcome.signal.orderable)
+        assertEquals(OperationalState.OBSERVATION, fresh.state.current())
+        assertEquals(sha256(freshPayload), fresh.recorded.auditEvent.payloadSha256)
+        assertTrue(freshPayload.contains("prices_source=etoro-public-api"))
+        assertTrue(freshPayload.contains("prices_license=unverified"))
+        assertTrue(freshPayload.contains("prices_stale=false"))
+        assertTrue(freshPayload.contains("news_source=fixture-news"))
+        assertFalse(freshPayload.contains("10.5"))
+        assertFalse(freshPayload.contains("prices_license=PASS"))
+
+        val staleBatch = LivePriceBatch(listOf(LiveRate("6270", BigDecimal("10.5"), at.minusSeconds(121))), 0)
+        val stale = recordLive(pipeline, at, staleBatch)
+        val stalePayload = payload(stale.recorded, pipeline.assess(at, staleBatch))
+        assertEquals("NO-TRADE", stale.recorded.outcome.action)
+        assertTrue(stale.recorded.outcome.reasonCodes.contains(ReasonCode.DATA_STALE))
+        assertTrue(stalePayload.contains("prices_stale=true"))
+        assertTrue(stalePayload.contains("prices_license=unverified"))
+        assertEquals(sha256(stalePayload), stale.recorded.auditEvent.payloadSha256)
+        assertFalse(stale.recorded.policy.brokerCalled)
+        assertEquals(OperationalState.OBSERVATION, stale.state.current())
+
+        val missingBatch = LivePriceBatch(emptyList(), 0)
+        val missing = recordLive(pipeline, at, missingBatch)
+        val missingPayload = payload(missing.recorded, pipeline.assess(at, missingBatch))
+        assertEquals("NO-TRADE", missing.recorded.outcome.action)
+        assertTrue(missing.recorded.outcome.reasonCodes.contains(ReasonCode.DATA_MISSING))
+        assertFalse(missing.recorded.outcome.reasonCodes.contains(ReasonCode.DATA_STALE))
+        assertTrue(missingPayload.contains("prices_accepted=0"))
+        assertTrue(missingPayload.contains("prices_stale=false"))
+        assertEquals(sha256(missingPayload), missing.recorded.auditEvent.payloadSha256)
+        assertFalse(missing.recorded.policy.brokerCalled)
+        assertEquals(OperationalState.OBSERVATION, missing.state.current())
+        assertEquals(EvidenceStatus.UNVERIFIED, EvidenceGate().rows().first { it.controlId == "RF-045" }.status)
+        assertEquals(EvidenceStatus.UNVERIFIED, EvidenceGate().rows().first { it.controlId == "RF-059" }.status)
+    }
+
+    private fun recordLive(pipeline: IngestionPipeline, at: Instant, batch: LivePriceBatch): LiveDecision {
+        val state = OperationalStateService(clock = { at })
+        val cycle = DecisionCycle(
+            strategyEngine = StrategyEngine(),
+            ingestionPipeline = pipeline,
+            evidenceGate = EvidenceGate(),
+            operationalStateService = state,
+            configurationService = ConfigurationService(),
+            auditLog = AuditLog(),
+            policyGate = PolicyGate(),
+            clock = { at },
+            assess = { pipeline.assess(it, batch) },
+        )
+        return LiveDecision(cycle.record(), state)
+    }
+
     private fun cycle(json: String, at: Instant): DecisionCycle = DecisionCycle(
         strategyEngine = StrategyEngine(),
         ingestionPipeline = IngestionPipeline.fromJson(json),
@@ -414,4 +481,9 @@ class DecisionCycleTest {
             channel("fundamentals"),
         )
     }
+
+    private data class LiveDecision(
+        val recorded: RecordedDecision,
+        val state: OperationalStateService,
+    )
 }

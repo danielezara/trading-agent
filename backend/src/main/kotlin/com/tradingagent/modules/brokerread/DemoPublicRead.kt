@@ -35,6 +35,7 @@ class JdkHttpGet : HttpGet {
             .GET()
             .header("Accept", "application/json")
         headers.forEach { (name, value) -> builder.header(name, value) }
+        builder.header("User-Agent", "trading-agent-observation")
         val response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString())
         val retryAfter = response.headers().firstValue("retry-after").orElse(null)?.trim()?.toLongOrNull()
         val body = response.body().orEmpty()

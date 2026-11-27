@@ -6,7 +6,7 @@ import com.tradingagent.modules.chat.ChatContext
 import com.tradingagent.modules.chat.ChatPosition
 import com.tradingagent.modules.chat.ChatQuery
 import com.tradingagent.modules.decision.DecisionCycle
-import com.tradingagent.modules.ingestion.IngestionPipeline
+import com.tradingagent.modules.ingestion.ObservationPrices
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -19,14 +19,14 @@ class ChatController(
     private val chatQuery: ChatQuery,
     private val decisionCycle: DecisionCycle,
     private val capabilityProbe: CapabilityProbe,
-    private val ingestionPipeline: IngestionPipeline,
+    private val observationPrices: ObservationPrices,
 ) {
     @GetMapping
     fun ask(@RequestParam q: String): ApiEnvelope<ChatTurnData> {
         val at = Instant.now()
         val outcome = decisionCycle.latest().outcome
         val probe = capabilityProbe.current()
-        val health = ingestionPipeline.assess(at)
+        val health = observationPrices.assess(at)
         val prices = health.channels.firstOrNull { it.channel == "prices" }
         val news = health.channels.firstOrNull { it.channel == "news" }
         val macro = health.channels.firstOrNull { it.channel == "macro" }

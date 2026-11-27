@@ -72,17 +72,17 @@ class IngestionPipeline private constructor(
 ) {
     fun enabled(): Boolean = false
 
-    fun assess(now: Instant): IngestionAssessment {
+    fun assess(now: Instant, livePrices: LivePriceBatch? = null): IngestionAssessment {
         val channels = (FIXTURE_CHANNELS + BROKER_CHANNELS).map { channel ->
-            if (channel in BROKER_CHANNELS) {
-                notWired(channel)
-            } else {
-                assessChannel(channel, now)
+            when {
+                channel in BROKER_CHANNELS -> notWired(channel)
+                channel == "prices" && livePrices != null -> livePriceHealth(livePrices, now)
+                else -> assessChannel(channel, now)
             }
         }.sortedBy { it.channel }
         return IngestionAssessment(
-            source = "classpath-fixture",
-            network = false,
+            source = if (livePrices == null) "classpath-fixture" else "mixed",
+            network = livePrices != null,
             connectorVersion = connectorVersion,
             quarantinedCount = quarantinedCount,
             channels = channels,
@@ -91,8 +91,52 @@ class IngestionPipeline private constructor(
 
     private fun assessChannel(channel: String, now: Instant): ChannelHealth {
         val rows = accepted.filter { it.channel == channel }
-        val rejected = rejectedByChannel[channel] ?: 0
-        val duplicates = duplicatesByChannel[channel] ?: 0
+        return summarize(
+            channel = channel,
+            rows = rows,
+            rejected = rejectedByChannel[channel] ?: 0,
+            duplicates = duplicatesByChannel[channel] ?: 0,
+            now = now,
+        )
+    }
+
+    private fun livePriceHealth(batch: LivePriceBatch, now: Instant): ChannelHealth {
+        val kept = linkedMapOf<String, AcceptedRecord>()
+        var duplicates = 0
+        batch.rates.forEachIndexed { index, rate ->
+            val row = AcceptedRecord(
+                recordId = "live-${rate.instrumentId}-$index",
+                channel = "prices",
+                category = "market-data",
+                sourceName = LIVE_PRICE_SOURCE,
+                eventTime = rate.eventTime,
+                ingestedAt = now,
+                license = LIVE_PRICE_LICENSE,
+                licenseVerified = false,
+                contractVerified = false,
+                instrumentId = rate.instrumentId,
+                value = rate.value,
+            )
+            val previous = kept[rate.instrumentId]
+            if (previous == null) {
+                kept[rate.instrumentId] = row
+            } else {
+                duplicates += 1
+                if (row.eventTime.isAfter(previous.eventTime)) {
+                    kept[rate.instrumentId] = row
+                }
+            }
+        }
+        return summarize("prices", kept.values.toList(), batch.rejectedCount, duplicates, now)
+    }
+
+    private fun summarize(
+        channel: String,
+        rows: List<AcceptedRecord>,
+        rejected: Int,
+        duplicates: Int,
+        now: Instant,
+    ): ChannelHealth {
         val threshold = staleAfter(channel)
         val observedAt = observedAt(channel)
         val freshRows = rows.filter { !isStale(observedAt(it), now, threshold) }
@@ -142,6 +186,8 @@ class IngestionPipeline private constructor(
         private val brokerChannels = listOf("orders", "positions")
         val FIXTURE_CHANNELS: List<String> = fixtureChannels
         val BROKER_CHANNELS: List<String> = brokerChannels
+        const val LIVE_PRICE_SOURCE: String = "etoro-public-api"
+        const val LIVE_PRICE_LICENSE: String = "unverified"
 
         operator fun invoke(): IngestionPipeline = fromClasspath()
 

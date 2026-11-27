@@ -405,10 +405,15 @@ function LoadNotice({ loaded }: { loaded: LoadState }) {
 }
 
 function DataPage({ loaded }: { loaded: LoadState }) {
+  const live = loaded.status === "ready" && loaded.data.health.network;
   return (
     <section className="panel">
       <h1>Dati e agente</h1>
-      <p>I canali arrivano da una fixture locale. Nessuna rete e nessuna chiamata al broker.</p>
+      <p>
+        {live
+          ? "I prezzi arrivano da una lettura di mercato in sola lettura. News, macro e fondamentali restano fixture. Nessun ordine."
+          : "I canali arrivano da una fixture locale. Nessuna rete e nessuna chiamata al broker."}
+      </p>
       <LoadNotice loaded={loaded} />
       {loaded.status === "ready" ? (
         <>
@@ -427,16 +432,17 @@ function MarketFixture({ channel }: { channel: DataChannel | undefined }) {
   if (!channel || channel.accepted_count === 0) {
     return <p data-testid="market-data">Canale prezzi assente. La decisione resta NO-TRADE.</p>;
   }
+  const kind = channel.source === "etoro-public-api" ? "Prezzi di mercato" : "Fixture prezzi";
   if (channel.stale) {
     return (
       <p data-testid="market-data">
-        {`Fixture prezzi stale (${channel.source}, ${channel.event_time ?? "senza orario"}, licenza ${channel.license ?? "non verificata"}). La decisione resta NO-TRADE.`}
+        {`${kind} stale (${channel.source}, ${channel.event_time ?? "senza orario"}, licenza ${channel.license ?? "non verificata"}). La decisione resta NO-TRADE.`}
       </p>
     );
   }
   return (
     <p data-testid="market-data">
-      {`Fixture prezzi ${channel.source}. Evento ${channel.event_time ?? "non disponibile"}. Licenza ${channel.license ?? "non verificata"}.`}
+      {`${kind} ${channel.source}. Evento ${channel.event_time ?? "non disponibile"}. Licenza ${channel.license ?? "non verificata"}.${channel.source === "etoro-public-api" ? " La decisione resta NO-TRADE." : ""}`}
     </p>
   );
 }

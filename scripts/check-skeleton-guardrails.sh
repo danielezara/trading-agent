@@ -16,7 +16,7 @@ if [[ -n "$tracked_secrets" ]]; then
 fi
 
 broker_urls="$(git grep -I -n -E -i 'https?://[^[:space:]]*etoro' -- . ':!scripts/check-skeleton-guardrails.sh' || true)"
-unexpected_broker_urls="$(printf '%s\n' "$broker_urls" | grep -v -F 'https://public-api.etoro.com/api/v1/trading/info/demo/portfolio' || true)"
+unexpected_broker_urls="$(printf '%s\n' "$broker_urls" | grep -v -F 'https://public-api.etoro.com/api/v1/trading/info/demo/portfolio' | grep -v -F 'https://public-api.etoro.com/api/v1/market-data/instruments/rates' || true)"
 if [[ -n "$unexpected_broker_urls" ]]; then
   fail "broker URL is not allowed:\n$unexpected_broker_urls"
 fi

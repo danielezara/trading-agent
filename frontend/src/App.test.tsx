@@ -396,4 +396,83 @@ describe("dashboard skeleton", () => {
     expect(screen.getByText(/Registrazioni: 0/)).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
+
+  it("keeps a stale live price as no trade and leaves news on the fixture", async () => {
+    const liveHealth = {
+      ...health,
+      data: {
+        ...health.data,
+        source: "mixed",
+        network: true,
+        channels: health.data.channels.map((channel) => (
+          channel.channel === "prices"
+            ? {
+              ...channel,
+              source: "etoro-public-api",
+              accepted_count: 1,
+              stale: true,
+              conflict: false,
+              status: "STALE",
+              license: "unverified",
+              event_time: "2026-11-27T09:00:00Z",
+            }
+            : channel
+        )),
+      },
+    };
+    vi.stubGlobal("fetch", (input: string) => Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => (String(input).includes("data-health") ? liveHealth : jsonFor(String(input))),
+    }));
+    render(
+      <MemoryRouter initialEntries={["/dati"]}>
+        <AppRoutes />
+      </MemoryRouter>,
+    );
+    const market = await screen.findByTestId("market-data");
+    expect(market).toHaveTextContent("Prezzi di mercato stale");
+    expect(market).toHaveTextContent("etoro-public-api");
+    expect(market).toHaveTextContent("unverified");
+    expect(market).toHaveTextContent("NO-TRADE");
+    expect(screen.getByText(/Rete: sì/)).toBeInTheDocument();
+    expect(screen.getByText(/News, macro e fondamentali restano fixture/)).toBeInTheDocument();
+    expect(screen.getByTestId("news-data")).toHaveTextContent("Fixture news stale");
+    expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps a missing live price as no trade", async () => {
+    const missingHealth = {
+      ...health,
+      data: {
+        ...health.data,
+        source: "mixed",
+        network: true,
+        channels: health.data.channels.map((channel) => (
+          channel.channel === "prices"
+            ? {
+              ...channel,
+              source: "classpath-fixture",
+              accepted_count: 0,
+              stale: false,
+              status: "UNUSABLE",
+              license: null,
+              event_time: null,
+            }
+            : channel
+        )),
+      },
+    };
+    vi.stubGlobal("fetch", (input: string) => Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => (String(input).includes("data-health") ? missingHealth : jsonFor(String(input))),
+    }));
+    render(
+      <MemoryRouter initialEntries={["/dati"]}>
+        <AppRoutes />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId("market-data")).toHaveTextContent("Canale prezzi assente. La decisione resta NO-TRADE.");
+  });
 });

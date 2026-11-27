@@ -668,10 +668,10 @@ components:
           properties:
             source:
               type: string
-              enum: [classpath-fixture]
+              enum: [classpath-fixture, mixed]
             network:
               type: boolean
-              enum: [false]
+              enum: [false, true]
             connector_version:
               type: string
             quarantined_count:
