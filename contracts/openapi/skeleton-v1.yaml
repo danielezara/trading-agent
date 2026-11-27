@@ -531,6 +531,23 @@ components:
             fx_status:
               type: string
               enum: [UNOBSERVED, NOT_REQUIRED, UNCONFIGURED, APPLIED]
+            fx_source:
+              type: string
+              nullable: true
+              description: ecb-eurofxref when the official daily reference was applied. Null when the rate is missing or stale.
+            fx_version:
+              type: string
+              nullable: true
+              description: Reference date from the ECB file. Not a guessed rate.
+            fx_observed_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: 16:00 Europe/Berlin on the reference date, the usual ECB publication time.
+            fx_haircut_bps:
+              type: integer
+              nullable: true
+              description: Documented haircut from the signed parameters. 100 means the converted cash is reduced by 1 percent.
             journal_entry_count:
               type: integer
             journal_balanced:

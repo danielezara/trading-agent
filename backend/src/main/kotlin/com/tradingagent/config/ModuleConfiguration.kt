@@ -8,6 +8,8 @@ import com.tradingagent.modules.brokerread.DemoMarketRatesLookup
 import com.tradingagent.modules.brokerread.ClosedTradeRead
 import com.tradingagent.modules.brokerread.DemoClosedTradeRead
 import com.tradingagent.modules.brokerread.DemoInstrumentClassRead
+import com.tradingagent.modules.brokerread.EcbEuroFx
+import com.tradingagent.modules.brokerread.EuroFxRead
 import com.tradingagent.modules.brokerread.InstrumentClassRead
 import com.tradingagent.modules.brokerread.DemoPositionQuotes
 import com.tradingagent.modules.brokerread.InstrumentNameRead
@@ -128,6 +130,7 @@ class ModuleConfiguration {
             ledger = ledger,
             capabilityProbe = capabilityProbe,
             assess = { observationPrices.assess(it) },
+            euroFx = euroFxRead(),
         )
         val recorded = cycle.record()
         auditLog.sealDay(LocalDate.ofInstant(recorded.outcome.evaluatedAt, ZoneOffset.UTC))
@@ -177,7 +180,11 @@ class ModuleConfiguration {
         instrumentNameRead,
         instrumentClassRead,
         closedTradeRead,
+        euroFxRead(),
     )
+
+    @Bean
+    fun euroFxRead(): EuroFxRead = EcbEuroFx(transport = JdkHttpGet())
 
     @Bean fun chatQuery() = ChatQuery()
 

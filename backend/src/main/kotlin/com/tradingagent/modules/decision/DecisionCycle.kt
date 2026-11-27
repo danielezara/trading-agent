@@ -3,6 +3,7 @@ package com.tradingagent.modules.decision
 import com.tradingagent.modules.audit.AuditEvent
 import com.tradingagent.modules.audit.AuditLog
 import com.tradingagent.modules.brokerread.CapabilityProbe
+import com.tradingagent.modules.brokerread.EuroFxRead
 import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.configuration.ConfigurationVersion
 import com.tradingagent.modules.configuration.EvidenceGate
@@ -40,6 +41,7 @@ class DecisionCycle(
     private val ledger: Ledger = Ledger(),
     private val capabilityProbe: CapabilityProbe = CapabilityProbe.offline(),
     private val assess: (Instant) -> IngestionAssessment = { instant -> ingestionPipeline.assess(instant) },
+    private val euroFx: EuroFxRead = EuroFxRead { _, _, _ -> null },
 ) {
     private var recorded: RecordedDecision? = null
 
@@ -51,13 +53,21 @@ class DecisionCycle(
         val assessment = assess(at)
         val configuration = configurationService.active()
         val brokerCash = capabilityProbe.current().brokerCash
+        val fx = euroFx.read(
+            at,
+            configuration.parameters.economic.fxHaircutBps,
+            configuration.parameters.technical.fxReferenceMaxAgeDays,
+        )
         val quote = ledger.quote(
             CashInputs(
                 currency = configuration.budget.baseCurrency,
                 brokerCashMinor = brokerCash?.minorUnits,
                 brokerCurrency = brokerCash?.currency,
                 assignedBudgetMinor = configuration.budget.assignedBudgetMinor,
-                cashBufferMinor = configuration.budget.cashBufferMinor,
+                externalHoldingsMinor = if (fx == null) null else 0,
+                reservedCashMinor = if (fx == null) null else 0,
+                cashBufferMinor = if (fx == null) configuration.budget.cashBufferMinor else configuration.budget.cashBufferMinor ?: 0,
+                fx = fx,
             ),
         )
         val outcome = strategyEngine.evaluate(

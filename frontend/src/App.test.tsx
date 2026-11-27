@@ -313,7 +313,7 @@ describe("dashboard skeleton", () => {
     expect(closed).toHaveTextContent("2026-11-01T12:00:00Z");
     expect(screen.getAllByTestId("closed-profit").map((cell) => cell.textContent)).toEqual(["-2.5", ""]);
     expect(screen.getByTestId("cash-alignment")).toHaveTextContent("cassa USD, budget EUR");
-    expect(screen.getByTestId("cash-alignment")).toHaveTextContent("Nessun cambio configurato");
+    expect(screen.getByTestId("cash-alignment")).toHaveTextContent("Il riferimento BCE manca o è stale");
     expect(screen.getByText("50000 EUR")).toBeInTheDocument();
     expect(card).not.toHaveTextContent("Conto Demo delle chiavi");
   });

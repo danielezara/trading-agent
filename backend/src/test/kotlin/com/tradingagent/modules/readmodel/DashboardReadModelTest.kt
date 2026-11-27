@@ -3,6 +3,7 @@ package com.tradingagent.modules.readmodel
 import com.tradingagent.kernel.EvidenceStatus
 import com.tradingagent.kernel.OperationalState
 import com.tradingagent.modules.brokerread.CapabilityProbe
+import com.tradingagent.modules.brokerread.EcbEuroFx
 import com.tradingagent.modules.brokerread.ClosedTrade
 import com.tradingagent.modules.brokerread.ClosedTradeRead
 import com.tradingagent.modules.brokerread.DemoKeyMaterial
@@ -172,6 +173,43 @@ class DashboardReadModelTest {
     }
 
     @Test
+    fun `a fresh ecb reference values usd cash in eur and a stale reference leaves it null`() {
+        val body = """<Cube time='2026-11-26'><Cube currency='USD' rate='1.0975'/></Cube>"""
+        val seen = mutableListOf<java.net.URI>()
+        val transport = HttpGet { uri, _ ->
+            seen += uri
+            InboundHttp(200, null, body)
+        }
+        val fresh = model(
+            """{"clientPortfolio":{"credit":280.35,"accountCurrencyId":1,"positions":[]}}""",
+            PositionQuoteRead { emptyMap() },
+            euroFx = EcbEuroFx(transport),
+            clock = { Instant.parse("2026-11-27T10:00:00Z") },
+        ).portfolio()
+        assertEquals(listOf(EcbEuroFx.ENDPOINT), seen)
+        assertEquals(Ledger.FX_APPLIED, fresh.fxStatus)
+        assertEquals(Ledger.STATUS_CALCULATED, fresh.ledgerStatus)
+        assertEquals("ecb-eurofxref", fresh.fx?.source)
+        assertEquals("2026-11-26", fresh.fx?.version)
+        assertEquals(100, fresh.fx?.haircutBps)
+        assertEquals(Instant.parse("2026-11-26T15:00:00Z"), fresh.fx?.observedAt)
+        assertEquals("EUR", fresh.availableCash?.currency)
+        assertEquals(25_288L, fresh.availableCash?.minorUnits)
+        assertEquals(OperationalState.OBSERVATION, fresh.operationalState)
+        assertFalse(fresh.tradingEnabled)
+
+        val stale = model(
+            """{"clientPortfolio":{"credit":280.35,"accountCurrencyId":1,"positions":[]}}""",
+            PositionQuoteRead { emptyMap() },
+            euroFx = EcbEuroFx(transport),
+            clock = { Instant.parse("2026-12-02T10:00:00Z") },
+        ).portfolio()
+        assertNull(stale.availableCash)
+        assertNull(stale.fx)
+        assertEquals(Ledger.STATUS_FX_UNAVAILABLE, stale.ledgerStatus)
+    }
+
+    @Test
     fun `quotes are not requested when there are no positions`() {
         var calls = 0
         val snapshot = model(
@@ -192,6 +230,8 @@ class DashboardReadModelTest {
         names: InstrumentNameRead = InstrumentNameRead { null },
         closedTrades: ClosedTradeRead = ClosedTradeRead { null },
         classes: InstrumentClassRead = InstrumentClassRead { null },
+        euroFx: com.tradingagent.modules.brokerread.EuroFxRead = com.tradingagent.modules.brokerread.EuroFxRead { _, _, _ -> null },
+        clock: () -> Instant = { Instant.parse("2026-11-27T00:00:00Z") },
     ) = DashboardReadModel(
         operationalStateService = OperationalStateService(clock = { Instant.parse("2026-11-27T00:00:00Z") }),
         ledger = Ledger(),
@@ -210,5 +250,7 @@ class DashboardReadModelTest {
         instrumentNames = names,
         instrumentClasses = classes,
         closedTrades = closedTrades,
+        euroFx = euroFx,
+        clock = clock,
     )
 }

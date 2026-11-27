@@ -89,6 +89,10 @@ class DashboardController(
                 configurationVersionNumber = snapshot.configurationVersionNumber,
                 ledgerStatus = snapshot.ledgerStatus,
                 fxStatus = snapshot.fxStatus,
+                fxSource = snapshot.fx?.source,
+                fxVersion = snapshot.fx?.version,
+                fxObservedAt = snapshot.fx?.observedAt,
+                fxHaircutBps = snapshot.fx?.haircutBps,
                 journalEntryCount = snapshot.journalEntryCount,
                 journalBalanced = snapshot.journalBalanced,
                 brokerConnected = snapshot.brokerConnected,
@@ -115,7 +119,7 @@ class DashboardController(
                     add(
                         ApiWarning(
                             code = "FX_UNAVAILABLE",
-                            detail = "Cassa broker e budget sono in valute diverse. Nessun cambio con fonte, versione, timestamp e haircut è configurato, quindi il disponibile resta assente.",
+                            detail = "Cassa broker e budget sono in valute diverse. Il riferimento BCE manca o è stale, quindi il disponibile resta assente.",
                         ),
                     )
                 }
@@ -156,6 +160,10 @@ data class OverviewData(
     val configurationVersionNumber: Long,
     val ledgerStatus: String,
     val fxStatus: String,
+    val fxSource: String?,
+    val fxVersion: String?,
+    val fxObservedAt: Instant?,
+    val fxHaircutBps: Int?,
     val journalEntryCount: Int,
     val journalBalanced: Boolean,
     val brokerConnected: Boolean,

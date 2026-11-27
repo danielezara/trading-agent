@@ -76,6 +76,7 @@ data class TechnicalParameters(
     val qualityProvenanceMillis: Int get() = int("quality_provenance_millis")
     val qualityFreshnessMillis: Int get() = int("quality_freshness_millis")
     val pricesStaleSeconds: Long get() = int("prices_stale_seconds").toLong()
+    val fxReferenceMaxAgeDays: Int get() = int("fx_reference_max_age_days")
     val newsStaleSeconds: Long get() = int("news_stale_seconds").toLong()
     val slowDataStaleSeconds: Long get() = int("slow_data_stale_seconds").toLong()
     val priceConflictBps: Int get() = int("price_conflict_bps")
@@ -258,6 +259,7 @@ private object TradingParametersLoader {
         "decision_deadline_seconds",
         "reconciliation_age_seconds",
         "alert_ack_seconds",
+        "fx_reference_max_age_days",
     )
 
     fun load(path: String): TradingParameters {

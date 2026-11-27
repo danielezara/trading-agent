@@ -49,6 +49,10 @@ export type Overview = {
   cash_buffer: Money;
   ledger_status: string;
   fx_status?: string;
+  fx_source?: string | null;
+  fx_version?: string | null;
+  fx_observed_at?: string | null;
+  fx_haircut_bps?: number | null;
   journal_entry_count: number;
   journal_balanced: boolean;
   broker_connected: boolean;

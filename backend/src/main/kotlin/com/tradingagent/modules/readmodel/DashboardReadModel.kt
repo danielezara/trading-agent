@@ -5,6 +5,8 @@ import com.tradingagent.kernel.OperationalState
 import java.time.Instant
 import com.tradingagent.modules.brokerread.CapabilityProbe
 import com.tradingagent.modules.brokerread.ClosedTrade
+import com.tradingagent.modules.brokerread.EuroFxRead
+import com.tradingagent.modules.ledger.FxQuote
 import com.tradingagent.modules.brokerread.ClosedTradeRead
 import com.tradingagent.modules.brokerread.DisplayQuote
 import com.tradingagent.modules.brokerread.InstrumentClassRead
@@ -47,6 +49,7 @@ data class PortfolioSnapshot(
     val orders: List<ObservedOrder>?,
     val executions: List<ObservedOrder>?,
     val closedTrades: List<ClosedTrade>?,
+    val fx: FxQuote?,
 )
 
 class DashboardReadModel(
@@ -58,21 +61,29 @@ class DashboardReadModel(
     private val instrumentNames: InstrumentNameRead = InstrumentNameRead { null },
     private val instrumentClasses: InstrumentClassRead = InstrumentClassRead { null },
     private val closedTrades: ClosedTradeRead = ClosedTradeRead { null },
+    private val euroFx: EuroFxRead = EuroFxRead { _, _, _ -> null },
+    private val clock: () -> Instant = Instant::now,
 ) {
     fun portfolio(): PortfolioSnapshot {
         val configuration = configurationService.active()
         val budget = configuration.budget
         val observed = capabilityProbe.refresh()
         val brokerCash = observed.brokerCash
+        val fx = euroFx.read(
+            clock(),
+            configuration.parameters.economic.fxHaircutBps,
+            configuration.parameters.technical.fxReferenceMaxAgeDays,
+        )
         val quote = ledger.quote(
             CashInputs(
                 currency = budget.baseCurrency,
                 brokerCashMinor = brokerCash?.minorUnits,
                 brokerCurrency = brokerCash?.currency,
                 assignedBudgetMinor = budget.assignedBudgetMinor,
-                externalHoldingsMinor = null,
-                reservedCashMinor = null,
-                cashBufferMinor = budget.cashBufferMinor,
+                externalHoldingsMinor = if (fx == null) null else 0,
+                reservedCashMinor = if (fx == null) null else 0,
+                cashBufferMinor = if (fx == null) budget.cashBufferMinor else budget.cashBufferMinor ?: 0,
+                fx = fx,
             ),
         )
         return PortfolioSnapshot(
@@ -109,7 +120,8 @@ class DashboardReadModel(
             },
             orders = observed.orders,
             executions = observed.executions,
-            closedTrades = if (observed.connected) closedTrades.read(observed.observedAt ?: Instant.now()) else null,
+            closedTrades = if (observed.connected) closedTrades.read(observed.observedAt ?: clock()) else null,
+            fx = if (quote.fxStatus == Ledger.FX_APPLIED) fx else null,
         )
     }
 }

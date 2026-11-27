@@ -3,7 +3,7 @@
 # millis = millesimi di 1 (1000 = 1.00). Le soglie tecniche sono calibrabili.
 schema: trading-parameters/1
 author: daniele
-reason: "Budget 500 EUR. Perdita massima 10% del budget, poi blocco. Orizzonte in giorni. Allowlist large-cap e ETF, solo long, leva 1. Benchmark MSCI World total return. Capability e licenze non verificate."
+reason: "Budget 500 EUR. Perdita massima 10% del budget, poi blocco. Orizzonte in giorni. Allowlist large-cap e ETF, solo long, leva 1. Benchmark MSCI World total return. Capability e licenze non verificate. Cambio EUR/USD dal riferimento giornaliero BCE, haircut 100 bps."
 economic:
   base_currency: EUR
   currency_scale: 2
@@ -28,7 +28,8 @@ economic:
   instrument_exposure_bps: null
   sector_exposure_bps: null
   min_cash_bps: null
-  fx_haircut_bps: null
+  # 100 bps: il riferimento BCE non è un prezzo eseguibile. La cassa USD convertita è ridotta dell'1% prima del disponibile.
+  fx_haircut_bps: 100
   cooldown_seconds: null
   max_holding_count: null
 technical:
@@ -125,3 +126,5 @@ technical:
   decision_deadline_seconds: 30
   reconciliation_age_seconds: 45
   alert_ack_seconds: 60
+  # Il file BCE ha solo la data. Resta usabile per 4 giorni di calendario, poi è stale e il disponibile resta assente.
+  fx_reference_max_age_days: 4

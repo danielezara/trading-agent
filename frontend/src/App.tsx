@@ -297,7 +297,10 @@ function OverviewPage({ loaded }: { loaded: LoadState }) {
               <p data-testid="signal">{`Segnale ${loaded.data.decision.signal.signal_id.slice(0, 12)} · direzione ${loaded.data.decision.signal.direction} · eseguibile: no`}</p>
             ) : null}
             {loaded.data.overview.ledger_status === "FX_UNAVAILABLE" ? (
-              <p data-testid="cash-alignment">{`Disponibile non calcolato: cassa ${loaded.data.overview.broker_cash?.currency ?? "non osservata"}, budget ${loaded.data.overview.assigned_budget?.currency ?? "non osservato"}. Nessun cambio configurato.`}</p>
+              <p data-testid="cash-alignment">{`Disponibile non calcolato: cassa ${loaded.data.overview.broker_cash?.currency ?? "non osservata"}, budget ${loaded.data.overview.assigned_budget?.currency ?? "non osservato"}. Il riferimento BCE manca o è stale.`}</p>
+            ) : null}
+            {loaded.data.overview.fx_status === "APPLIED" && loaded.data.overview.fx_source ? (
+              <p data-testid="fx-reference">{`Cambio ${loaded.data.overview.fx_source} ${loaded.data.overview.fx_version ?? ""} · ${loaded.data.overview.fx_observed_at ?? ""} · haircut ${loaded.data.overview.fx_haircut_bps ?? ""} bps`}</p>
             ) : null}
             <PositionsTable positions={loaded.data.overview.positions} />
             <ActivityTable
