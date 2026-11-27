@@ -18,6 +18,7 @@ const overview = {
     broker_connected: false,
     last_probe_at: null,
     probe_error_class: "KEYS_MISSING",
+    account_label: null,
     configuration_version_id: "11111111-1111-1111-1111-111111111111",
     configuration_version_number: 1,
   },
@@ -160,9 +161,41 @@ describe("dashboard skeleton", () => {
     expect(screen.getByTestId("decision")).toHaveTextContent("CAPABILITY_UNVERIFIED");
     expect(screen.getByTestId("policy")).toHaveTextContent("MISSING_INTENT");
     expect(screen.getByTestId("policy")).toHaveTextContent("Broker chiamato: no");
-    expect(screen.getByTestId("broker-link")).toHaveTextContent("Demo API connessa: no");
-    expect(screen.getByTestId("broker-link")).toHaveTextContent("KEYS_MISSING");
+    expect(screen.getByTestId("account-card")).toHaveTextContent("Demo eToro");
+    expect(screen.getByTestId("account-card")).toHaveTextContent("Connessa");
+    expect(screen.getByTestId("account-card")).toHaveTextContent("no");
+    expect(screen.getByTestId("account-card")).toHaveTextContent("Conto Demo delle chiavi in backend/.env");
+    expect(screen.getByTestId("account-card")).toHaveTextContent("Cassa broker");
+    expect(screen.getByTestId("account-card")).toHaveTextContent("non disponibile");
     expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the demo account and broker cash amount", async () => {
+    const withCash = {
+      ...overview,
+      data: {
+        ...overview.data,
+        broker_connected: true,
+        broker_cash: { minor_units: 28035, currency: "USD" },
+        account_label: "demo.user",
+      },
+    };
+    vi.stubGlobal("fetch", (input: string) => Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => (String(input).includes("overview") ? withCash : jsonFor(String(input))),
+    }));
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <AppRoutes />
+      </MemoryRouter>,
+    );
+    const card = await screen.findByTestId("account-card");
+    expect(card).toHaveTextContent("Demo eToro");
+    expect(card).toHaveTextContent("sì");
+    expect(card).toHaveTextContent("demo.user");
+    expect(card).toHaveTextContent("280,35 USD");
+    expect(card).not.toHaveTextContent("Conto Demo delle chiavi");
   });
 
   it("shows the active configuration version", async () => {

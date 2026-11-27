@@ -78,6 +78,7 @@ data class ObservedAccount(
     val brokerCash: Money?,
     val equity: Money?,
     val positionCount: Int?,
+    val accountLabel: String?,
 )
 
 sealed interface ReadOutcome {
@@ -154,7 +155,32 @@ object DemoPortfolioRead {
         }
         val positions = portfolio.get("positions")
         val positionCount = if (positions != null && positions.isArray) positions.size() else null
-        return ObservedAccount(brokerCash, equity, positionCount)
+        return ObservedAccount(brokerCash, equity, positionCount, accountLabel(root, portfolio))
+    }
+
+    private fun accountLabel(root: JsonNode, portfolio: JsonNode): String? {
+        val keys = listOf("username", "userName", "accountId", "account_id")
+        for (key in keys) {
+            for (node in listOf(portfolio, root)) {
+                val value = node.get(key) ?: continue
+                val text = when {
+                    value.isTextual -> value.asText().trim()
+                    value.isIntegralNumber -> value.asText().trim()
+                    else -> continue
+                }
+                if (isPublicAccountLabel(text)) {
+                    return text
+                }
+            }
+        }
+        return null
+    }
+
+    private fun isPublicAccountLabel(text: String): Boolean {
+        if (text.length !in 1..64) {
+            return false
+        }
+        return text.all { it.isLetterOrDigit() || it in " ._-@" }
     }
 
     private fun currency(node: JsonNode?): String? = when {

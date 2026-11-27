@@ -62,6 +62,7 @@ class DashboardController(
                 brokerConnected = snapshot.brokerConnected,
                 lastProbeAt = snapshot.lastProbeAt,
                 probeErrorClass = snapshot.probeErrorClass,
+                accountLabel = snapshot.accountLabel,
             ),
             meta = ApiMeta(schemaVersion = "portfolio-snapshot/1"),
             warnings = listOf(
@@ -110,4 +111,5 @@ data class OverviewData(
     val brokerConnected: Boolean,
     val lastProbeAt: java.time.Instant?,
     val probeErrorClass: String?,
+    val accountLabel: String?,
 )

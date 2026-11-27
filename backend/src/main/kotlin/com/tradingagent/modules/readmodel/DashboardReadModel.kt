@@ -29,6 +29,7 @@ data class PortfolioSnapshot(
     val brokerConnected: Boolean,
     val lastProbeAt: Instant?,
     val probeErrorClass: String?,
+    val accountLabel: String?,
 )
 
 class DashboardReadModel(
@@ -71,6 +72,7 @@ class DashboardReadModel(
             brokerConnected = observed.connected,
             lastProbeAt = observed.observedAt,
             probeErrorClass = observed.errorClass,
+            accountLabel = observed.accountLabel,
         )
     }
 }

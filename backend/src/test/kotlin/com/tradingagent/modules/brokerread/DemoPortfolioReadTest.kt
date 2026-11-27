@@ -46,6 +46,7 @@ class DemoPortfolioReadTest {
         assertEquals("USD", pass.account.brokerCash?.currency)
         assertEquals(28_155L, pass.account.equity?.minorUnits)
         assertEquals(0, pass.account.positionCount)
+        assertNull(pass.account.accountLabel)
         assertEquals(1, calls.size)
     }
 
@@ -124,6 +125,24 @@ class DemoPortfolioReadTest {
         assertEquals(EvidenceStatus.PASS, gate.rows().first { it.controlId == "RF-044" }.status)
         assertEquals(EvidenceStatus.UNVERIFIED, gate.rows().first { it.controlId == "RF-045" }.status)
         assertFalse(gate.allowsActive())
+    }
+
+    @Test
+    fun `an account label is shown only when the read provides a public one`() {
+        val named = DemoPortfolioRead.parse(
+            """{"clientPortfolio":{"credit":1,"username":"demo.user"}}""",
+        )
+        assertEquals("demo.user", named?.accountLabel)
+        val numbered = DemoPortfolioRead.parse(
+            """{"username":"12","clientPortfolio":{"credit":1}}""",
+        )
+        assertEquals("12", numbered?.accountLabel)
+        val secret = DemoPortfolioRead.parse(
+            """{"clientPortfolio":{"credit":1,"username":"${"a".repeat(80)}"}}""",
+        )
+        assertNull(secret?.accountLabel)
+        val absent = DemoPortfolioRead.parse("""{"clientPortfolio":{"credit":1}}""")
+        assertNull(absent?.accountLabel)
     }
 
     private fun keys(): DemoKeyMaterial = DemoKeyMaterial.fromEnvironment(

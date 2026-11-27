@@ -23,6 +23,7 @@ export type Overview = {
   broker_connected: boolean;
   last_probe_at: string | null;
   probe_error_class: string | null;
+  account_label: string | null;
   configuration_version_id: string;
   configuration_version_number: number;
 };

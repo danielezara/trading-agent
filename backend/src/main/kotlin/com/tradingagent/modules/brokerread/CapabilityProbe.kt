@@ -13,6 +13,7 @@ data class ProbeSnapshot(
     val brokerCash: Money?,
     val equity: Money?,
     val positionCount: Int?,
+    val accountLabel: String?,
 )
 
 class CapabilityProbe(
@@ -34,6 +35,7 @@ class CapabilityProbe(
         brokerCash = null,
         equity = null,
         positionCount = null,
+        accountLabel = null,
     )
 
     fun current(): ProbeSnapshot = synchronized(lock) { snapshot }
@@ -51,7 +53,7 @@ class CapabilityProbe(
         val material = keys()
         val next = if (material == null) {
             evidenceGate.recordBrokerRead(EvidenceStatus.UNVERIFIED)
-            ProbeSnapshot(false, clock(), "KEYS_MISSING", null, null, null)
+            ProbeSnapshot(false, clock(), "KEYS_MISSING", null, null, null, null)
         } else {
             when (val outcome = DemoPortfolioRead.execute(transport, material, sleep)) {
                 is ReadOutcome.Pass -> {
@@ -63,15 +65,16 @@ class CapabilityProbe(
                         brokerCash = outcome.account.brokerCash,
                         equity = outcome.account.equity,
                         positionCount = outcome.account.positionCount,
+                        accountLabel = outcome.account.accountLabel,
                     )
                 }
                 is ReadOutcome.Failed -> {
                     evidenceGate.recordBrokerRead(EvidenceStatus.FAIL)
-                    ProbeSnapshot(false, clock(), outcome.errorClass, null, null, null)
+                    ProbeSnapshot(false, clock(), outcome.errorClass, null, null, null, null)
                 }
                 is ReadOutcome.Unverified -> {
                     evidenceGate.recordBrokerRead(EvidenceStatus.UNVERIFIED)
-                    ProbeSnapshot(false, clock(), outcome.errorClass, null, null, null)
+                    ProbeSnapshot(false, clock(), outcome.errorClass, null, null, null, null)
                 }
             }
         }

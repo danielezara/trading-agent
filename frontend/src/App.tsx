@@ -128,11 +128,17 @@ function useDashboardData(): LoadState {
   return loaded;
 }
 
-function brokerLink(overview: Overview): string {
-  const connected = overview.broker_connected ? "sì" : "no";
-  const error = overview.probe_error_class ?? "nessuno";
-  const at = overview.last_probe_at ?? "non disponibile";
-  return `Demo API connessa: ${connected}. Ultimo probe: ${at}. Errore: ${error}.`;
+const DEMO_ACCOUNT_FALLBACK = "Conto Demo delle chiavi in backend/.env";
+
+function cashAmount(money: Money): string {
+  if (!money) {
+    return "non disponibile";
+  }
+  const negative = money.minor_units < 0;
+  const absolute = Math.abs(money.minor_units);
+  const whole = Math.trunc(absolute / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const fraction = String(absolute % 100).padStart(2, "0");
+  return `${negative ? "-" : ""}${whole},${fraction} ${money.currency}`;
 }
 
 function OverviewPage({ loaded }: { loaded: LoadState }) {
@@ -146,7 +152,13 @@ function OverviewPage({ loaded }: { loaded: LoadState }) {
           <>
             <p data-testid="decision">{`Decisione: ${loaded.data.decision.action} · ${loaded.data.decision.reason_codes[0]}`}</p>
             <p data-testid="policy">{`Policy: ${loaded.data.decision.policy.reason}. Broker chiamato: no.`}</p>
-            <p data-testid="broker-link">{brokerLink(loaded.data.overview)}</p>
+            <dl className="facts" data-testid="account-card">
+              <div><dt>Piattaforma</dt><dd>Demo eToro</dd></div>
+              <div><dt>Connessa</dt><dd>{loaded.data.overview.broker_connected ? "sì" : "no"}</dd></div>
+              <div><dt>Conto</dt><dd>{loaded.data.overview.account_label || DEMO_ACCOUNT_FALLBACK}</dd></div>
+              <div><dt>Cassa broker</dt><dd>{cashAmount(loaded.data.overview.broker_cash)}</dd></div>
+              <div><dt>Ultimo probe</dt><dd>{loaded.data.overview.last_probe_at ?? "non disponibile"}</dd></div>
+            </dl>
           </>
         ) : null}
       </section>

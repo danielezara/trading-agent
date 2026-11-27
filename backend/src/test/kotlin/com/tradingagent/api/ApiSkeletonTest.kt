@@ -73,6 +73,7 @@ class ApiSkeletonTest(
             .andExpect(jsonPath("$.data.broker_cash").value(nullValue()))
             .andExpect(jsonPath("$.data.broker_connected").value(false))
             .andExpect(jsonPath("$.data.probe_error_class").value("KEYS_MISSING"))
+            .andExpect(jsonPath("$.data.account_label").value(nullValue()))
             .andExpect(jsonPath("$.data.ledger_status").value("UNOBSERVED"))
             .andExpect(jsonPath("$.data.journal_entry_count").value(0))
             .andExpect(jsonPath("$.data.journal_balanced").value(true))

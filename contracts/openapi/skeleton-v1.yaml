@@ -514,6 +514,9 @@ components:
             probe_error_class:
               type: string
               nullable: true
+            account_label:
+              type: string
+              nullable: true
         meta:
           $ref: "#/components/schemas/Meta"
         warnings:
