@@ -4,6 +4,7 @@ import com.tradingagent.kernel.Money
 import com.tradingagent.modules.identity.AccessModel
 import com.tradingagent.modules.identity.Role
 import com.tradingagent.modules.brokerread.BrokerCashBalance
+import com.tradingagent.modules.brokerread.CashMovement
 import com.tradingagent.modules.brokerread.DisplayQuote
 import com.tradingagent.modules.brokerread.ObservedOrder
 import com.tradingagent.modules.brokerread.ObservedPosition
@@ -107,6 +108,7 @@ class DashboardController(
                 executions = snapshot.executions?.map { order -> orderData(order) },
                 closedTrades = snapshot.closedTrades?.map { trade -> closedTradeData(trade) },
                 cashBalances = snapshot.cashBalances,
+                cashMovements = snapshot.cashMovements,
                 reconciliation = reconciliationData(report),
             ),
             meta = ApiMeta(schemaVersion = "portfolio-snapshot/1"),
@@ -177,6 +179,7 @@ data class OverviewData(
     val executions: List<OrderData>?,
     val closedTrades: List<ClosedTradeData>?,
     val cashBalances: List<BrokerCashBalance>?,
+    val cashMovements: List<CashMovement>?,
     val reconciliation: ReconciliationData,
 )
 

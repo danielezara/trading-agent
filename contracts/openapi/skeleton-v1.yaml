@@ -556,6 +556,33 @@ components:
                     type: integer
                   currency:
                     type: string
+            cash_movements:
+              type: array
+              nullable: true
+              description: Cash-account transactions as returned by eToro. amount and currency are the posted native fields. originalAmount, originalCurrency and conversionRate are not copied. An empty array means the transactions page was empty.
+              items:
+                type: object
+                required: [movement_id, account_type, direction, status, kind, minor_units, currency]
+                properties:
+                  movement_id:
+                    type: string
+                  account_type:
+                    type: string
+                    enum: [Cash]
+                  direction:
+                    type: string
+                    enum: [credit, debit]
+                  status:
+                    type: string
+                  kind:
+                    type: string
+                  minor_units:
+                    type: integer
+                  currency:
+                    type: string
+                  posted_at:
+                    type: string
+                    nullable: true
             assigned_budget:
               nullable: true
             available_cash:

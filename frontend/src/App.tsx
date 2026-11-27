@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { getJson } from "./api/client";
 import { assertSkeletonApiBase } from "./api/policy";
-import type { AuditChain, CashBalance, ChatTurn, ClosedTrade, Configuration, DataChannel, DataHealth, Decision, Envelope, Money, OperationalState, Overview } from "./api/types";
+import type { AuditChain, CashBalance, CashMovement, ChatTurn, ClosedTrade, Configuration, DataChannel, DataHealth, Decision, Envelope, Money, OperationalState, Overview } from "./api/types";
 import "./styles.css";
 
 const NAV = [
@@ -79,7 +79,7 @@ function DashboardShell() {
           <Route path="/" element={<OverviewPage loaded={loaded} />} />
           <Route path="/portafoglio" element={<PortfolioPage loaded={loaded} />} />
           <Route path="/performance" element={<Page title="Performance" />} />
-          <Route path="/attivita" element={<Page title="Attività" />} />
+          <Route path="/attivita" element={<ActivityPage loaded={loaded} />} />
           <Route path="/dati" element={<DataPage loaded={loaded} />} />
           <Route path="/alert" element={<Page title="Alert" />} />
           <Route path="/audit" element={<AuditPage loaded={loaded} />} />
@@ -182,7 +182,7 @@ function ClosedTrades({ rows }: { rows: ClosedTrade[] | null | undefined }) {
     return <p data-testid="closed-trades">Storico chiusure non disponibile</p>;
   }
   if (rows.length === 0) {
-    return <p data-testid="closed-trades">Nessuna chiusura Demo</p>;
+    return <p data-testid="closed-trades">Storico operazioni vuoto</p>;
   }
   return (
     <table className="data-table" data-testid="closed-trades">
@@ -338,9 +338,58 @@ function PortfolioPage({ loaded }: { loaded: LoadState }) {
         <>
           <p>{`Stato ledger: ${loaded.data.overview.ledger_status}`}</p>
           <p>{`Registrazioni: ${loaded.data.overview.journal_entry_count}. Giornale bilanciato: ${loaded.data.overview.journal_balanced ? "sì" : "no"}.`}</p>
+          <p>Il registro mostra i movimenti del conto Cash nella valuta che eToro indica, senza conversione.</p>
+          <MovementRegister rows={loaded.data.overview.cash_movements} />
           <ReconciliationLine report={loaded.data.overview.reconciliation} />
         </>
       ) : null}
+    </section>
+  );
+}
+
+function MovementRegister({ rows }: { rows: CashMovement[] | null | undefined }) {
+  if (rows == null) {
+    return <p data-testid="cash-movements">Movimenti non disponibili</p>;
+  }
+  if (rows.length === 0) {
+    return <p data-testid="cash-movements">Nessun movimento</p>;
+  }
+  return (
+    <table className="data-table" data-testid="cash-movements">
+      <caption>Registro movimenti</caption>
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Conto</th>
+          <th>Tipo</th>
+          <th>Verso</th>
+          <th>Stato</th>
+          <th>Importo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.movement_id}>
+            <td>{row.posted_at ?? ""}</td>
+            <td>{row.account_type}</td>
+            <td>{row.kind}</td>
+            <td>{row.direction === "credit" ? "accredito" : "addebito"}</td>
+            <td>{row.status}</td>
+            <td>{cashAmount({ minor_units: row.minor_units, currency: row.currency })}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function ActivityPage({ loaded }: { loaded: LoadState }) {
+  return (
+    <section className="panel">
+      <h1>Attività</h1>
+      <p>Storico operazioni Demo. Nessun ordine da questa schermata.</p>
+      <LoadNotice loaded={loaded} />
+      {loaded.status === "ready" ? <ClosedTrades rows={loaded.data.overview.closed_trades} /> : null}
     </section>
   );
 }

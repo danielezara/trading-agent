@@ -14,6 +14,17 @@ export type CashBalance = {
   currency: string;
 };
 
+export type CashMovement = {
+  movement_id: string;
+  account_type: string;
+  direction: "credit" | "debit";
+  status: string;
+  kind: string;
+  minor_units: number;
+  currency: string;
+  posted_at: string | null;
+};
+
 export type DemoPosition = {
   instrument_id: string;
   quantity: string | null;
@@ -50,6 +61,7 @@ export type Overview = {
   equity: Money;
   broker_cash: Money;
   cash_balances?: CashBalance[] | null;
+  cash_movements?: CashMovement[] | null;
   assigned_budget: Money;
   available_cash: Money;
   reserved_cash: Money;

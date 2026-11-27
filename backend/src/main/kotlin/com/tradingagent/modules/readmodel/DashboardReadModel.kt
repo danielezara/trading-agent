@@ -6,6 +6,8 @@ import java.time.Instant
 import com.tradingagent.modules.brokerread.BrokerCashBalance
 import com.tradingagent.modules.brokerread.CapabilityProbe
 import com.tradingagent.modules.brokerread.CashBalanceRead
+import com.tradingagent.modules.brokerread.CashMovement
+import com.tradingagent.modules.brokerread.CashMovementRead
 import com.tradingagent.modules.brokerread.ClosedTrade
 import com.tradingagent.modules.brokerread.EuroFxRead
 import com.tradingagent.modules.ledger.FxQuote
@@ -53,6 +55,7 @@ data class PortfolioSnapshot(
     val closedTrades: List<ClosedTrade>?,
     val fx: FxQuote?,
     val cashBalances: List<BrokerCashBalance>?,
+    val cashMovements: List<CashMovement>?,
 )
 
 class DashboardReadModel(
@@ -66,6 +69,7 @@ class DashboardReadModel(
     private val closedTrades: ClosedTradeRead = ClosedTradeRead { null },
     private val euroFx: EuroFxRead = EuroFxRead { _, _, _ -> null },
     private val cashBalances: CashBalanceRead = CashBalanceRead { null },
+    private val cashMovements: CashMovementRead = CashMovementRead { null },
     private val clock: () -> Instant = Instant::now,
 ) {
     fun portfolio(): PortfolioSnapshot {
@@ -127,6 +131,7 @@ class DashboardReadModel(
             closedTrades = if (observed.connected) closedTrades.read(observed.observedAt ?: clock()) else null,
             fx = if (quote.fxStatus == Ledger.FX_APPLIED) fx else null,
             cashBalances = if (observed.connected) cashBalances.read() else null,
+            cashMovements = if (observed.connected) cashMovements.read() else null,
         )
     }
 }

@@ -352,7 +352,7 @@ describe("dashboard skeleton", () => {
     expect(await screen.findByTestId("positions")).toHaveTextContent("Nessuna posizione");
     expect(screen.getByTestId("orders")).toHaveTextContent("Nessun ordine Demo");
     expect(screen.getByTestId("executions")).toHaveTextContent("Nessuna esecuzione Demo");
-    expect(screen.getByTestId("closed-trades")).toHaveTextContent("Nessuna chiusura Demo");
+    expect(screen.getByTestId("closed-trades")).toHaveTextContent("Storico operazioni vuoto");
     expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
   });
 
@@ -443,7 +443,54 @@ describe("dashboard skeleton", () => {
     expect(screen.getByTestId("reconciliation")).toHaveTextContent("Nessun ordine");
     expect(screen.getByTestId("reconciliation")).toHaveTextContent("OBSERVATION");
     expect(screen.getByText(/Registrazioni: 0/)).toBeInTheDocument();
+    expect(screen.getByTestId("cash-movements")).toHaveTextContent("Movimenti non disponibili");
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("shows an empty operation history and a native cash movement", async () => {
+    const withHistory = {
+      ...overview,
+      data: {
+        ...overview.data,
+        broker_connected: true,
+        closed_trades: [],
+        cash_movements: [
+          {
+            movement_id: "12345",
+            account_type: "Cash",
+            direction: "credit",
+            status: "settled",
+            kind: "internalTransfer",
+            minor_units: 10000,
+            currency: "EUR",
+            posted_at: "2026-05-03T10:16:12Z",
+          },
+        ],
+      },
+    };
+    vi.stubGlobal("fetch", (input: string) => Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => (String(input).includes("overview") ? withHistory : jsonFor(String(input))),
+    }));
+    const { unmount } = render(
+      <MemoryRouter initialEntries={["/attivita"]}>
+        <AppRoutes />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId("closed-trades")).toHaveTextContent("Storico operazioni vuoto");
+    expect(screen.queryByRole("button", { name: /compra|vendi|buy|sell/i })).not.toBeInTheDocument();
+    unmount();
+    render(
+      <MemoryRouter initialEntries={["/portafoglio"]}>
+        <AppRoutes />
+      </MemoryRouter>,
+    );
+    const register = await screen.findByTestId("cash-movements");
+    expect(register).toHaveTextContent("100,00 EUR");
+    expect(register).toHaveTextContent("accredito");
+    expect(register).toHaveTextContent("internalTransfer");
+    expect(register).not.toHaveTextContent("USD");
   });
 
   it("shows a live quote beside a position and leaves a missing quote blank", async () => {
