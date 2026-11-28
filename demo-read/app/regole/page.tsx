@@ -13,8 +13,8 @@ export default function RulesPage() {
       <h2>Ingresso</h2>
       <ul className="rules">
         <li>Compra dopo due chiusure al rialzo su barre da 5 minuti già chiuse. I prezzi sono quelli di eToro.</li>
-        <li>Solo azioni e ETF, solo long, leva 1.</li>
-        <li>Universo: AAPL, MSFT, GOOG, NVDA, META, JPM, SPY e SWDA.L.</li>
+        <li>Solo Bitcoin, solo long, leva 1.</li>
+        <li>Universo: il Bitcoin di eToro, simbolo BTC, tipo Crypto. Un future, un ETF o un altro simbolo non si compra. Se non è un acquisto a leva 1, non si opera.</li>
         <li>Budget 500 EUR.</li>
         <li>Rischio 2,50 EUR per ingresso.</li>
         <li>Massimo 75 EUR a titolo.</li>
@@ -30,7 +30,7 @@ export default function RulesPage() {
       <h2>Uscita</h2>
       <ul className="rules">
         <li>La regola di uscita è: vende dopo due chiusure al ribasso, oppure stop a 2×ATR, oppure dopo 390 barre da 5 minuti.</li>
-        <li>Quel calcolo c&apos;è nel codice. Il giro acceso non invia vendite e non chiude le posizioni.</li>
+        <li>Quel calcolo c&apos;è nel codice. Il giro degli ingressi non invia vendite da solo.</li>
       </ul>
       <h2>Pagina</h2>
       <ul className="rules">

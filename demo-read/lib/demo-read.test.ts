@@ -223,7 +223,9 @@ describe("demo read", () => {
     assert.equal(rules.includes("50 EUR"), true);
     assert.equal(rules.includes("solo long"), true);
     assert.equal(rules.includes("leva 1"), true);
-    assert.equal(rules.includes("azioni e ETF"), true);
+    assert.equal(rules.includes("Solo Bitcoin, solo long, leva 1."), true);
+    assert.equal(rules.includes("simbolo BTC"), true);
+    assert.equal(rules.includes("azioni e ETF"), false);
     assert.equal(rules.includes("15 secondi"), true);
     assert.equal(rules.includes("non invia vendite"), true);
     assert.equal(rules.includes("use client"), false);

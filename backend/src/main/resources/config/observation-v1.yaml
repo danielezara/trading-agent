@@ -3,7 +3,7 @@
 # millis = millesimi di 1 (1000 = 1.00). Le soglie tecniche sono calibrabili.
 schema: trading-parameters/1
 author: daniele
-reason: "Budget 500 EUR. Perdita massima 10% del budget, poi blocco. Orizzonte in giorni. Allowlist large-cap e ETF, solo long, leva 1. Benchmark MSCI World total return. Ingresso e uscita closed-bar-trend/1 sui prezzi eToro, solo barre da 5 minuti già chiuse: ingresso dopo 2 chiusure consecutive al rialzo, uscita dopo 2 chiusure al ribasso oppure stop a 2×ATR oppure 390 barre. Size = minimo tra rischio 0,50% del budget, cap 15% per strumento e budget residuo dopo il 20% di cassa. Capability e licenze non verificate. La cassa mostrata è quella nativa eToro, senza conversione."
+reason: "Budget 500 EUR. Perdita massima 10% del budget, poi blocco. Orizzonte in giorni. Universo solo Bitcoin, solo long, leva 1. Benchmark MSCI World total return. Ingresso e uscita closed-bar-trend/1 sui prezzi eToro, solo barre da 5 minuti già chiuse: ingresso dopo 2 chiusure consecutive al rialzo, uscita dopo 2 chiusure al ribasso oppure stop a 2×ATR oppure 390 barre. Size = minimo tra rischio 0,50% del budget, cap 15% per strumento e budget residuo dopo il 20% di cassa. Capability e licenze non verificate. La cassa mostrata è quella nativa eToro, senza conversione."
 economic:
   base_currency: EUR
   currency_scale: 2
@@ -13,20 +13,13 @@ economic:
   max_loss_action: block
   horizon: days
   allowlist:
-    universe: large_cap_stocks_and_etfs
+    universe: bitcoin
     direction: long_only
     leverage: 1
     instrument_ids: []
-    # Simboli nuovi, fuori dalle posizioni già aperte. La regola decide se uno è ordinabile.
+    # Solo Bitcoin. Un future, un ETF o un altro simbolo non entra.
     entry_symbols:
-      - AAPL
-      - MSFT
-      - GOOG
-      - NVDA
-      - META
-      - JPM
-      - SPY
-      - SWDA.L
+      - BTC
   benchmark:
     name: MSCI World
     return_basis: total_return

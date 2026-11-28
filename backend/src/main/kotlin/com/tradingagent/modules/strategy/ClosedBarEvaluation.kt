@@ -55,7 +55,7 @@ object ClosedBarEvaluation {
         }
         val chosen = pairs.firstOrNull { it.second.action == "ENTER" }
             ?: pairs.firstOrNull { it.second.action != "NO-TRADE" }
-            ?: pairs.firstOrNull { it.first.assetClass == "stock" || it.first.assetClass == "etf" }
+            ?: pairs.firstOrNull { it.first.assetClass == "crypto" }
             ?: pairs.first()
         val decision = chosen.second
         return if (decision.instrumentId != null) decision else decision.copy(instrumentId = chosen.first.instrumentId)

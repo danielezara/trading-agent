@@ -84,7 +84,7 @@ object MandateControl {
     fun configReason(economic: EconomicParameters): String? = when {
         economic.horizon != "days" -> HORIZON
         economic.benchmarkName != "MSCI World" || economic.benchmarkReturnBasis != "total_return" -> BENCHMARK
-        economic.allowlistUniverse != "large_cap_stocks_and_etfs" -> UNIVERSE
+        economic.allowlistUniverse != "bitcoin" -> UNIVERSE
         economic.allowlistDirection != "long_only" -> DIRECTION
         economic.allowlistLeverage != 1 -> LEVERAGE
         economic.maxLossAction != "block" || economic.maxLossBps != 1_000 -> LOSS_LIMIT
@@ -109,7 +109,7 @@ object MandateControl {
         if (!candidate.barClosed) {
             return BAR_OPEN
         }
-        if (candidate.assetClass != "stock" && candidate.assetClass != "etf") {
+        if (candidate.assetClass != "crypto") {
             return UNIVERSE
         }
         if (candidate.direction != "LONG") {
@@ -208,7 +208,7 @@ object ClosedBarPolicy {
             return none(MandateControl.WARMUP)
         }
         val position = input.position
-        if (position != null && input.assetClass != "stock" && input.assetClass != "etf") {
+        if (position != null && input.assetClass != "crypto") {
             return hold(input, MandateControl.UNIVERSE)
         }
         val maxLoss = input.economic.maxLossMinor()
@@ -248,7 +248,7 @@ object ClosedBarPolicy {
         if (score < buyScore) {
             return none(MandateControl.SCORE)
         }
-        if (input.assetClass != "stock" && input.assetClass != "etf") {
+        if (input.assetClass != "crypto") {
             return none(MandateControl.UNIVERSE)
         }
         if (maxLoss != null && input.lossMinor >= maxLoss) {

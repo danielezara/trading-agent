@@ -164,7 +164,7 @@ class DecisionCycleTest {
             at = at,
             brokerPositions = 16,
             held = ObservedInstrumentBars("1005", "stock", emptyList()),
-            candidate = ObservedInstrumentBars("1001", "stock", risingBars(origin)),
+            candidate = ObservedInstrumentBars("1001", "crypto", risingBars(origin)),
             sender = sender,
             rate = "1.09626",
         )
@@ -199,14 +199,14 @@ class DecisionCycleTest {
             at = at,
             brokerPositions = 16,
             held = ObservedInstrumentBars("1005", "stock", emptyList()),
-            candidate = ObservedInstrumentBars("1002", "stock", risingBars(origin)),
+            candidate = ObservedInstrumentBars("1002", "crypto", risingBars(origin)),
             sender = sender,
             rate = "1.09626",
             programPositions = book,
             candidates = { heldIds ->
                 pass += 1
                 val id = if (pass == 1) "1001" else "1002"
-                listOf(ObservedInstrumentBars(id, "stock", risingBars(origin))).filter { it.instrumentId !in heldIds }
+                listOf(ObservedInstrumentBars(id, "crypto", risingBars(origin))).filter { it.instrumentId !in heldIds }
             },
         )
         val skipped = cycle.record()
@@ -240,7 +240,7 @@ class DecisionCycleTest {
             at = at,
             brokerPositions = 16,
             held = ObservedInstrumentBars("1005", "stock", emptyList()),
-            candidate = ObservedInstrumentBars("1008", "stock", risingBars(origin)),
+            candidate = ObservedInstrumentBars("1008", "crypto", risingBars(origin)),
             sender = sender,
             rate = "1.09626",
             programPositions = book,
@@ -263,7 +263,7 @@ class DecisionCycleTest {
             at = at,
             brokerPositions = 16,
             held = ObservedInstrumentBars("1005", "stock", emptyList()),
-            candidate = ObservedInstrumentBars("1001", "stock", flatBars(origin)),
+            candidate = ObservedInstrumentBars("1001", "crypto", flatBars(origin)),
             sender = flat,
             rate = "1.09626",
         )
@@ -278,7 +278,7 @@ class DecisionCycleTest {
             at = at,
             brokerPositions = 16,
             held = ObservedInstrumentBars("1001", "stock", emptyList()),
-            candidate = ObservedInstrumentBars("1001", "stock", risingBars(origin)),
+            candidate = ObservedInstrumentBars("1001", "crypto", risingBars(origin)),
             sender = heldSender,
             rate = "1.09626",
         )
@@ -298,7 +298,7 @@ class DecisionCycleTest {
             at = at,
             brokerPositions = 0,
             held = ObservedInstrumentBars("1005", "stock", emptyList()),
-            candidate = ObservedInstrumentBars("1001", "stock", risingBars(origin)),
+            candidate = ObservedInstrumentBars("1001", "crypto", risingBars(origin)),
             sender = sender,
             rate = null,
         )

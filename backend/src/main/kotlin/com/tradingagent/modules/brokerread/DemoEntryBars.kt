@@ -77,7 +77,8 @@ class DemoEntryBarRead(
         }
         val classes = DemoInstrumentClasses.execute(transport, material, ids, sleep).orEmpty()
         return ids.map { id ->
-            val asset = classes[id]?.assetClass ?: "unknown"
+            val classification = classes[id]
+            val asset = if (classification?.officialType == "Crypto") "crypto" else classification?.assetClass ?: "unknown"
             val bars = DemoClosedBars.barsFor(transport, material, id, now, sleep)
             pause()
             ObservedInstrumentBars(id, asset, bars)

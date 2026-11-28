@@ -193,7 +193,7 @@ class ClosedBarPolicyTest {
     private fun candidate(
         direction: String = "LONG",
         leverage: Int = 1,
-        assetClass: String = "stock",
+        assetClass: String = "crypto",
         notionalMinor: Long = 7_500,
         investedMinor: Long = 0,
         economic: com.tradingagent.modules.configuration.EconomicParameters = parameters.economic,
@@ -215,7 +215,7 @@ class ClosedBarPolicyTest {
         bars: List<PriceBar>,
         now: Instant = origin.plusSeconds(300L * 20),
         position: HeldPosition? = null,
-        assetClass: String = "stock",
+        assetClass: String = "crypto",
         investedMinor: Long = 0,
         sectorInvestedMinor: Long? = 0,
         lossMinor: Long = 0,

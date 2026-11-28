@@ -15,7 +15,7 @@ class ClosedBarEvaluationTest {
     fun `a short history stays no trade`() {
         val decision = ClosedBarEvaluation.decide(
             now,
-            BarBook(0, listOf(InstrumentBars("1001", "stock", bars(2)))),
+            BarBook(0, listOf(InstrumentBars("1001", "crypto", bars(2)))),
             parameters.economic,
             parameters.technical,
         )
@@ -28,7 +28,7 @@ class ClosedBarEvaluationTest {
     fun `enough rising stock bars are evaluated and stay unorderable`() {
         val rising = ClosedBarEvaluation.decide(
             now,
-            BarBook(0, listOf(InstrumentBars("1001", "stock", bars(21, step = 10)))),
+            BarBook(0, listOf(InstrumentBars("1001", "crypto", bars(21, step = 10)))),
             parameters.economic,
             parameters.technical,
         )
@@ -39,7 +39,7 @@ class ClosedBarEvaluationTest {
 
         val crowded = ClosedBarEvaluation.decide(
             now,
-            BarBook(8, listOf(InstrumentBars("1001", "stock", bars(21, step = 10)))),
+            BarBook(8, listOf(InstrumentBars("1001", "crypto", bars(21, step = 10)))),
             parameters.economic,
             parameters.technical,
         )
@@ -54,7 +54,7 @@ class ClosedBarEvaluationTest {
             now,
             BarBook(
                 0,
-                listOf(InstrumentBars("1001", "stock", bars(21, step = 10))),
+                listOf(InstrumentBars("1001", "crypto", bars(21, step = 10))),
                 sectorInvestedMinor = 0,
             ),
             parameters.economic,
@@ -68,7 +68,7 @@ class ClosedBarEvaluationTest {
             now,
             BarBook(
                 0,
-                listOf(InstrumentBars("1001", "stock", bars(21, step = 10))),
+                listOf(InstrumentBars("1001", "crypto", bars(21, step = 10))),
                 sectorInvestedMinor = 0,
                 heldInstrumentIds = setOf("1001"),
             ),
@@ -89,7 +89,7 @@ class ClosedBarEvaluationTest {
                 0,
                 listOf(
                     InstrumentBars("1000", "other", bars(21, step = 10)),
-                    InstrumentBars("1001", "stock", bars(21)),
+                    InstrumentBars("1001", "crypto", bars(21)),
                 ),
             ),
             parameters.economic,
@@ -107,7 +107,7 @@ class ClosedBarEvaluationTest {
             now,
             BarBook(
                 0,
-                listOf(InstrumentBars("1001", "stock", bars(21, step = 10))),
+                listOf(InstrumentBars("1001", "crypto", bars(21, step = 10))),
                 reportedLossMinor = 5_000,
                 reportedLossCurrency = "EUR",
             ),
@@ -126,7 +126,7 @@ class ClosedBarEvaluationTest {
             now,
             BarBook(
                 0,
-                listOf(InstrumentBars("1001", "stock", bars(21, step = 10))),
+                listOf(InstrumentBars("1001", "crypto", bars(21, step = 10))),
                 reportedLossMinor = 5_000,
                 reportedLossCurrency = "USD",
             ),
@@ -144,7 +144,7 @@ class ClosedBarEvaluationTest {
     fun `sixteen demo positions reject the entry`() {
         val decision = ClosedBarEvaluation.decide(
             now,
-            BarBook(16, listOf(InstrumentBars("1001", "stock", bars(21, step = 10)))),
+            BarBook(16, listOf(InstrumentBars("1001", "crypto", bars(21, step = 10)))),
             parameters.economic,
             parameters.technical,
         )
@@ -161,7 +161,7 @@ class ClosedBarEvaluationTest {
             now,
             BarBook(
                 0,
-                listOf(InstrumentBars("1001", "stock", bars(21, step = 10))),
+                listOf(InstrumentBars("1001", "crypto", bars(21, step = 10))),
                 reportedLossMinor = 1_389,
                 reportedLossCurrency = "USD",
                 payloadRates = rate,
@@ -176,7 +176,7 @@ class ClosedBarEvaluationTest {
             now,
             BarBook(
                 0,
-                listOf(InstrumentBars("1001", "stock", bars(21, step = 10))),
+                listOf(InstrumentBars("1001", "crypto", bars(21, step = 10))),
                 reportedLossMinor = 6_000,
                 reportedLossCurrency = "USD",
                 payloadRates = rate,
