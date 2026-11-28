@@ -69,7 +69,7 @@ class DecisionCycle(
     private val reportedRates: ReportedRateSource = ReportedRateSource { emptyList() },
     private val entriesBlocked: () -> Boolean = { false },
     private val entryCandidates: EntryCandidates = EntryCandidates { _, _ -> emptyList() },
-    private val demoEntries: DemoEntrySubmit = DemoEntrySubmit { _, _, _ -> DemoOpenResult("NOT_SENT", "UNWIRED") },
+    private val demoEntries: DemoEntrySubmit = DemoEntrySubmit { _, _, _, _ -> DemoOpenResult("NOT_SENT", "UNWIRED") },
     private val programPositions: ProgramPositions = ProgramPositions(),
 ) {
     private var recorded: RecordedDecision? = null
@@ -196,7 +196,7 @@ class DecisionCycle(
         val news = assessment.channels.firstOrNull { it.channel == "news" }
         val macro = assessment.channels.firstOrNull { it.channel == "macro" }
         val fundamentals = assessment.channels.firstOrNull { it.channel == "fundamentals" }
-        val demoEntry = demoEntry(rule, rates, held)
+        val demoEntry = demoEntry(rule, rates, held, candidates)
         if (demoEntry.status == "ACCEPTED" && rule.instrumentId != null && rule.notionalMinor != null) {
             programPositions.note(rule.instrumentId, rule.notionalMinor)
         }
@@ -248,7 +248,12 @@ class DecisionCycle(
         return result
     }
 
-    private fun demoEntry(rule: RuleDecision, rates: List<PayloadRate>, held: Set<String>): DemoOpenResult {
+    private fun demoEntry(
+        rule: RuleDecision,
+        rates: List<PayloadRate>,
+        held: Set<String>,
+        candidates: List<ObservedInstrumentBars>,
+    ): DemoOpenResult {
         if (rule.action != "ENTER" || !rule.orderable || rule.instrumentId == null || rule.notionalMinor == null) {
             return DemoOpenResult("NOT_SENT", rule.reason)
         }
@@ -260,7 +265,8 @@ class DecisionCycle(
         if (!TradingAmount.acceptable(amount)) {
             return DemoOpenResult("NOT_SENT", "AMOUNT")
         }
-        return demoEntries.submit(rule.instrumentId, amount, held)
+        val leverage = if (candidates.firstOrNull { it.instrumentId == rule.instrumentId }?.includeLeverage == true) 1 else null
+        return demoEntries.submit(rule.instrumentId, amount, held, leverage)
     }
 
     companion object {

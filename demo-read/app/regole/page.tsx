@@ -14,7 +14,8 @@ export default function RulesPage() {
       <ul className="rules">
         <li>Compra dopo due chiusure al rialzo su barre da 5 minuti già chiuse. I prezzi sono quelli di eToro.</li>
         <li>Solo Bitcoin, solo long, leva 1.</li>
-        <li>Universo: il Bitcoin di eToro, simbolo BTC, tipo Crypto. Un future, un ETF o un altro simbolo non si compra. Se non è un acquisto a leva 1, non si opera.</li>
+        <li>Universo: il Bitcoin di eToro, simbolo BTC, tipo Crypto. Un future, un ETF o un altro simbolo non si compra.</li>
+        <li>La leva 1 si scrive sull&apos;ordine solo se eToro la indica sullo strumento. Se il campo non c&apos;è, l&apos;ordine parte senza quel campo.</li>
         <li>Budget 500 EUR.</li>
         <li>Rischio 2,50 EUR per ingresso.</li>
         <li>Massimo 75 EUR a titolo.</li>

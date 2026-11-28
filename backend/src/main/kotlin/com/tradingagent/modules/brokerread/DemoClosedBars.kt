@@ -20,6 +20,7 @@ data class ObservedInstrumentBars(
     val instrumentId: String,
     val assetClass: String,
     val bars: List<ObservedBar>,
+    val includeLeverage: Boolean = false,
 )
 
 data class ObservedBars(

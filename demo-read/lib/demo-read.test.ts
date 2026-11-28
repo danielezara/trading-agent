@@ -225,6 +225,7 @@ describe("demo read", () => {
     assert.equal(rules.includes("leva 1"), true);
     assert.equal(rules.includes("Solo Bitcoin, solo long, leva 1."), true);
     assert.equal(rules.includes("simbolo BTC"), true);
+    assert.equal(rules.includes("senza quel campo"), true);
     assert.equal(rules.includes("azioni e ETF"), false);
     assert.equal(rules.includes("15 secondi"), true);
     assert.equal(rules.includes("non invia vendite"), true);

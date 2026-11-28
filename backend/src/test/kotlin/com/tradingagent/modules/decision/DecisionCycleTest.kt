@@ -718,7 +718,12 @@ class DecisionCycleTest {
     ) : DemoEntrySubmit {
         val calls = mutableListOf<Triple<String, BigDecimal, Set<String>>>()
 
-        override fun submit(instrumentId: String, amount: BigDecimal, heldInstrumentIds: Set<String>): DemoOpenResult {
+        override fun submit(
+            instrumentId: String,
+            amount: BigDecimal,
+            heldInstrumentIds: Set<String>,
+            leverage: Int?,
+        ): DemoOpenResult {
             calls += Triple(instrumentId, amount, heldInstrumentIds)
             return result
         }

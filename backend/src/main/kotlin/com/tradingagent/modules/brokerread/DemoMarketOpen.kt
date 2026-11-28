@@ -13,7 +13,12 @@ data class DemoOpenResult(
 )
 
 fun interface DemoEntrySubmit {
-    fun submit(instrumentId: String, amount: BigDecimal, heldInstrumentIds: Set<String>): DemoOpenResult
+    fun submit(
+        instrumentId: String,
+        amount: BigDecimal,
+        heldInstrumentIds: Set<String>,
+        leverage: Int?,
+    ): DemoOpenResult
 }
 
 object DemoMarketOpen {
@@ -30,15 +35,20 @@ object DemoMarketOpen {
         material: DemoKeyMaterial,
         instrumentId: String,
         amount: BigDecimal,
+        leverage: Int? = null,
     ): DemoOpenResult {
         val uri = endpoint()
         val id = this.instrumentId.matchEntire(instrumentId)?.value?.toIntOrNull()
             ?: return DemoOpenResult("NOT_SENT", "INSTRUMENT")
+        if (leverage != null && leverage != 1) {
+            return DemoOpenResult("NOT_SENT", "LEVERAGE")
+        }
         if (!TradingAmount.acceptable(amount) || amount.scale() > 2) {
             return DemoOpenResult("NOT_SENT", "AMOUNT")
         }
         val cash = amount.setScale(2)
-        val body = """{"InstrumentID":$id,"IsBuy":true,"Leverage":1,"Amount":${cash.toPlainString()}}"""
+        val leverageField = if (leverage == 1) ""","Leverage":1""" else ""
+        val body = """{"InstrumentID":$id,"IsBuy":true$leverageField,"Amount":${cash.toPlainString()}}"""
         val response = transport.post(uri, material.headers(), body)
         if (response.status == 200) {
             val opened = parseOrderId(response.body)
@@ -101,7 +111,12 @@ class DemoEntryDispatch(
 ) : DemoEntrySubmit {
     private val attempted = mutableSetOf<String>()
 
-    override fun submit(instrumentId: String, amount: BigDecimal, heldInstrumentIds: Set<String>): DemoOpenResult {
+    override fun submit(
+        instrumentId: String,
+        amount: BigDecimal,
+        heldInstrumentIds: Set<String>,
+        leverage: Int?,
+    ): DemoOpenResult {
         if (instrumentId in heldInstrumentIds) {
             return DemoOpenResult("NOT_SENT", "EXISTING_POSITION")
         }
@@ -114,7 +129,7 @@ class DemoEntryDispatch(
         val material = keys() ?: return DemoOpenResult("NOT_SENT", "KEYS_MISSING")
         attempted += instrumentId
         return try {
-            DemoMarketOpen.submit(transport, material, instrumentId, amount)
+            DemoMarketOpen.submit(transport, material, instrumentId, amount, leverage)
         } catch (_: Exception) {
             DemoOpenResult("REJECTED", "TRANSPORT")
         }
