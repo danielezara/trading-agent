@@ -4,9 +4,11 @@ import {
   WHITELIST,
   clearWhitelistCache,
   eurPair,
+  mergeCards,
   parseCandles,
   portfolioNote,
   readWhitelist,
+  type CryptoCard,
 } from "./whitelist.ts";
 
 const keys = {
@@ -95,61 +97,82 @@ describe("whitelist", () => {
     ).performance, "non disponibile");
   });
 
-  it("reads every ticker with GET and does not invent a price when candles are missing", async () => {
+  it("reads one euro pair per window and keeps its candles when the next read fails", async () => {
     clearWhitelistCache();
     const calls: string[] = [];
-    const now = new Date("2026-11-28T06:06:00Z");
-    const cards = await readWhitelist({
-      env: keys,
-      now: () => now,
-      fetchImpl: async (url, init) => {
-        assert.equal(init.method, "GET");
-        assert.equal(url.includes("/real"), false);
-        assert.equal(url.includes("BTCEUR"), false);
-        calls.push(url);
-        const asset = new URL(url).searchParams.get("internalSymbolFull");
-        if (asset === "BTC") {
-          return json(page([cryptoRow("BTC", 100000), cryptoRow("BTCEUR", 100109)]));
+    let now = new Date("2026-11-28T06:06:00Z");
+    let failCandles = false;
+    const fetchImpl = async (url: string, init: { method: "GET" }) => {
+      assert.equal(init.method, "GET");
+      assert.equal(url.includes("/real"), false);
+      assert.equal(url.includes("BTCEUR"), false);
+      calls.push(url);
+      const asset = new URL(url).searchParams.get("internalSymbolFull");
+      if (asset === "BTC") {
+        return json(page([cryptoRow("BTC", 100000), cryptoRow("BTCEUR", 100109)]));
+      }
+      if (asset) {
+        return json(page([cryptoRow(asset, 1000)]));
+      }
+      if (url.endsWith("/100109/history/candles/desc/FiveMinutes/30")) {
+        if (failCandles) {
+          return { status: 429, headers: { get: () => "30" }, text: async () => "" };
         }
-        if (asset) {
-          return json(page([cryptoRow(asset, 1000)]));
-        }
-        if (url.endsWith("/100109/history/candles/desc/FiveMinutes/30")) {
-          return json(JSON.stringify({
-            interval: "FiveMinutes",
-            candles: [{ candles: [{ fromDate: "2026-11-28T06:00:00Z", open: 1, high: 2, low: 0.5, close: 1.5 }] }],
-          }));
-        }
-        return json("");
-      },
-    });
+        return json(JSON.stringify({
+          interval: "FiveMinutes",
+          candles: [{ candles: [{ fromDate: "2026-11-28T06:00:00Z", open: 1, high: 2, low: 0.5, close: 1.5 }] }],
+        }));
+      }
+      return json("");
+    };
+    const cards = await readWhitelist({ env: keys, now: () => now, fetchImpl });
     assert.equal(cards.length, 20);
     assert.equal(cards[0].pair?.instrumentId, "100109");
     assert.equal(cards[0].price, "1.5");
     assert.equal(cards[0].candles.length, 1);
-    assert.equal(cards[2].ticker, "BNB");
-    assert.equal(cards[2].pair, null);
-    assert.equal(cards[2].reason, "Coppia EUR assente");
-    assert.equal(cards[2].price, null);
-    assert.equal(calls.filter((url) => url.includes("/search")).length, 20);
+    assert.equal(cards[0].stale, false);
+    assert.equal(cards[1].reason, "Lettura in corso");
+    assert.equal(calls.length, 2);
     assert.equal(calls.some((url) => url.includes("/trading/execution")), false);
 
-    const again = await readWhitelist({
-      env: keys,
-      now: () => now,
-      fetchImpl: async (url, init) => {
-        assert.equal(init.method, "GET");
-        calls.push(url);
-        if (url.includes("/search")) {
-          throw new Error("pair cache should skip the catalog");
-        }
-        return json("");
-      },
-    });
-    assert.equal(again[0].reason, "Candele non disponibili");
-    assert.equal(again[0].price, null);
-    assert.equal(again[2].reason, "Coppia EUR assente");
+    const again = await readWhitelist({ env: keys, now: () => now, fetchImpl });
+    assert.equal(again[0].price, "1.5");
+    assert.equal(calls.length, 2);
+
+    now = new Date("2026-11-28T06:07:00Z");
+    failCandles = true;
+    const held = await readWhitelist({ env: keys, now: () => now, fetchImpl });
+    assert.equal(held[0].price, "1.5");
+    assert.equal(held[0].candles.length, 1);
+    assert.equal(held[0].stale, true);
+    assert.equal(held[0].reason, "Ultimo disponibile");
     clearWhitelistCache();
+  });
+
+  it("keeps a drawn chart when a later payload has no candles", () => {
+    const previous: CryptoCard[] = [{
+      ticker: "BTC",
+      pair: { symbol: "BTCEUR", instrumentId: "100109" },
+      reason: null,
+      candles: [{ start: "2026-11-28T06:00:00Z", open: 1, high: 2, low: 0.5, close: 1.5 }],
+      price: "1.5",
+      stale: false,
+      quotedAt: "2026-11-28T06:06:00Z",
+    }];
+    const incoming: CryptoCard[] = WHITELIST.map((ticker) => ({
+      ticker,
+      pair: null,
+      reason: ticker === "BTC" ? "Ricerca non disponibile" : "Lettura in corso",
+      candles: [],
+      price: null,
+      stale: false,
+      quotedAt: null,
+    }));
+    const merged = mergeCards(previous, incoming);
+    assert.equal(merged[0].price, "1.5");
+    assert.equal(merged[0].candles.length, 1);
+    assert.equal(merged[0].reason, "Ultimo disponibile");
+    assert.equal(merged[1].reason, "Lettura in corso");
   });
 
   it("does not repeat a failed catalog read on the next poll", async () => {
@@ -164,7 +187,8 @@ describe("whitelist", () => {
     const second = await readWhitelist({ env: keys, now: () => now, fetchImpl });
     assert.equal(first[0].reason, "Ricerca non disponibile");
     assert.equal(second[0].reason, "Ricerca non disponibile");
-    assert.equal(calls, 20);
+    assert.equal(first[1].reason, "Lettura in corso");
+    assert.equal(calls, 1);
     clearWhitelistCache();
   });
 

@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { type ProgramBook } from "../lib/program-book";
-import { portfolioNote, WHITELIST, type Candle, type CryptoCard } from "../lib/whitelist";
+import { mergeCards, portfolioNote, WHITELIST, type Candle, type CryptoCard } from "../lib/whitelist";
 
 const POLL_MS = 5_000;
 
 export function WhitelistBoard({ book }: { book: ProgramBook }) {
   const [cards, setCards] = useState<CryptoCard[] | null>(null);
   const [refreshError, setRefreshError] = useState(false);
+  const [seenAt, setSeenAt] = useState<string | null>(null);
 
   useEffect(() => {
     let stopped = false;
@@ -25,7 +26,8 @@ export function WhitelistBoard({ book }: { book: ProgramBook }) {
         }
         const next = (await response.json()) as CryptoCard[];
         if (!stopped && Array.isArray(next) && next.length === WHITELIST.length) {
-          setCards(next);
+          setCards((current) => mergeCards(current, next));
+          setSeenAt(new Date().toISOString());
           setRefreshError(false);
         } else if (!stopped) {
           setRefreshError(true);
@@ -33,6 +35,7 @@ export function WhitelistBoard({ book }: { book: ProgramBook }) {
       } catch {
         if (!stopped) {
           setRefreshError(true);
+          setCards((current) => current?.map((card) => card.candles.length > 0 ? { ...card, stale: true, reason: "Ultimo disponibile" } : card) ?? current);
         }
       } finally {
         pending = false;
@@ -48,7 +51,8 @@ export function WhitelistBoard({ book }: { book: ProgramBook }) {
     };
   }, []);
 
-  const shown = cards ?? WHITELIST.map((ticker) => ({ ticker, pair: null, reason: "Lettura in corso", candles: [], price: null }));
+  const shown = cards ?? WHITELIST.map((ticker) => ({ ticker, pair: null, reason: "Lettura in corso", candles: [] as Candle[], price: null, stale: false, quotedAt: null }));
+  const stale = shown.some((card) => card.stale);
   return (
     <section className="cryptos">
       <header className="bot-head">
@@ -56,7 +60,7 @@ export function WhitelistBoard({ book }: { book: ProgramBook }) {
           <p className="eyebrow">Whitelist</p>
           <h2>Le 20 crypto</h2>
         </div>
-        <p className="asof">Candele eToro ogni 5 secondi{refreshError ? " · aggiornamento non riuscito" : ""}</p>
+        <p className="asof">Ogni 5 secondi{seenAt ? ` · ${rome(seenAt)}` : ""}{stale ? " · ultimo disponibile" : ""}{refreshError ? " · aggiornamento non riuscito" : ""}</p>
       </header>
       <div className="crypto-grid">
         {shown.map((card) => (
@@ -79,7 +83,7 @@ function CryptoSection({ card, book }: { card: CryptoCard; book: ProgramBook }) 
       </div>
       {card.candles.length > 0 ? <CandleChart candles={card.candles} /> : card.pair ? <p className="missing">{card.reason ?? "Candele non disponibili"}</p> : null}
       <dl className="facts">
-        <div><dt>Prezzo</dt><dd>{card.price ?? "non disponibile"}</dd></div>
+        <div><dt>Prezzo</dt><dd>{card.price ?? "non disponibile"}{card.stale ? ` · ultimo disponibile${card.quotedAt ? ` ${rome(card.quotedAt)}` : ""}` : ""}</dd></div>
         <div><dt>Portafoglio</dt><dd>{note.membership}</dd></div>
         <div><dt>Rendimento</dt><dd className={toneOf(note.performance)}>{note.performance}</dd></div>
       </dl>
@@ -112,6 +116,21 @@ function CandleChart({ candles }: { candles: Candle[] }) {
       })}
     </svg>
   );
+}
+
+function rome(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("it-IT", {
+    timeZone: "Europe/Rome",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+  }).format(date);
 }
 
 function toneOf(performance: string): string {

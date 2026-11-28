@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { DEMO_ACCOUNT_FALLBACK, DEMO_PORTFOLIO_URL, formatCash, readDemoOverview, readProgramBook } from "./demo-read.ts";
-import { changeBps, formatBps, missingValueSentence, parseBenchmarkId, parseReferenceClose, selectProgramPositions, tick } from "./program-book.ts";
+import { changeBps, formatBps, holdBook, missingBenchmark, missingValueSentence, parseBenchmarkId, parseReferenceClose, selectProgramPositions, tick, type ProgramBook } from "./program-book.ts";
 
 const keys = {
   ETORO_DEMO_API_KEY: "test-api",
@@ -235,11 +235,26 @@ describe("demo read", () => {
     assert.equal(rules.includes("simbolo BTC"), true);
     assert.equal(rules.includes("senza quel campo"), true);
     assert.equal(rules.includes("azioni e ETF"), false);
-    assert.equal(rules.includes("15 secondi"), true);
+    assert.equal(rules.includes("5 secondi"), true);
+    assert.equal(rules.includes("ultimo valore disponibile"), true);
+    assert.equal(bot.includes("5_000"), true);
+    assert.equal(bot.includes("ultimo disponibile"), true);
     assert.equal(rules.includes("non invia vendite"), true);
     assert.equal(rules.includes("use client"), false);
     assert.equal(page.includes("Storico operazioni vuoto"), true);
     assert.equal(page.includes("Registro movimenti"), true);
+  });
+
+  it("keeps the last portfolio value when the next read loses the price and the benchmark", () => {
+    const current = book({ valueEurMinor: 7529, resolved: true });
+    const failed = book({ valueEurMinor: null, resolved: false });
+    const held = holdBook(current, failed);
+    assert.equal(held.stale, true);
+    assert.equal(held.book.valueEurMinor, 7529);
+    assert.equal(held.book.benchmark.instrumentId, "3040");
+    const fresh = holdBook(current, book({ valueEurMinor: 7600, resolved: true }));
+    assert.equal(fresh.stale, false);
+    assert.equal(fresh.book.valueEurMinor, 7600);
   });
 
   it("shows an empty operation history and a native cash movement", async () => {
@@ -388,6 +403,25 @@ describe("demo read", () => {
     assert.equal(formatBps(null), "non disponibile");
   });
 });
+
+function book(options: { valueEurMinor: number | null; resolved: boolean }): ProgramBook {
+  return {
+    budgetEurMinor: 50000,
+    connected: true,
+    errorClass: null,
+    positions: [],
+    valueUsdMinor: options.valueEurMinor,
+    valueEurMinor: options.valueEurMinor,
+    changeUsdMinor: 0,
+    changeEurMinor: 0,
+    lossEurMinor: 0,
+    lossBpsOfBudget: 0,
+    missingValues: options.valueEurMinor === null ? ["397030666"] : [],
+    eurUsdRate: "1.09",
+    benchmark: options.resolved ? { ...missingBenchmark(), resolved: true, instrumentId: "3040", name: "iShares Core MSCI World UCITS ETF" } : missingBenchmark(),
+    readAt: "2026-11-28T07:12:00Z",
+  };
+}
 
 function json(status: number, body: unknown) {
   return {

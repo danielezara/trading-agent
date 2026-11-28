@@ -352,6 +352,19 @@ function positionLabel(position: ProgramPosition): string {
   return position.symbol || position.name || position.orderId;
 }
 
+export function holdBook(previous: ProgramBook | null, next: ProgramBook): { book: ProgramBook; stale: boolean } {
+  if (!previous) {
+    return { book: next, stale: false };
+  }
+  const failed = Boolean(next.errorClass)
+    || (previous.positions !== null && next.positions === null)
+    || (previous.valueEurMinor !== null && next.valueEurMinor === null && previous.benchmark.resolved && !next.benchmark.resolved);
+  if (failed) {
+    return { book: previous, stale: true };
+  }
+  return { book: next, stale: false };
+}
+
 export function missingBenchmark(): BenchmarkQuote {
   return {
     resolved: false,

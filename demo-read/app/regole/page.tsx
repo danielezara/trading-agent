@@ -34,7 +34,7 @@ export default function RulesPage() {
       </ul>
       <h2>Pagina</h2>
       <ul className="rules">
-        <li>Il portafoglio si aggiorna da eToro a ogni visita e poi ogni 15 secondi.</li>
+        <li>Il portafoglio e le crypto si aggiornano da soli ogni 5 secondi. Se una lettura fallisce, resta l&apos;ultimo valore disponibile.</li>
         <li>Il valore è la somma dei valori eToro delle posizioni del bot. Se un ordine è ancora aperto e il valore manca, il totale dice cosa manca e non inventa la cifra.</li>
       </ul>
     </main>

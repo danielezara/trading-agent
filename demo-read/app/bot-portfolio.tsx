@@ -11,16 +11,19 @@ import {
   formatBps,
   formatMinor,
   formatSignedMinor,
+  holdBook,
   missingValueSentence,
   tick,
 } from "../lib/program-book";
 
-const POLL_MS = 15_000;
+const POLL_MS = 5_000;
 
 export function BotPortfolio({ initial }: { initial: ProgramBook }) {
   const [book, setBook] = useState(initial);
   const [liveTicks, setLiveTicks] = useState<Record<string, Tick | null>>({});
   const [refreshError, setRefreshError] = useState(false);
+  const [stale, setStale] = useState(false);
+  const [checkedAt, setCheckedAt] = useState<string | null>(null);
   const bookRef = useRef(initial);
 
   useEffect(() => {
@@ -31,29 +34,38 @@ export function BotPortfolio({ initial }: { initial: ProgramBook }) {
         if (!response.ok) {
           throw new Error("refresh failed");
         }
-        const next = (await response.json()) as ProgramBook;
+        const next = (await response.json()) as ProgramBook & { stale?: boolean };
         if (stopped) {
           return;
         }
+        const held = holdBook(bookRef.current, next);
         const current = bookRef.current;
-        const ticks: Record<string, Tick | null> = {};
-        for (const position of next.positions ?? []) {
-          const prior = current.positions?.find((row) => row.orderId === position.orderId)?.bid ?? null;
-          ticks[position.orderId] = tick(prior, position.bid);
+        if (!held.stale) {
+          const ticks: Record<string, Tick | null> = {};
+          for (const position of held.book.positions ?? []) {
+            const prior = current.positions?.find((row) => row.orderId === position.orderId)?.bid ?? null;
+            ticks[position.orderId] = tick(prior, position.bid);
+          }
+          if (held.book.benchmark.resolved) {
+            ticks.benchmark = tick(current.benchmark.bid, held.book.benchmark.bid);
+          }
+          setLiveTicks(ticks);
         }
-        if (next.benchmark.resolved) {
-          ticks.benchmark = tick(current.benchmark.bid, next.benchmark.bid);
-        }
-        bookRef.current = next;
-        setLiveTicks(ticks);
-        setBook(next);
+        bookRef.current = held.book;
+        setBook(held.book);
+        setStale(held.stale || Boolean(next.stale));
+        setCheckedAt(new Date().toISOString());
         setRefreshError(false);
       } catch {
         if (!stopped) {
           setRefreshError(true);
+          if (bookRef.current.valueEurMinor !== null || bookRef.current.benchmark.resolved) {
+            setStale(true);
+          }
         }
       }
     }
+    void refresh();
     const timer = setInterval(() => {
       void refresh();
     }, POLL_MS);
@@ -72,8 +84,9 @@ export function BotPortfolio({ initial }: { initial: ProgramBook }) {
           <h2>Dentro i 500 EUR</h2>
         </div>
         <p className="asof">
-          Prezzi eToro
-          {book.readAt ? ` · ${rome(book.readAt)}` : ""}
+          Ogni 5 secondi
+          {checkedAt ? ` · ${rome(checkedAt)}` : book.readAt ? ` · ${rome(book.readAt)}` : ""}
+          {stale ? " · ultimo disponibile" : ""}
           {refreshError ? " · aggiornamento non riuscito" : ""}
         </p>
       </header>
