@@ -1,0 +1,65 @@
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+  line-height: 1.45;
+  background: #0b1220;
+  color: #f4f7fb;
+}
+
+body { margin: 0; }
+main { max-width: 72rem; margin: 0 auto; padding: 1.5rem; }
+.eyebrow { margin: 0; color: #93a0b5; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.78rem; }
+.lead { color: #93a0b5; }
+h1, h2 { margin: 0.2rem 0 0.6rem; }
+.panel {
+  background: #152033;
+  border: 1px solid #243044;
+  border-radius: 16px;
+  padding: 1rem 1.05rem;
+  margin-top: 1rem;
+}
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem 1rem; margin: 0; }
+.facts dt { color: #93a0b5; font-size: 0.82rem; }
+.facts dd { margin: 0; font-variant-numeric: tabular-nums; }
+.row, .row-between { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: end; }
+.row-between { justify-content: space-between; align-items: flex-start; }
+label { display: flex; flex-direction: column; gap: 0.25rem; color: #93a0b5; font-size: 0.85rem; }
+input {
+  background: #0b1220;
+  border: 1px solid #243044;
+  border-radius: 8px;
+  color: #f4f7fb;
+  padding: 0.45rem 0.6rem;
+}
+button {
+  background: #1fd67a;
+  color: #0b1220;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.55rem 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+button.danger { background: #ff5b6e; color: #fff; }
+.muted, .result { color: #93a0b5; }
+.crypto-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+.card {
+  background: #0b1220;
+  border: 1px solid #243044;
+  border-radius: 12px;
+  padding: 0.8rem;
+}
+.card .symbol { margin: 0; font-weight: 700; }
+.card .order { margin: 0.2rem 0 0.5rem; color: #93a0b5; font-size: 0.85rem; }
+.chart { width: 100%; height: 5.5rem; display: block; }
+.chart line { stroke: currentColor; stroke-width: 1; }
+.chart rect { fill: currentColor; }
+.chart .forming { opacity: 0.55; }
+.up { color: #1fd67a; }
+.down { color: #ff5b6e; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.4rem 0.2rem; border-top: 1px solid #243044; }
+th { color: #93a0b5; font-weight: 650; }
+@media (max-width: 720px) {
+  .facts, .crypto-grid { grid-template-columns: 1fr; }
+}

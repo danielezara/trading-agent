@@ -25,11 +25,17 @@ class ObservationMutationFilter(
             filterChain.doFilter(request, response)
             return
         }
+        // Solo operazioni Demo esplicite sulla Public API: open/close sotto /api/v1/demo/.
+        val path = request.requestURI ?: ""
+        if (path.startsWith("/api/v1/demo/")) {
+            filterChain.doFilter(request, response)
+            return
+        }
         val problem = mapOf(
             "type" to "about:blank",
             "title" to "Mutazioni disabilitate",
             "status" to HttpStatus.FORBIDDEN.value(),
-            "detail" to "Lo scheletro resta in OBSERVATION: nessun ordine, comando o scrittura.",
+            "detail" to "Fuori da /api/v1/demo nessuna scrittura: usa solo open/close Demo.",
             "code" to "OBSERVATION_MUTATIONS_DISABLED",
             "retryable" to false,
         )

@@ -24,6 +24,7 @@ import com.tradingagent.modules.brokerread.DemoPositionQuotes
 import com.tradingagent.modules.brokerread.InstrumentNameRead
 import com.tradingagent.modules.brokerread.JdkHttpGet
 import com.tradingagent.modules.brokerread.PositionQuoteRead
+import com.tradingagent.modules.brokerread.WhitelistMarketData
 import com.tradingagent.modules.chat.ChatQuery
 import com.tradingagent.modules.configuration.ConfigurationService
 import com.tradingagent.modules.configuration.EvidenceGate
@@ -111,6 +112,12 @@ class ModuleConfiguration {
     @Bean fun policyGate() = PolicyGate()
 
     @Bean fun killSwitch() = KillSwitch()
+
+    @Bean
+    fun whitelistMarketData() = WhitelistMarketData(
+        keys = { DemoKeyMaterial.fromEnvironment(System.getenv()) },
+        transport = JdkHttpGet(),
+    )
 
     @Bean fun ledger() = Ledger()
 
