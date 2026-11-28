@@ -104,6 +104,7 @@ class DemoEntryBarRead(
     private val keys: () -> DemoKeyMaterial?,
     private val transport: HttpGet,
     private val sleep: (Duration) -> Unit = {},
+    private val maxSymbols: Int = MAX_SYMBOLS,
 ) : EntryCandidates {
     override fun load(now: Instant, heldInstrumentIds: Set<String>): List<ObservedInstrumentBars> {
         val material = keys() ?: return emptyList()
@@ -112,7 +113,7 @@ class DemoEntryBarRead(
         val resolved = symbols().mapNotNull { symbol -> resolve(material, symbol) }
             .distinctBy { it.instrumentId }
             .filter { it.instrumentId !in skip }
-            .take(MAX_SYMBOLS)
+            .take(maxSymbols)
         if (resolved.isEmpty()) {
             return emptyList()
         }

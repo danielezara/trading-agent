@@ -28,6 +28,7 @@ data class ObservedBars(
     val instruments: List<ObservedInstrumentBars>,
     val bookLossMinor: Long? = null,
     val bookLossCurrency: String? = null,
+    val blockedEntryIds: Set<String> = emptySet(),
 )
 
 fun interface ClosedBarSource {
@@ -79,7 +80,18 @@ object DemoClosedBars {
             instruments,
             loss?.minorUnits,
             loss?.currency,
+            blockedEntryIds(account),
         )
+    }
+
+    /** Bitcoin già comprato con l'ordine 397105707 non si ricompra finché quell'ordine è aperto. */
+    fun blockedEntryIds(account: ObservedAccount): Set<String> {
+        val rows = account.executions.orEmpty() + account.orders.orEmpty()
+        return rows
+            .filter { it.orderId == OPEN_BITCOIN_ORDER }
+            .mapNotNull { it.instrumentId }
+            .filter { it.isNotBlank() }
+            .toSet()
     }
 
     fun barsFor(
@@ -243,6 +255,7 @@ object DemoClosedBars {
     }
 
     private const val MAX_INSTRUMENTS: Int = 20
+    const val OPEN_BITCOIN_ORDER: String = "397105707"
 }
 
 class DemoClosedBarRead(

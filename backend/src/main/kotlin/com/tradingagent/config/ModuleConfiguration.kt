@@ -12,6 +12,7 @@ import com.tradingagent.modules.brokerread.DemoMarketRatesLookup
 import com.tradingagent.modules.brokerread.ClosedTradeRead
 import com.tradingagent.modules.brokerread.DemoClosedBarRead
 import com.tradingagent.modules.brokerread.DemoEntryBarRead
+import com.tradingagent.modules.brokerread.SpotEnabledTickers
 import com.tradingagent.modules.brokerread.DemoEntryDispatch
 import com.tradingagent.modules.brokerread.JdkHttpPost
 import com.tradingagent.modules.brokerread.DemoClosedTradeRead
@@ -159,16 +160,38 @@ class ModuleConfiguration {
             ),
             entriesBlocked = { killSwitch.armed() },
             entryCandidates = DemoEntryBarRead(
-                symbols = { configurationService.active().parameters.economic.entrySymbols },
+                symbols = {
+                    val parameters = configurationService.active().parameters
+                    val entry = parameters.economic.entrySymbols
+                    val material = DemoKeyMaterial.fromEnvironment(System.getenv())
+                    val enabled = if (material == null) {
+                        emptyList()
+                    } else {
+                        try {
+                            SpotEnabledTickers.load(
+                                parameters.spotSelection,
+                                JdkHttpGet(),
+                                material,
+                                java.time.Instant.now(),
+                                { duration -> Thread.sleep(duration.toMillis()) },
+                            )
+                        } catch (_: Exception) {
+                            emptyList()
+                        }
+                    }
+                    (entry + enabled).distinct()
+                },
                 keys = { DemoKeyMaterial.fromEnvironment(System.getenv()) },
                 transport = JdkHttpGet(),
                 sleep = { duration -> Thread.sleep(duration.toMillis()) },
+                maxSymbols = 20,
             ),
             demoEntries = DemoEntryDispatch(
                 transport = JdkHttpPost(),
                 keys = { DemoKeyMaterial.fromEnvironment(System.getenv()) },
             ),
             programPositions = ProgramPositions.withOpenedBook(),
+            breakout = true,
         )
         val recorded = cycle.record()
         auditLog.sealDay(LocalDate.ofInstant(recorded.outcome.evaluatedAt, ZoneOffset.UTC))
@@ -192,7 +215,7 @@ class ModuleConfiguration {
 
     private fun logEntry(recorded: RecordedDecision, loop: String) {
         log.info(
-            "rule={} reason={} instrument={} demo={} order={} program_positions={} invested_minor={} loop={}",
+            "strategy=breakout/1 rule={} reason={} instrument={} demo={} order={} program_positions={} invested_minor={} loop={}",
             recorded.rule.action,
             recorded.rule.reason,
             recorded.rule.instrumentId.orEmpty(),

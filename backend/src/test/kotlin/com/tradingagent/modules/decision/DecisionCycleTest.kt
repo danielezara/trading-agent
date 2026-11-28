@@ -290,6 +290,60 @@ class DecisionCycleTest {
     }
 
     @Test
+    fun `breakout buys a fresh pair and does not buy the open bitcoin order`() {
+        val origin = Instant.parse("2026-11-27T10:00:00Z")
+        val at = origin.plusSeconds(300L * 21)
+        val sender = RecordingEntry()
+        val fresh = DecisionCycle(
+            strategyEngine = StrategyEngine(),
+            ingestionPipeline = IngestionPipeline.fromClasspath(),
+            evidenceGate = EvidenceGate(),
+            operationalStateService = OperationalStateService(clock = { at }),
+            configurationService = ConfigurationService(),
+            auditLog = AuditLog(),
+            policyGate = PolicyGate(),
+            clock = { at },
+            closedBars = ClosedBarSource { ObservedBars(1, emptyList()) },
+            reportedRates = ReportedRateSource { listOf(ReportedRate("EUR", "USD", "1.09626")) },
+            entryCandidates = EntryCandidates { _, _ -> listOf(ObservedInstrumentBars("100109", "crypto", breakoutBars(origin))) },
+            demoEntries = sender,
+            breakout = true,
+        )
+        val entered = fresh.record()
+        assertEquals("ENTER", entered.rule.action)
+        assertEquals("breakout_high", entered.rule.reason)
+        assertEquals("100109", entered.rule.instrumentId)
+        assertEquals(1, sender.calls.size)
+        assertEquals("100109", sender.calls.single().first)
+
+        val blockedSender = RecordingEntry()
+        val blocked = DecisionCycle(
+            strategyEngine = StrategyEngine(),
+            ingestionPipeline = IngestionPipeline.fromClasspath(),
+            evidenceGate = EvidenceGate(),
+            operationalStateService = OperationalStateService(clock = { at }),
+            configurationService = ConfigurationService(),
+            auditLog = AuditLog(),
+            policyGate = PolicyGate(),
+            clock = { at },
+            closedBars = ClosedBarSource {
+                ObservedBars(1, emptyList(), blockedEntryIds = setOf("100000"))
+            },
+            reportedRates = ReportedRateSource { listOf(ReportedRate("EUR", "USD", "1.09626")) },
+            entryCandidates = EntryCandidates { _, held ->
+                listOf(ObservedInstrumentBars("100000", "crypto", breakoutBars(origin))).filter { it.instrumentId !in held }
+            },
+            demoEntries = blockedSender,
+            breakout = true,
+        )
+        val skipped = blocked.record()
+        assertEquals("NO-TRADE", skipped.rule.action)
+        assertEquals("existing_position", skipped.rule.reason)
+        assertEquals(0, blockedSender.calls.size)
+        assertFalse(EntryPace.finished(skipped.rule.reason))
+    }
+
+    @Test
     fun `a missing eur usd rate does not invent an amount`() {
         val origin = Instant.parse("2026-11-27T10:00:00Z")
         val at = origin.plusSeconds(300L * 20)
@@ -701,6 +755,15 @@ class DecisionCycleTest {
         demoEntries = sender,
         programPositions = programPositions,
     )
+
+    private fun breakoutBars(origin: Instant): List<ObservedBar> {
+        val prior = (0 until 20).map { index ->
+            val start = origin.plusSeconds(300L * index)
+            ObservedBar(start, start.plusSeconds(300), 10_000L, 10_050L, 9_950L)
+        }
+        val start = origin.plusSeconds(300L * 20)
+        return prior + ObservedBar(start, start.plusSeconds(300), 10_100L, 10_150L, 10_000L)
+    }
 
     private fun risingBars(origin: Instant): List<ObservedBar> = (0 until 20).map { index ->
         val close = 10_000L + if (index >= 18) (index - 17) * 50L else 0L

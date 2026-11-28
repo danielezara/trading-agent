@@ -24,6 +24,8 @@ import com.tradingagent.modules.risk.DispatchPreconditions
 import com.tradingagent.modules.risk.PolicyGate
 import com.tradingagent.modules.risk.PolicyVerdict
 import com.tradingagent.modules.strategy.BarBook
+import com.tradingagent.modules.strategy.BreakoutCycleInput
+import com.tradingagent.modules.strategy.BreakoutLive
 import com.tradingagent.modules.strategy.BudgetLoss
 import com.tradingagent.modules.strategy.ChannelObservation
 import com.tradingagent.modules.strategy.ClosedBarEvaluation
@@ -71,6 +73,7 @@ class DecisionCycle(
     private val entryCandidates: EntryCandidates = EntryCandidates { _, _ -> emptyList() },
     private val demoEntries: DemoEntrySubmit = DemoEntrySubmit { _, _, _, _ -> DemoOpenResult("NOT_SENT", "UNWIRED") },
     private val programPositions: ProgramPositions = ProgramPositions(),
+    private val breakout: Boolean = false,
 ) {
     private var recorded: RecordedDecision? = null
     private var storedBars: List<ObservedInstrumentBars> = emptyList()
@@ -105,18 +108,22 @@ class DecisionCycle(
                 fx = fx,
             ),
         )
-        val programHeld = programPositions.ids()
-        val candidates = try {
-            entryCandidates.load(at, programHeld)
-        } catch (_: Exception) {
-            emptyList()
-        }
         val observed = try {
             closedBars.load(at)
         } catch (_: Exception) {
             null
         } ?: ObservedBars(0, emptyList())
         storedBars = observed.instruments
+        if (breakout) {
+            val size = configuration.parameters.breakout.positionSizeMinor
+            observed.blockedEntryIds.forEach { instrumentId -> programPositions.note(instrumentId, size) }
+        }
+        val programHeld = programPositions.ids()
+        val candidates = try {
+            entryCandidates.load(at, programHeld)
+        } catch (_: Exception) {
+            emptyList()
+        }
         val held = observed.instruments.map { it.instrumentId }.filter { it.isNotBlank() }.toSet() + programHeld
         val rates = try {
             reportedRates.load().map { rate ->
@@ -152,12 +159,26 @@ class DecisionCycle(
             configuration.parameters.economic,
             rates,
         )
-        val rule = ClosedBarEvaluation.decide(
-            at,
-            book,
-            configuration.parameters.economic,
-            configuration.parameters.technical,
-        )
+        val rule = if (breakout) {
+            val enabled = book.instruments.map { it.instrumentId }.toSet() + observed.blockedEntryIds
+            BreakoutLive.decide(
+                BreakoutCycleInput(
+                    candidates = book.instruments,
+                    openIds = observed.blockedEntryIds,
+                    enabledIds = enabled,
+                    parameters = configuration.parameters.breakout,
+                    entriesBlocked = entriesBlocked(),
+                    lossBlocksEntries = lossBlocksEntries,
+                ),
+            )
+        } else {
+            ClosedBarEvaluation.decide(
+                at,
+                book,
+                configuration.parameters.economic,
+                configuration.parameters.technical,
+            )
+        }
         val closedBarCount = book.instruments
             .filter { it.instrumentId !in held }
             .maxOfOrNull { it.bars.size } ?: 0
@@ -166,7 +187,7 @@ class DecisionCycle(
         } else {
             check(!rule.orderable) { "solo un ingresso nuovo può essere inviabile" }
         }
-        if (closedBarCount < configuration.parameters.technical.int("regime_atr_bars")) {
+        if (!breakout && closedBarCount < configuration.parameters.technical.int("regime_atr_bars")) {
             check(rule.action == "NO-TRADE") {
                 "senza abbastanza barre chiuse il ciclo non può proporre un ingresso"
             }

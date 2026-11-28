@@ -6,33 +6,31 @@ export default function RulesPage() {
       <p className="product">Agente trading</p>
       <h1>Regole</h1>
       <p>Solo quello che il programma applica. Le cifre sono quelle del config attivo.</p>
-      <p>Il giro già acceso applica ancora closed-bar-trend/1 e non ha caricato la strategia di breakout.</p>
+      <p>Il giro acceso è breakout/1.</p>
       <nav className="nav">
         <a href="/">Portafoglio</a>
         <a href="/regole">Regole</a>
       </nav>
       <h2>Ingresso</h2>
       <ul className="rules">
-        <li>Compra dopo due chiusure al rialzo su barre da 5 minuti già chiuse. I prezzi sono quelli di eToro.</li>
-        <li>Solo Bitcoin, solo long, leva 1.</li>
-        <li>Universo: il Bitcoin di eToro, simbolo BTC, tipo Crypto. Un future, un ETF o un altro simbolo non si compra.</li>
+        <li>Compra se la chiusura supera il massimo delle ultime 20 candele da 5 minuti, esclusa la corrente. I prezzi sono quelli di eToro. Se lo storico non basta, non c&apos;è segnale.</li>
+        <li>Solo Bitcoin e le coppie spot abilitate, solo long, leva 1.</li>
+        <li>Universo: Bitcoin, simbolo BTC, e le coppie della whitelist che passano i filtri di ingresso. Una coppia esclusa non si compra.</li>
         <li>La leva 1 si scrive sull&apos;ordine solo se eToro la indica sullo strumento. Se il campo non c&apos;è, l&apos;ordine parte senza quel campo.</li>
         <li>Budget 500 EUR.</li>
-        <li>Rischio 2,50 EUR per ingresso.</li>
-        <li>Massimo 75 EUR a titolo.</li>
-        <li>Massimo 8 posizioni del bot.</li>
-        <li>Restano almeno 100 EUR di cassa. L&apos;investito non supera 400 EUR.</li>
-        <li>Il rischio aperto complessivo è 10 EUR: al massimo quattro ingressi da 2,50 EUR.</li>
+        <li>Ogni ingresso è 75 EUR, e 75 EUR è anche il massimo di una posizione. L&apos;esposizione del breakout è 400 EUR. Al massimo 4 posizioni.</li>
+        <li>Se più coppie segnalano insieme, passa prima l&apos;id di catalogo in ordine alfabetico.</li>
+        <li>Non si aumenta una posizione già aperta.</li>
         <li>Stop perdita 10%, cioè 50 EUR. Se la perdita aperta che eToro riporta, in euro col suo tasso, arriva a 50 EUR, i nuovi ingressi si bloccano.</li>
-        <li>Non riapre un titolo che il bot ha già.</li>
+        <li>Non ricompra Bitcoin se l&apos;ordine 397105707 è ancora aperto.</li>
         <li>Le 16 posizioni preesistenti, aperte prima delle 16:13 del 27 novembre 2026 (ora di Roma), sono fuori: nessun ordine su quelle.</li>
         <li>Se manca il tasso euro/dollaro di eToro, l&apos;ordine non parte.</li>
         <li>Il giro legge una barra da 5 minuti alla volta. Il kill switch, se è inserito, blocca i nuovi ordini. Adesso è spento.</li>
       </ul>
       <h2>Uscita</h2>
       <ul className="rules">
-        <li>La regola di uscita è: vende dopo due chiusure al ribasso, oppure stop a 2×ATR, oppure dopo 390 barre da 5 minuti.</li>
-        <li>Quel calcolo c&apos;è nel codice. Il giro degli ingressi non invia vendite da solo.</li>
+        <li>L&apos;uscita è la chiusura sotto il minimo delle ultime 10 candele, oppure lo stop al 2% dal prezzo di esecuzione. Lo stop non garantisce quel prezzo.</li>
+        <li>Il giro acceso non invia vendite: non chiude le 16 posizioni preesistenti e non vende da solo.</li>
       </ul>
       <h2>Pagina</h2>
       <ul className="rules">
