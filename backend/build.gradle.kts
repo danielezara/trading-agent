@@ -43,6 +43,10 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+springBoot {
+    mainClass.set("com.tradingagent.TradingAgentApplicationKt")
+}
+
 tasks.register<JavaExec>("spotPairReport") {
     group = "verification"
     description = "Print one spot-pair row per whitelist asset. Does not send orders."
