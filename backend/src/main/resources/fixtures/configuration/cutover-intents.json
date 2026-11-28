@@ -1,0 +1,15 @@
+{
+  "scheduled_bar_open": "2026-11-27T00:05:00Z",
+  "intents": [
+    {
+      "intent_id": "in-flight",
+      "state": "dispatch_pending",
+      "config_version_number": 1
+    },
+    {
+      "intent_id": "already-filled",
+      "state": "filled",
+      "config_version_number": 1
+    }
+  ]
+}

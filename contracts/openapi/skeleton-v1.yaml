@@ -1,0 +1,1064 @@
+openapi: 3.0.3
+info:
+  title: Trading agent skeleton API
+  version: 0.1.0
+  description: >
+    Read-only surface of the OBSERVATION skeleton. There is no broker client,
+    no order placement, and no path to ACTIVE. Any method other than GET or HEAD
+    returns 403 OBSERVATION_MUTATIONS_DISABLED.
+servers:
+  - url: http://127.0.0.1:8080
+paths:
+  /health/live:
+    get:
+      operationId: live
+      responses:
+        "200":
+          description: Process is up
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [UP]
+  /health/ready-trading:
+    get:
+      operationId: readyTrading
+      responses:
+        "503":
+          description: Trading workers are not ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DownProbe"
+  /health/ready-admin:
+    get:
+      operationId: readyAdmin
+      responses:
+        "503":
+          description: Admin readiness is down because the datastore is not wired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DownProbe"
+  /api/v1/system/status:
+    get:
+      operationId: systemStatus
+      responses:
+        "200":
+          description: Observation status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemStatusEnvelope"
+  /api/v1/configurations:
+    get:
+      operationId: listConfigurations
+      responses:
+        "200":
+          description: Immutable configuration versions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigurationListEnvelope"
+  /api/v1/configurations/active:
+    get:
+      operationId: activeConfiguration
+      responses:
+        "200":
+          description: Active configuration version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigurationEnvelope"
+  /api/v1/operational-state:
+    get:
+      operationId: operationalState
+      responses:
+        "200":
+          description: Current operational state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationalStateEnvelope"
+  /api/v1/data-health:
+    get:
+      operationId: dataHealth
+      responses:
+        "200":
+          description: Classpath fixture channel health, with no network
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataHealthEnvelope"
+  /api/v1/chat:
+    get:
+      operationId: askChat
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            maxLength: 400
+      responses:
+        "200":
+          description: Read-only answer from local decision, positions and data health
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatEnvelope"
+  /api/v1/decisions/latest:
+    get:
+      operationId: latestDecision
+      responses:
+        "200":
+          description: Deterministic NO-TRADE decision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DecisionEnvelope"
+  /api/v1/reconciliation:
+    get:
+      operationId: reconciliation
+      responses:
+        "200":
+          description: Read-only comparison of the Demo portfolio read and the local ledger
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReconciliationEnvelope"
+  /api/v1/audit:
+    get:
+      operationId: auditChain
+      responses:
+        "200":
+          description: In-memory tamper-evident decision audit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEnvelope"
+  /api/v1/evidence-gate:
+    get:
+      operationId: evidenceGate
+      responses:
+        "200":
+          description: Evidence rows, all unverified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceEnvelope"
+  /api/dashboard/v1/session:
+    get:
+      operationId: dashboardSession
+      responses:
+        "200":
+          description: Unauthenticated local session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionEnvelope"
+  /api/dashboard/v1/overview:
+    get:
+      operationId: dashboardOverview
+      responses:
+        "200":
+          description: Empty portfolio snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OverviewEnvelope"
+components:
+  schemas:
+    ConfigurationEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          $ref: "#/components/schemas/Configuration"
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    ConfigurationListEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Configuration"
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    Configuration:
+      type: object
+      required: [version_id, version_number, author, reason, content_sha256, active, budget]
+      properties:
+        version_id:
+          type: string
+        version_number:
+          type: integer
+        author:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+        content_sha256:
+          type: string
+        valid_from_bar_open:
+          type: string
+          format: date-time
+        active:
+          type: boolean
+        budget:
+          type: object
+          properties:
+            base_currency:
+              type: string
+              nullable: true
+            assigned_budget_minor:
+              type: integer
+              nullable: true
+            cash_buffer_minor:
+              type: integer
+              nullable: true
+            max_positions:
+              type: integer
+              nullable: true
+        economic:
+          type: object
+          properties:
+            max_loss_bps:
+              type: integer
+              nullable: true
+            max_loss_action:
+              type: string
+              nullable: true
+            horizon:
+              type: string
+              nullable: true
+            allowlist_universe:
+              type: string
+              nullable: true
+            allowlist_direction:
+              type: string
+              nullable: true
+            leverage:
+              type: integer
+              nullable: true
+            benchmark_name:
+              type: string
+              nullable: true
+            benchmark_return_basis:
+              type: string
+              nullable: true
+            technical_calibratable:
+              type: boolean
+            source_path:
+              type: string
+            risk_per_trade_bps:
+              type: integer
+              nullable: true
+            aggregate_risk_bps:
+              type: integer
+              nullable: true
+            instrument_exposure_bps:
+              type: integer
+              nullable: true
+            sector_exposure_bps:
+              type: integer
+              nullable: true
+            min_cash_bps:
+              type: integer
+              nullable: true
+            cooldown_seconds:
+              type: integer
+              nullable: true
+            max_holding_count:
+              type: integer
+              nullable: true
+            entry_rule:
+              type: string
+            price_source:
+              type: string
+            decision_bar_seconds:
+              type: integer
+    OperationalStateEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [state, actions]
+          properties:
+            state:
+              type: string
+              enum: [OBSERVATION]
+            since:
+              type: string
+              format: date-time
+            reason:
+              type: string
+            generation:
+              type: integer
+            actions:
+              type: object
+              properties:
+                new_entries:
+                  type: boolean
+                  enum: [false]
+                local_exits:
+                  type: boolean
+                  enum: [false]
+                cancel:
+                  type: boolean
+                  enum: [false]
+                reconcile_permitted:
+                  type: boolean
+                reconcile_wired:
+                  type: boolean
+                  enum: [false]
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    DownProbe:
+      type: object
+      required: [status, reason]
+      properties:
+        status:
+          type: string
+          enum: [DOWN]
+        operational_state:
+          type: string
+        reason:
+          type: string
+    Meta:
+      type: object
+      required: [api_version, schema_version, environment, consistency, freshness]
+      properties:
+        api_version:
+          type: string
+        schema_version:
+          type: string
+        request_id:
+          type: string
+        generated_at:
+          type: string
+          format: date-time
+        server_time:
+          type: string
+          format: date-time
+        environment:
+          type: string
+          enum: [DEMO]
+        base_currency:
+          type: string
+          nullable: true
+        consistency:
+          type: string
+        as_of:
+          type: string
+          nullable: true
+        reconciled_at:
+          type: string
+          nullable: true
+        freshness:
+          type: object
+          properties:
+            status:
+              type: string
+            age_ms:
+              type: integer
+              nullable: true
+            stale_after_ms:
+              type: integer
+              nullable: true
+    Warning:
+      type: object
+      required: [code, detail]
+      properties:
+        code:
+          type: string
+        detail:
+          type: string
+    SystemStatusEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [operational_state, trading_enabled, broker_dispatch, active_transition_allowed, strategy_action]
+          properties:
+            operational_state:
+              type: string
+              enum: [OBSERVATION]
+            environment:
+              type: string
+              enum: [DEMO]
+            trading_enabled:
+              type: boolean
+              enum: [false]
+            broker_dispatch:
+              type: string
+              enum: [disabled]
+            broker_connected:
+              type: boolean
+            last_probe_at:
+              type: string
+              format: date-time
+              nullable: true
+            probe_error_class:
+              type: string
+              nullable: true
+            active_transition_allowed:
+              type: boolean
+              description: True when RF-044 is PASS. RF-045 is not required. The process still refuses to leave OBSERVATION.
+            strategy_action:
+              type: string
+              enum: [NO-TRADE]
+            strategy_reason:
+              type: string
+            ingestion_enabled:
+              type: boolean
+              enum: [false]
+            ingestion_source:
+              type: string
+              enum: [classpath-fixture]
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    EvidenceEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [allows_active, rows]
+          properties:
+            allows_active:
+              type: boolean
+              description: True when RF-044 is PASS. RF-045 stays listed and is not required. A license row is not marked PASS without evidence.
+            broker_connected:
+              type: boolean
+            last_probe_at:
+              type: string
+              format: date-time
+              nullable: true
+            probe_error_class:
+              type: string
+              nullable: true
+            rows:
+              type: array
+              items:
+                type: object
+                required: [control_id, status]
+                properties:
+                  control_id:
+                    type: string
+                  scope:
+                    type: string
+                  owner_role:
+                    type: string
+                  status:
+                    type: string
+                    enum: [UNVERIFIED, PASS, FAIL, EXPIRED]
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    SessionEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [authenticated, capabilities]
+          properties:
+            authenticated:
+              type: boolean
+            role:
+              type: string
+              nullable: true
+            environment:
+              type: string
+              enum: [DEMO]
+            capabilities:
+              type: object
+              properties:
+                view:
+                  type: boolean
+                acknowledge_alert:
+                  type: boolean
+                kill_switch:
+                  type: boolean
+                reset:
+                  type: boolean
+                configure:
+                  type: boolean
+                place_order:
+                  type: boolean
+                  enum: [false]
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    OverviewEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [operational_state, trading_enabled]
+          properties:
+            operational_state:
+              type: string
+              enum: [OBSERVATION]
+            trading_enabled:
+              type: boolean
+              enum: [false]
+            equity:
+              nullable: true
+            broker_cash:
+              nullable: true
+            cash_balances:
+              type: array
+              nullable: true
+              description: Native eToro cash. Each row is accountType plus equityDetails.available in that account's currency. Cash may use balance when available is absent. displayBalance, displayCurrency and the ECB rate are not copied. A currency that is not in the payload is not added.
+              items:
+                type: object
+                required: [account_type, minor_units, currency]
+                properties:
+                  account_type:
+                    type: string
+                    enum: [Cash, Trading]
+                  minor_units:
+                    type: integer
+                  currency:
+                    type: string
+            cash_movements:
+              type: array
+              nullable: true
+              description: Cash-account transactions as returned by eToro. amount and currency are the posted native fields. originalAmount, originalCurrency and conversionRate are not copied. An empty array means the transactions page was empty.
+              items:
+                type: object
+                required: [movement_id, account_type, direction, status, kind, minor_units, currency]
+                properties:
+                  movement_id:
+                    type: string
+                  account_type:
+                    type: string
+                    enum: [Cash]
+                  direction:
+                    type: string
+                    enum: [credit, debit]
+                  status:
+                    type: string
+                  kind:
+                    type: string
+                  minor_units:
+                    type: integer
+                  currency:
+                    type: string
+                  posted_at:
+                    type: string
+                    nullable: true
+            assigned_budget:
+              nullable: true
+            available_cash:
+              nullable: true
+            reserved_cash:
+              nullable: true
+            position_count:
+              type: integer
+              nullable: true
+            unknown_order_count:
+              type: integer
+              nullable: true
+            ledger_status:
+              type: string
+            fx_status:
+              type: string
+              enum: [UNOBSERVED, NOT_REQUIRED, UNCONFIGURED, APPLIED]
+            fx_source:
+              type: string
+              nullable: true
+              description: ecb-eurofxref when the official daily reference was applied. Null when the rate is missing or stale.
+            fx_version:
+              type: string
+              nullable: true
+              description: Reference date from the ECB file. Not a guessed rate.
+            fx_observed_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: 16:00 Europe/Berlin on the reference date, the usual ECB publication time.
+            fx_haircut_bps:
+              type: integer
+              nullable: true
+              description: Documented haircut from the signed parameters. 100 means the converted cash is reduced by 1 percent.
+            journal_entry_count:
+              type: integer
+            journal_balanced:
+              type: boolean
+            broker_connected:
+              type: boolean
+            last_probe_at:
+              type: string
+              format: date-time
+              nullable: true
+            probe_error_class:
+              type: string
+              nullable: true
+            account_label:
+              type: string
+              nullable: true
+            positions:
+              type: array
+              nullable: true
+              items:
+                type: object
+                required: [instrument_id]
+                properties:
+                  instrument_id:
+                    type: string
+                  quantity:
+                    type: string
+                    nullable: true
+                  value:
+                    nullable: true
+                  quote_price:
+                    type: string
+                    nullable: true
+                    description: Bid when present, otherwise last execution. Null when that instrument has no quote. A missing quote is not zero.
+                  quote_time:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  display_name:
+                    type: string
+                    nullable: true
+                    description: Official instrumentDisplayName from the instruments GET. Null when that read has no name. The instrument id is never replaced by an invented name.
+                  asset_class:
+                    type: string
+                    nullable: true
+                    enum: [stock, etf, other, unknown]
+                    description: Official instrument type. Stocks and ETF are those exact descriptions. Any other description is other. Missing type is unknown, not guessed.
+                  allowlist:
+                    type: string
+                    nullable: true
+                    enum: [inside, outside, unknown]
+                    description: inside for official Stocks or ETF. outside for any other official type. unknown when the type is missing. No order is sent.
+                  official_type:
+                    type: string
+                    nullable: true
+                    description: Exact instrumentTypeDescription. Null when the type is missing. The name is never used as a type.
+            orders:
+              type: array
+              nullable: true
+              description: Pending Demo orders already present on the portfolio read. Empty when the account has none.
+              items:
+                $ref: "#/components/schemas/DemoOrder"
+            executions:
+              type: array
+              nullable: true
+              description: Open executions and close orders already present on the portfolio read. Empty when the account has none.
+              items:
+                $ref: "#/components/schemas/DemoOrder"
+            closed_trades:
+              type: array
+              nullable: true
+              description: One page of closed Demo trades from the documented demo history GET. Empty when that page has none. Null when the read was not attempted or failed. A missing net profit is null, not zero.
+              items:
+                $ref: "#/components/schemas/ClosedTrade"
+            reconciliation:
+              $ref: "#/components/schemas/ReconciliationReport"
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    ReconciliationEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          $ref: "#/components/schemas/ReconciliationReport"
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    ReconciliationReport:
+      type: object
+      required: [status, classes, order_sent, broker_called, operational_state]
+      properties:
+        status:
+          type: string
+          enum: [MATCH, MISMATCH, UNAVAILABLE]
+        classes:
+          type: array
+          items:
+            type: string
+            enum: [position, cash, order]
+        position_diff_count:
+          type: integer
+        cash_diff_minor:
+          type: integer
+          format: int64
+          nullable: true
+        order_sent:
+          type: boolean
+          enum: [false]
+        broker_called:
+          type: boolean
+          enum: [false]
+        operational_state:
+          type: string
+          enum: [OBSERVATION]
+        fill_count:
+          type: integer
+          minimum: 0
+        fill_status:
+          type: string
+          enum: [EMPTY_HISTORY, UNAVAILABLE, POPULATED]
+          description: EMPTY_HISTORY means the execution history was read and had no fills. The register stays empty. UNAVAILABLE means the history was not read. POPULATED lists only the history rows.
+    ClosedTrade:
+      type: object
+      required: [position_id]
+      properties:
+        position_id:
+          type: string
+        instrument_id:
+          type: string
+          nullable: true
+        side:
+          type: string
+          nullable: true
+          enum: [BUY, SELL]
+        quantity:
+          type: string
+          nullable: true
+        net_profit:
+          type: string
+          nullable: true
+          description: Net profit decimal from the history row. Null when absent. A missing profit is not zero.
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
+    DemoOrder:
+      type: object
+      required: [order_id]
+      properties:
+        order_id:
+          type: string
+        instrument_id:
+          type: string
+          nullable: true
+        side:
+          type: string
+          nullable: true
+          enum: [BUY, SELL]
+        quantity:
+          type: string
+          nullable: true
+        value:
+          nullable: true
+        opened_at:
+          type: string
+          nullable: true
+    Problem:
+      type: object
+      required: [status, code]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        code:
+          type: string
+          enum: [OBSERVATION_MUTATIONS_DISABLED]
+        retryable:
+          type: boolean
+    DataHealthEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [source, network, channels]
+          properties:
+            source:
+              type: string
+              enum: [classpath-fixture, mixed]
+            network:
+              type: boolean
+              enum: [false, true]
+            connector_version:
+              type: string
+            quarantined_count:
+              type: integer
+            channels:
+              type: array
+              items:
+                type: object
+                required: [channel, status, quality_millis, accepted_count]
+                properties:
+                  channel:
+                    type: string
+                  source:
+                    type: string
+                  status:
+                    type: string
+                  quality_millis:
+                    type: integer
+                  accepted_count:
+                    type: integer
+                  stale:
+                    type: boolean
+                  conflict:
+                    type: boolean
+                  category:
+                    type: string
+                    nullable: true
+                  event_time:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  ingested_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  license:
+                    type: string
+                    nullable: true
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    ChatEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [executed, refused, text, environment, citations]
+          properties:
+            executed:
+              type: boolean
+              enum: [false]
+            refused:
+              type: boolean
+            text:
+              type: string
+            environment:
+              type: string
+              enum: [DEMO]
+            as_of:
+              type: string
+              format: date-time
+            citations:
+              type: array
+              items:
+                type: object
+                required: [citation_id, source_type, resource_id, label, field]
+                properties:
+                  citation_id:
+                    type: string
+                  source_type:
+                    type: string
+                    enum: [decision, positions, data-health]
+                  resource_id:
+                    type: string
+                  label:
+                    type: string
+                  field:
+                    type: string
+                  as_of:
+                    type: string
+                    format: date-time
+                    nullable: true
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    DecisionEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [action, reason_codes, input_hash]
+          properties:
+            action:
+              type: string
+              enum: [NO-TRADE]
+            reason_codes:
+              type: array
+              items:
+                type: string
+            summary:
+              type: string
+            input_hash:
+              type: string
+            evaluated_at:
+              type: string
+              format: date-time
+            config_version_id:
+              type: string
+            audit_event_hash:
+              type: string
+            policy:
+              type: object
+              required: [accepted, reason, broker_called]
+              properties:
+                accepted:
+                  type: boolean
+                  enum: [false]
+                reason:
+                  type: string
+                broker_called:
+                  type: boolean
+                  enum: [false]
+            signal:
+              type: object
+              required: [signal_id, origin, direction, confidence_millis, orderable]
+              properties:
+                signal_id:
+                  type: string
+                origin:
+                  type: string
+                origin_version:
+                  type: string
+                instrument_id:
+                  type: string
+                  nullable: true
+                direction:
+                  type: string
+                  enum: [NONE]
+                evaluated_at:
+                  type: string
+                  format: date-time
+                valid_until:
+                  type: string
+                  format: date-time
+                  nullable: true
+                confidence_millis:
+                  type: integer
+                rationale:
+                  type: string
+                orderable:
+                  type: boolean
+                  enum: [false]
+            rule_action:
+              type: string
+              enum: [NO-TRADE, ENTER, EXIT, HOLD]
+            rule_reason:
+              type: string
+            rule_instrument_id:
+              type: string
+              nullable: true
+            rule_orderable:
+              type: boolean
+              description: Vero solo quando closed-bar-trend/1 marca un ingresso nuovo come inviabile.
+            closed_bar_count:
+              type: integer
+              minimum: 0
+            book_loss_minor:
+              type: integer
+              minimum: 0
+              nullable: true
+            book_loss_currency:
+              type: string
+              nullable: true
+            loss_blocks_entries:
+              type: boolean
+            demo_entry_status:
+              type: string
+              enum: [NOT_SENT, ACCEPTED, REJECTED]
+            demo_entry_reason:
+              type: string
+            demo_entry_http_status:
+              type: integer
+              nullable: true
+            demo_entry_order_id:
+              type: string
+              nullable: true
+              description: Identificativo numerico dell'ordine Demo. Non è un token.
+            program_open_positions:
+              type: integer
+              minimum: 0
+              description: Posizioni aperte da questo programma, dentro i 500 EUR.
+            program_invested_minor:
+              type: integer
+              minimum: 0
+              description: Nominale EUR già impegnato dal programma, in minor unit.
+            entry_loop:
+              type: string
+              description: ON finché un giro sulle barre da 5 minuti può ancora aprire. Altrimenti il motivo di stop.
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+    AuditEnvelope:
+      type: object
+      required: [data, meta, warnings]
+      properties:
+        data:
+          type: object
+          required: [durable, chain_valid, event_count]
+          properties:
+            durable:
+              type: boolean
+              enum: [false]
+            chain_valid:
+              type: boolean
+            event_count:
+              type: integer
+            head_hash:
+              type: string
+              nullable: true
+            daily_digest:
+              type: string
+              nullable: true
+            daily_digest_sealed:
+              type: boolean
+        meta:
+          $ref: "#/components/schemas/Meta"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"

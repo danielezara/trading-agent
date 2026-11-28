@@ -1,0 +1,196 @@
+# Parametri versionati del conto Demo. Nessuna credenziale e nessun indirizzo di rete.
+# Scala: minor unit della valuta (EUR, 2 decimali: 500.00 = 50000); bps = 1/100 di punto percentuale;
+# millis = millesimi di 1 (1000 = 1.00). Le soglie tecniche sono calibrabili.
+schema: trading-parameters/1
+author: daniele
+reason: "Budget 500 EUR. Perdita massima 10% del budget, poi blocco. Orizzonte in giorni. Universo solo Bitcoin, solo long, leva 1. Benchmark MSCI World total return. Ingresso e uscita closed-bar-trend/1 sui prezzi eToro, solo barre da 5 minuti già chiuse: ingresso dopo 2 chiusure consecutive al rialzo, uscita dopo 2 chiusure al ribasso oppure stop a 2×ATR oppure 390 barre. Size = minimo tra rischio 0,50% del budget, cap 15% per strumento e budget residuo dopo il 20% di cassa. Capability e licenze non verificate. La cassa mostrata è quella nativa eToro, senza conversione."
+economic:
+  base_currency: EUR
+  currency_scale: 2
+  assigned_budget_amount: "500.00"
+  assigned_budget_minor: 50000
+  max_loss_bps: 1000
+  max_loss_action: block
+  horizon: days
+  allowlist:
+    universe: bitcoin
+    direction: long_only
+    leverage: 1
+    instrument_ids: []
+    # Solo Bitcoin. Un future, un ETF o un altro simbolo non entra.
+    entry_symbols:
+      - BTC
+  benchmark:
+    name: MSCI World
+    return_basis: total_return
+  # 100 EUR, il 20% del budget, restano non investiti.
+  cash_buffer_minor: 10000
+  max_positions: 8
+  max_drawdown_bps: null
+  # 0,50% di 500 EUR = 2,50 EUR di rischio per nuovo ingresso.
+  risk_per_trade_bps: 50
+  # 2% del budget = 10 EUR di rischio aperto complessivo.
+  aggregate_risk_bps: 200
+  # 15% del budget = 75 EUR per strumento.
+  instrument_exposure_bps: 1500
+  # 30% del budget = 150 EUR per settore.
+  sector_exposure_bps: 3000
+  # 20% del budget resta cassa.
+  min_cash_bps: 2000
+  # Il riferimento BCE non modifica la cassa mostrata.
+  fx_haircut_bps: 100
+  # Una barra da 5 minuti prima di un nuovo ingresso.
+  cooldown_seconds: 300
+  # 390 barre chiuse da 5 minuti: cinque sessioni da 6,5 ore.
+  max_holding_count: 390
+technical:
+  calibratable: true
+  tie_break: instrument_id
+  price_poll_seconds: 60
+  decision_bar_seconds: 300
+  order_poll_min_seconds: 15
+  order_poll_max_seconds: 30
+  news_poll_seconds: 300
+  macro_check_seconds: 3600
+  slow_data_refresh_seconds: 86400
+  prices_stale_seconds: 120
+  orders_stale_seconds: 45
+  news_stale_seconds: 600
+  slow_data_stale_seconds: 7200
+  price_conflict_bps: 10
+  price_conflict_spread_multiple: 3
+  price_conflict_align_seconds: 30
+  volume_conflict_bps: 3000
+  quality_schema_millis: 400
+  quality_provenance_millis: 350
+  quality_freshness_millis: 250
+  quality_threshold_millis: 850
+  probabilistic_schema_millis: 250
+  probabilistic_provenance_millis: 200
+  probabilistic_freshness_millis: 150
+  probabilistic_calibration_millis: 400
+  event_quality_threshold_millis: 650
+  weight_quant_millis: 450
+  weight_macro_millis: 150
+  weight_news_millis: 150
+  weight_fundamental_millis: 150
+  weight_liquidity_millis: 100
+  weight_trend_millis: 600
+  weight_momentum_millis: 250
+  weight_reversion_millis: 150
+  buy_score_millis: 650
+  buy_confidence_millis: 650
+  exit_score_millis: 350
+  confirmation_bars: 2
+  stability_scale_millis: 250
+  confidence_agreement_floor_millis: 500
+  confidence_agreement_slope_millis: 500
+  stop_atr_multiple_millis: 2000
+  chase_bps: 25
+  event_blackout_minutes: 30
+  event_key_floor_minutes: 30
+  edge_shrinkage_millis: 500
+  edge_min_observations: 100
+  edge_min_bps: 75
+  edge_to_stop_millis: 250
+  cost_share_of_gross_edge_millis: 500
+  edge_buffer_bps: 25
+  stressed_cost_multiple_millis: 1500
+  slippage_spread_divisor: 2
+  slippage_percentile: 95
+  slippage_atr_coefficient_millis: 100
+  regime_ema_fast_bars: 20
+  regime_ema_slow_bars: 60
+  regime_ema_bars: 200
+  regime_vol_bars: 20
+  regime_atr_bars: 20
+  regime_vol_percentile_favorable: 75
+  regime_vol_percentile_stress: 90
+  regime_lateral_atr_ratio_millis: 1000
+  regime_size_trend_millis: 1000
+  regime_size_lateral_millis: 750
+  regime_size_high_vol_millis: 500
+  regime_buy_score_lateral_millis: 700
+  regime_buy_score_high_vol_millis: 750
+  regime_stress_benchmark_drawdown_bps: 1000
+  ece_bins: 10
+  ece_max_observations: 2000
+  ece_min_observations: 500
+  ece_min_per_family: 50
+  ece_haircut_millis: 100
+  ece_divisor_millis: 100
+  winsor_low_percentile: 5
+  winsor_high_percentile: 95
+  correlation_cluster_millis: 700
+  ewma_half_life_bars: 390
+  covariance_weight_millis: 750
+  covariance_shrinkage_millis: 250
+  covariance_lookback_bars: 1560
+  utility_floor_bps: 1
+  rebalance_band_of_target_millis: 200
+  rebalance_band_floor_bps: 200
+  utility_buffer_bps: 25
+  sizing_confidence_mid_millis: 750
+  sizing_confidence_high_millis: 900
+  sizing_confidence_full_millis: 1000
+  llm_temperature_millis: 0
+  decision_deadline_seconds: 30
+  reconciliation_age_seconds: 45
+  alert_ack_seconds: 60
+  # Il file BCE ha solo la data. Resta usabile per 4 giorni di calendario, poi è stale e il disponibile resta assente.
+  fx_reference_max_age_days: 4
+# Selezione delle coppie spot. Non sostituisce entry_symbols e non invia ordini.
+# Volume: campo volume della candela, su una sola barra chiusa del timeframe. Soglia min_volume, stessa unità nel report.
+# Spread: (ask-bid)/mid, unità bid_ask_mid_ratio. Soglia max_spread. Nessuna soglia è scritta nel codice.
+# spread_model none: senza storico bid/ask il backtest resta non verificabile. fixed_ratio usa spread_model_value e lo marca come stima.
+spot_selection:
+  exchange: etoro
+  quote_currency: EUR
+  timeframe: FiveMinutes
+  bar_seconds: 300
+  history_start: "2026-11-28T04:00:00Z"
+  history_end: "2026-11-28T05:00:00Z"
+  min_volume: "1"
+  volume_unit: candle_volume
+  volume_window: one_closed_bar
+  max_spread: "0.002"
+  spread_unit: bid_ask_mid_ratio
+  spread_model: none
+  spread_model_value: null
+  quote_max_age_seconds: 120
+  assets:
+    - BTC
+    - ETH
+    - BNB
+    - XRP
+    - SOL
+    - TRX
+    - HYPE
+    - ZEC
+    - DOGE
+    - LEO
+    - XMR
+    - LINK
+    - ADA
+    - XLM
+    - BCH
+    - NEAR
+    - LTC
+    - CC
+    - AVAX
+    - SUI
+# Breakout/1. Non è la strategia del giro acceso: quel processo resta su closed-bar-trend/1.
+# Precedenza se più coppie segnalano insieme: instrument_id in ordine lessicografico crescente.
+# Lo stop è la distanza dalla esecuzione, non dal close del segnale. Il prezzo di stop non è garantito.
+breakout:
+  strategy: breakout/1
+  timeframe: FiveMinutes
+  bar_seconds: 300
+  entry_lookback: 20
+  exit_lookback: 10
+  stop_distance_ratio: "0.02"
+  position_size_minor: 7500
+  max_position_minor: 7500
+  max_exposure_minor: 40000
+  max_positions: 4
+  priority: instrument_id

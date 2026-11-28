@@ -1,0 +1,122 @@
+{
+  "connector_version": "fixture-1",
+  "records": [
+    {
+      "record_id": "price-a",
+      "channel": "prices",
+      "category": "market-data",
+      "provider_class": "deterministic",
+      "source_name": "fixture-market-data",
+      "event_time": "2026-11-27T00:00:00Z",
+      "ingested_at": "2026-11-27T00:00:01Z",
+      "license": "fixture-unverified",
+      "license_verified": false,
+      "contract_verified": false,
+      "instrument_id": "INST-1",
+      "value": "100.00"
+    },
+    {
+      "record_id": "price-a",
+      "channel": "prices",
+      "category": "market-data",
+      "provider_class": "deterministic",
+      "source_name": "fixture-market-data",
+      "event_time": "2026-11-27T00:00:00Z",
+      "ingested_at": "2026-11-27T00:00:01Z",
+      "license": "fixture-unverified",
+      "license_verified": false,
+      "contract_verified": false,
+      "instrument_id": "INST-1",
+      "value": "100.00"
+    },
+    {
+      "record_id": "price-b",
+      "channel": "prices",
+      "category": "market-data",
+      "provider_class": "deterministic",
+      "source_name": "fixture-market-crosscheck",
+      "event_time": "2026-11-27T00:00:10Z",
+      "ingested_at": "2026-11-27T00:00:11Z",
+      "license": "fixture-unverified",
+      "license_verified": false,
+      "contract_verified": false,
+      "instrument_id": "INST-1",
+      "value": "101.20"
+    },
+    {
+      "record_id": "price-bad",
+      "channel": "prices",
+      "provider_class": "deterministic"
+    },
+    {
+      "record_id": "news-prob",
+      "channel": "news",
+      "category": "news",
+      "provider_class": "probabilistic",
+      "source_name": "fixture-news",
+      "event_time": "2026-11-27T00:00:00Z",
+      "ingested_at": "2026-11-27T00:00:01Z",
+      "license": "fixture-unverified",
+      "license_verified": false,
+      "contract_verified": false,
+      "instrument_id": "INST-1",
+      "value": "synthetic-headline"
+    },
+    {
+      "record_id": "news-1",
+      "channel": "news",
+      "category": "news",
+      "provider_class": "deterministic",
+      "source_name": "fixture-news",
+      "event_time": "2026-11-27T00:00:00Z",
+      "ingested_at": "2026-11-27T00:00:02Z",
+      "license": "fixture-unverified",
+      "license_verified": false,
+      "contract_verified": false,
+      "instrument_id": "INST-1",
+      "value": "synthetic-headline"
+    },
+    {
+      "record_id": "macro-1",
+      "channel": "macro",
+      "category": "macro",
+      "provider_class": "deterministic",
+      "source_name": "fixture-macro",
+      "event_time": "2026-11-27T00:00:00Z",
+      "ingested_at": "2026-11-27T00:00:02Z",
+      "license": "fixture-unverified",
+      "license_verified": false,
+      "contract_verified": false,
+      "instrument_id": "MACRO-1",
+      "value": "1.0"
+    },
+    {
+      "record_id": "fundamentals-1",
+      "channel": "fundamentals",
+      "category": "fundamentals",
+      "provider_class": "deterministic",
+      "source_name": "fixture-fundamentals",
+      "event_time": "2026-11-27T00:00:00Z",
+      "ingested_at": "2026-11-27T00:00:02Z",
+      "license": "fixture-unverified",
+      "license_verified": false,
+      "contract_verified": false,
+      "instrument_id": "INST-1",
+      "value": "10"
+    },
+    {
+      "record_id": "calendar-1",
+      "channel": "calendar",
+      "category": "calendar",
+      "provider_class": "deterministic",
+      "source_name": "fixture-calendar",
+      "event_time": "2026-11-27T00:00:00Z",
+      "ingested_at": "2026-11-27T00:00:02Z",
+      "license": "fixture-unverified",
+      "license_verified": false,
+      "contract_verified": false,
+      "instrument_id": "INST-1",
+      "value": "open"
+    }
+  ]
+}

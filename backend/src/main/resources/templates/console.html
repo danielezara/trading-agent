@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="it" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Trading agent — console Demo</title>
+  <link rel="stylesheet" th:href="@{/console.css}"/>
+</head>
+<body>
+<main>
+  <p class="eyebrow">Stack unico Kotlin · Demo eToro gratis</p>
+  <h1>Console</h1>
+  <p class="lead">Lettura e operazioni solo sulla Public API Demo. Un processo: <code>./gradlew bootRun</code>.</p>
+
+  <section class="panel">
+    <h2>Stato</h2>
+    <dl class="facts">
+      <div><dt>Chiavi Demo</dt><dd th:text="${keysReady} ? 'presenti' : 'mancanti'">mancanti</dd></div>
+      <div><dt>Connessa</dt><dd th:text="${connected} ? 'sì' : 'no'">no</dd></div>
+      <div><dt>Stato</dt><dd th:text="${operationalState}">OBSERVATION</dd></div>
+      <div><dt>Kill switch</dt><dd th:text="${killSwitch} ? 'inserito' : 'disinserito'">disinserito</dd></div>
+      <div><dt>Cassa</dt>
+        <dd th:if="${brokerCash != null}" th:text="${brokerCash.minorUnits} + ' ' + ${brokerCash.currency}">—</dd>
+        <dd th:if="${brokerCash == null}">non disponibile</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="panel">
+    <h2>Posizioni aperte</h2>
+    <table th:if="${!positions.isEmpty()}">
+      <thead>
+      <tr><th>Position</th><th>Instrument</th><th>Qty</th><th>Valore</th><th></th></tr>
+      </thead>
+      <tbody>
+      <tr th:each="p : ${positions}">
+        <td th:text="${p.positionId} ?: '—'">—</td>
+        <td th:text="${p.instrumentId}">0</td>
+        <td th:text="${p.quantity} ?: '—'">—</td>
+        <td th:if="${p.value != null}" th:text="${p.value.minorUnits} + ' ' + ${p.value.currency}">—</td>
+        <td th:if="${p.value == null}">—</td>
+        <td>
+          <button type="button" class="danger"
+                  th:if="${p.positionId != null}"
+                  th:attr="data-position-id=${p.positionId}"
+                  onclick="closePosition(this.dataset.positionId)">Chiudi</button>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+    <p th:if="${positions.isEmpty()}">Nessuna posizione.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Apri posizione Demo</h2>
+    <form id="open-form" class="row">
+      <label>Instrument ID <input name="instrumentId" required placeholder="100109"/></label>
+      <label>Importo <input name="amount" required placeholder="50.00"/></label>
+      <button type="submit">Apri long</button>
+    </form>
+    <p id="trade-result" class="result" hidden></p>
+  </section>
+
+  <section class="panel">
+    <header class="row-between">
+      <h2>Whitelist crypto</h2>
+      <p id="whitelist-asof" class="muted">Aggiornamento indipendente…</p>
+    </header>
+    <div id="crypto-grid" class="crypto-grid"></div>
+  </section>
+</main>
+<script th:src="@{/console.js}"></script>
+</body>
+</html>
