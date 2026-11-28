@@ -29,6 +29,7 @@ export type Candle = {
   high: number;
   low: number;
   close: number;
+  forming: boolean;
 };
 
 export type EuroPair = {
@@ -60,10 +61,10 @@ type FetchLike = (input: string, init: { method: "GET"; headers: Record<string, 
 }>;
 
 const CATALOG_TTL_MS = 10 * 60 * 1000;
-const CANDLE_TTL_MS = 45 * 1000;
-const UPSTREAM_GAP_MS = 20 * 1000;
+const CANDLE_TTL_MS = 30 * 1000;
+const UPSTREAM_GAP_MS = 10 * 1000;
 const PAUSE_MS = 60 * 1000;
-const MAX_CALLS = 2;
+const MAX_CALLS = 4;
 
 type Slot = { card: CryptoCard; catalogAt: number; candleAt: number | null };
 
@@ -204,16 +205,13 @@ export async function readWhitelist(options: {
   }
   let calls = 0;
   while (calls < MAX_CALLS && at >= pauseUntil) {
-    const due = WHITELIST.find((ticker) => {
-      const slot = slots.get(ticker);
-      return Boolean(slot?.card.pair) && (slot!.candleAt === null || at - slot!.candleAt >= CANDLE_TTL_MS);
-    });
+    const due = nextCandleDue(at);
     if (due) {
       calls += 1;
       lastUpstreamAt = at;
       const slot = slots.get(due)!;
-      const body = await readBody(options.fetchImpl, candleUrl(slot.card.pair!.instrumentId), apiKey, userKey, sleep);
-      const candles = body === null ? null : parseCandles(body, at);
+      const read = await readBody(options.fetchImpl, candleUrl(slot.card.pair!.instrumentId), apiKey, userKey, sleep);
+      const candles = read.body === null ? null : parseCandles(read.body, at);
       if (candles && candles.length > 0) {
         slot.card = {
           ticker: due,
@@ -227,20 +225,20 @@ export async function readWhitelist(options: {
         slot.candleAt = at;
         continue;
       }
-      if (slot.card.candles.length > 0 && slot.card.price) {
-        rememberStale();
-        pauseUntil = at + PAUSE_MS;
-        break;
-      }
-      slot.card = {
-        ...slot.card,
-        candles: [],
-        price: null,
-        stale: false,
-        reason: candles === null ? "Candele non disponibili" : "Nessuna candela chiusa",
-      };
+      // Advance this ticker so the next window prefers a different crypto.
       slot.candleAt = at;
-      if (body === null) {
+      if (slot.card.candles.length > 0 && slot.card.price) {
+        slot.card = { ...slot.card, stale: true, reason: "Ultimo disponibile" };
+      } else {
+        slot.card = {
+          ...slot.card,
+          candles: [],
+          price: null,
+          stale: false,
+          reason: candles === null ? "Candele non disponibili" : "Nessuna candela",
+        };
+      }
+      if (read.rateLimited) {
         pauseUntil = at + PAUSE_MS;
         break;
       }
@@ -253,7 +251,7 @@ export async function readWhitelist(options: {
     calls += 1;
     lastUpstreamAt = at;
     const search = await readBody(options.fetchImpl, searchUrl(missing), apiKey, userKey, sleep);
-    if (search === null) {
+    if (search.body === null) {
       const slot = slots.get(missing);
       if (slot?.card.price) {
         rememberStale();
@@ -263,7 +261,7 @@ export async function readWhitelist(options: {
       pauseUntil = at + PAUSE_MS;
       break;
     }
-    const found = eurPair(missing, search);
+    const found = eurPair(missing, search.body);
     const previous = slots.get(missing);
     if (found.kind === "absent") {
       if (previous?.card.candles.length) {
@@ -281,11 +279,12 @@ export async function readWhitelist(options: {
         reason: previous?.card.candles.length ? null : "Candele non disponibili",
         candles: previous?.card.candles ?? [],
         price: previous?.card.price ?? null,
-        stale: false,
+        stale: Boolean(previous?.card.candles.length) ? previous!.card.stale : false,
         quotedAt: previous?.card.quotedAt ?? null,
       },
       catalogAt: at,
-      candleAt: previous?.card.candles.length ? at : null,
+      // Catalog refresh must not pretend candles were just fetched.
+      candleAt: previous?.candleAt ?? null,
     });
   }
   return snapshot();
@@ -293,6 +292,26 @@ export async function readWhitelist(options: {
 
 function snapshot(): CryptoCard[] {
   return WHITELIST.map((ticker) => slots.get(ticker)?.card ?? pendingCard(ticker));
+}
+
+function nextCandleDue(at: number): string | undefined {
+  let chosen: string | undefined;
+  let chosenAt = Number.POSITIVE_INFINITY;
+  for (const ticker of WHITELIST) {
+    const slot = slots.get(ticker);
+    if (!slot?.card.pair) {
+      continue;
+    }
+    if (slot.candleAt !== null && at - slot.candleAt < CANDLE_TTL_MS) {
+      continue;
+    }
+    const age = slot.candleAt ?? Number.NEGATIVE_INFINITY;
+    if (age < chosenAt) {
+      chosen = ticker;
+      chosenAt = age;
+    }
+  }
+  return chosen;
 }
 
 function catalogFresh(slot: Slot | undefined, at: number): boolean {
@@ -352,7 +371,8 @@ function closedCandle(row: unknown, nowMs: number): Candle | null {
     return null;
   }
   const start = Date.parse(row.fromDate);
-  if (!Number.isFinite(start) || start + 300_000 > nowMs) {
+  // Keep the in-progress five-minute bar so the chart can move before the close.
+  if (!Number.isFinite(start) || start > nowMs) {
     return null;
   }
   const open = finite(row.open);
@@ -365,11 +385,25 @@ function closedCandle(row: unknown, nowMs: number): Candle | null {
   if (low < 0 || low > open || low > close || high < open || high < close) {
     return null;
   }
-  return { start: row.fromDate, open, high, low, close };
+  return {
+    start: row.fromDate,
+    open,
+    high,
+    low,
+    close,
+    forming: start + 300_000 > nowMs,
+  };
 }
 
 function finite(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  }
+  return null;
 }
 
 function positiveId(value: unknown): string | null {
@@ -385,17 +419,18 @@ async function readBody(
   apiKey: string,
   userKey: string,
   sleep: (ms: number) => Promise<void>,
-): Promise<string | null> {
+): Promise<{ body: string | null; rateLimited: boolean }> {
   const first = await get(fetchImpl, url, apiKey, userKey);
   if (first.kind === "transport") {
-    return null;
+    return { body: null, rateLimited: false };
   }
-  const retryAfter = first.status === 429 ? retryDelay(first.retryAfter) : null;
+  const rateLimited = first.status === 429;
+  const retryAfter = rateLimited ? retryDelay(first.retryAfter) : null;
   const response = retryAfter === null ? first : await retry(fetchImpl, url, apiKey, userKey, sleep, retryAfter);
   if (response.kind === "transport" || response.status !== 200 || !response.body.trim()) {
-    return null;
+    return { body: null, rateLimited: rateLimited || (response.kind === "http" && response.status === 429) };
   }
-  return response.body;
+  return { body: response.body, rateLimited: false };
 }
 
 async function retry(

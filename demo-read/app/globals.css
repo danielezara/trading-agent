@@ -64,6 +64,7 @@ h1, h2 { margin: 0.2rem 0 0.4rem; }
 .chart { width: 100%; height: 5.5rem; display: block; }
 .chart line { stroke: currentColor; stroke-width: 1; }
 .chart rect { fill: currentColor; }
+.chart .forming { opacity: 0.55; }
 .composition { list-style: none; margin: 0.6rem 0 0; padding: 0; }
 .composition li { display: grid; grid-template-columns: 1fr auto auto; gap: 0.8rem; padding: 0.35rem 0; border-top: 1px solid #243044; }
 

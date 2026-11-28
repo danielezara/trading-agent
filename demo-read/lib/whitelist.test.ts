@@ -57,7 +57,7 @@ describe("whitelist", () => {
     assert.deepEqual(found, { kind: "absent", reason: "Coppia ambigua" });
   });
 
-  it("keeps only closed five-minute candles", () => {
+  it("keeps closed bars and the in-progress five-minute candle", () => {
     const now = Date.parse("2026-11-28T06:06:00Z");
     const candles = parseCandles(JSON.stringify({
       interval: "FiveMinutes",
@@ -66,11 +66,28 @@ describe("whitelist", () => {
           { fromDate: "2026-11-28T06:05:00Z", open: 3, high: 4, low: 2, close: 3.5 },
           { fromDate: "2026-11-28T06:00:00Z", open: 1, high: 2, low: 0.5, close: 1.5 },
           { fromDate: "2026-11-28T05:55:00Z", open: 1, high: 0.5, low: 0.4, close: 0.9 },
+          { fromDate: "2026-11-28T06:10:00Z", open: 4, high: 5, low: 3.5, close: 4.2 },
         ],
       }],
     }), now);
     assert.deepEqual(candles, [
-      { start: "2026-11-28T06:00:00Z", open: 1, high: 2, low: 0.5, close: 1.5 },
+      { start: "2026-11-28T06:00:00Z", open: 1, high: 2, low: 0.5, close: 1.5, forming: false },
+      { start: "2026-11-28T06:05:00Z", open: 3, high: 4, low: 2, close: 3.5, forming: true },
+    ]);
+  });
+
+  it("reads candle prices when eToro sends them as strings", () => {
+    const now = Date.parse("2026-11-28T06:06:00Z");
+    const candles = parseCandles(JSON.stringify({
+      interval: "FiveMinutes",
+      candles: [{
+        candles: [
+          { fromDate: "2026-11-28T06:00:00Z", open: "1", high: "2", low: "0.5", close: "1.5" },
+        ],
+      }],
+    }), now);
+    assert.deepEqual(candles, [
+      { start: "2026-11-28T06:00:00Z", open: 1, high: 2, low: 0.5, close: 1.5, forming: false },
     ]);
   });
 
@@ -131,13 +148,13 @@ describe("whitelist", () => {
     assert.equal(cards[0].price, "1.5");
     assert.equal(cards[0].candles.length, 1);
     assert.equal(cards[0].stale, false);
-    assert.equal(cards[1].reason, "Lettura in corso");
-    assert.equal(calls.length, 2);
+    assert.equal(cards[1].reason, "Coppia EUR assente");
+    assert.equal(calls.length, 4);
     assert.equal(calls.some((url) => url.includes("/trading/execution")), false);
 
     const again = await readWhitelist({ env: keys, now: () => now, fetchImpl });
     assert.equal(again[0].price, "1.5");
-    assert.equal(calls.length, 2);
+    assert.equal(calls.length, 4);
 
     now = new Date("2026-11-28T06:07:00Z");
     failCandles = true;
@@ -149,12 +166,78 @@ describe("whitelist", () => {
     clearWhitelistCache();
   });
 
+  it("moves on to the next crypto after a candle read fails", async () => {
+    clearWhitelistCache();
+    const calls: string[] = [];
+    const now = new Date("2026-11-28T06:06:00Z");
+    const fetchImpl = async (url: string) => {
+      calls.push(url);
+      const asset = new URL(url).searchParams.get("internalSymbolFull");
+      if (asset === "BTC") {
+        return json(page([cryptoRow("BTCEUR", 100109)]));
+      }
+      if (asset === "ETH") {
+        return json(page([cryptoRow("ETHEUR", 100110)]));
+      }
+      if (asset) {
+        return json(page([cryptoRow(asset, 1000)]));
+      }
+      if (url.includes("/100109/history/candles/")) {
+        return { status: 503, headers: { get: () => null }, text: async () => "" };
+      }
+      if (url.includes("/100110/history/candles/")) {
+        return json(JSON.stringify({
+          interval: "FiveMinutes",
+          candles: [{ candles: [{ fromDate: "2026-11-28T06:00:00Z", open: 2, high: 3, low: 1, close: 2.5 }] }],
+        }));
+      }
+      return json("");
+    };
+    const cards = await readWhitelist({ env: keys, now: () => now, fetchImpl });
+    assert.equal(cards[0].pair?.instrumentId, "100109");
+    assert.equal(cards[0].candles.length, 0);
+    assert.equal(cards[1].pair?.instrumentId, "100110");
+    assert.equal(cards[1].price, "2.5");
+    assert.equal(cards[1].candles.length, 1);
+    assert.equal(calls.some((url) => url.includes("/100110/history/candles/")), true);
+    clearWhitelistCache();
+  });
+
+  it("does not treat a catalog refresh as a fresh candle read", async () => {
+    clearWhitelistCache();
+    let now = new Date("2026-11-28T06:06:00Z");
+    let candleCalls = 0;
+    const fetchImpl = async (url: string) => {
+      const asset = new URL(url).searchParams.get("internalSymbolFull");
+      if (asset === "BTC") {
+        return json(page([cryptoRow("BTCEUR", 100109)]));
+      }
+      if (asset) {
+        return json(page([cryptoRow(`${asset}EUR`, 100200 + asset.length)]));
+      }
+      if (url.includes("/history/candles/")) {
+        candleCalls += 1;
+        return json(JSON.stringify({
+          interval: "FiveMinutes",
+          candles: [{ candles: [{ fromDate: "2026-11-28T06:00:00Z", open: 1, high: 2, low: 0.5, close: 1.5 }] }],
+        }));
+      }
+      return json("");
+    };
+    await readWhitelist({ env: keys, now: () => now, fetchImpl });
+    const afterFirst = candleCalls;
+    now = new Date("2026-11-28T06:16:30Z");
+    await readWhitelist({ env: keys, now: () => now, fetchImpl });
+    assert.equal(candleCalls > afterFirst, true);
+    clearWhitelistCache();
+  });
+
   it("keeps a drawn chart when a later payload has no candles", () => {
     const previous: CryptoCard[] = [{
       ticker: "BTC",
       pair: { symbol: "BTCEUR", instrumentId: "100109" },
       reason: null,
-      candles: [{ start: "2026-11-28T06:00:00Z", open: 1, high: 2, low: 0.5, close: 1.5 }],
+      candles: [{ start: "2026-11-28T06:00:00Z", open: 1, high: 2, low: 0.5, close: 1.5, forming: false }],
       price: "1.5",
       stale: false,
       quotedAt: "2026-11-28T06:06:00Z",

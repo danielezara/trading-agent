@@ -108,7 +108,7 @@ function CandleChart({ candles }: { candles: Candle[] }) {
         const bottom = y(Math.min(candle.open, candle.close));
         const body = Math.max(1, bottom - top);
         return (
-          <g key={candle.start} className={up ? "up" : "down"}>
+          <g key={candle.start} className={`${up ? "up" : "down"}${candle.forming ? " forming" : ""}`}>
             <line x1={x} x2={x} y1={y(candle.high)} y2={y(candle.low)} />
             <rect x={x - Math.max(1, slot * 0.28)} y={top} width={Math.max(2, slot * 0.56)} height={body} />
           </g>
