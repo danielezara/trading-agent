@@ -61,21 +61,22 @@ type FetchLike = (input: string, init: { method: "GET"; headers: Record<string, 
 }>;
 
 const CATALOG_TTL_MS = 10 * 60 * 1000;
-const CANDLE_TTL_MS = 30 * 1000;
-const UPSTREAM_GAP_MS = 10 * 1000;
-const PAUSE_MS = 60 * 1000;
-const MAX_CALLS = 4;
+const CANDLE_TTL_MS = 20 * 1000;
+const FAIL_COOLDOWN_MS = 30 * 1000;
+const RATE_LIMIT_MS = 60 * 1000;
+const MAX_PARALLEL = 6;
 
-type Slot = { card: CryptoCard; catalogAt: number; candleAt: number | null };
+type Slot = {
+  card: CryptoCard;
+  catalogAt: number;
+  candleAt: number | null;
+  pauseUntil: number;
+};
 
 const slots = new Map<string, Slot>();
-let pauseUntil = 0;
-let lastUpstreamAt = 0;
 
 export function clearWhitelistCache(): void {
   slots.clear();
-  pauseUntil = 0;
-  lastUpstreamAt = 0;
 }
 
 export function mergeCards(previous: CryptoCard[] | null, incoming: CryptoCard[]): CryptoCard[] {
@@ -200,81 +201,57 @@ export async function readWhitelist(options: {
   }
   const sleep = options.sleep ?? (async () => {});
   const at = now().getTime();
-  if (at < pauseUntil || (lastUpstreamAt !== 0 && at - lastUpstreamAt < UPSTREAM_GAP_MS)) {
-    return snapshot();
-  }
-  let calls = 0;
-  while (calls < MAX_CALLS && at >= pauseUntil) {
-    const due = nextCandleDue(at);
-    if (due) {
-      calls += 1;
-      lastUpstreamAt = at;
-      const slot = slots.get(due)!;
-      const read = await readBody(options.fetchImpl, candleUrl(slot.card.pair!.instrumentId), apiKey, userKey, sleep);
-      const candles = read.body === null ? null : parseCandles(read.body, at);
-      if (candles && candles.length > 0) {
-        slot.card = {
-          ticker: due,
-          pair: slot.card.pair,
-          reason: null,
-          candles,
-          price: String(candles[candles.length - 1].close),
-          stale: false,
-          quotedAt: new Date(at).toISOString(),
-        };
-        slot.candleAt = at;
-        continue;
-      }
-      // Advance this ticker so the next window prefers a different crypto.
-      slot.candleAt = at;
-      if (slot.card.candles.length > 0 && slot.card.price) {
-        slot.card = { ...slot.card, stale: true, reason: "Ultimo disponibile" };
-      } else {
-        slot.card = {
-          ...slot.card,
-          candles: [],
-          price: null,
-          stale: false,
-          reason: candles === null ? "Candele non disponibili" : "Nessuna candela",
-        };
-      }
-      if (read.rateLimited) {
-        pauseUntil = at + PAUSE_MS;
-        break;
-      }
-      continue;
-    }
-    const missing = WHITELIST.find((ticker) => !catalogFresh(slots.get(ticker), at));
-    if (!missing) {
-      break;
-    }
-    calls += 1;
-    lastUpstreamAt = at;
-    const search = await readBody(options.fetchImpl, searchUrl(missing), apiKey, userKey, sleep);
+  const due = dueTickers(at).slice(0, MAX_PARALLEL);
+  await Promise.all(due.map((ticker) => refreshTicker(ticker, at, options.fetchImpl, apiKey, userKey, sleep)));
+  return snapshot();
+}
+
+async function refreshTicker(
+  ticker: string,
+  at: number,
+  fetchImpl: FetchLike,
+  apiKey: string,
+  userKey: string,
+  sleep: (ms: number) => Promise<void>,
+): Promise<void> {
+  const slot = slots.get(ticker);
+  if (!catalogFresh(slot, at)) {
+    const search = await readBody(fetchImpl, searchUrl(ticker), apiKey, userKey, sleep);
     if (search.body === null) {
-      const slot = slots.get(missing);
-      if (slot?.card.price) {
-        rememberStale();
+      if (slot?.card.candles.length && slot.card.price) {
+        slot.card = { ...slot.card, stale: true, reason: "Ultimo disponibile" };
+        slot.catalogAt = at;
+        slot.pauseUntil = at + (search.rateLimited ? RATE_LIMIT_MS : FAIL_COOLDOWN_MS);
       } else {
-        slots.set(missing, { card: emptyCard(missing, "Ricerca non disponibile"), catalogAt: at, candleAt: null });
+        slots.set(ticker, {
+          card: emptyCard(ticker, "Ricerca non disponibile"),
+          catalogAt: at,
+          candleAt: null,
+          pauseUntil: at + (search.rateLimited ? RATE_LIMIT_MS : FAIL_COOLDOWN_MS),
+        });
       }
-      pauseUntil = at + PAUSE_MS;
-      break;
+      return;
     }
-    const found = eurPair(missing, search.body);
-    const previous = slots.get(missing);
+    const found = eurPair(ticker, search.body);
+    const previous = slots.get(ticker);
     if (found.kind === "absent") {
       if (previous?.card.candles.length) {
         previous.card = { ...previous.card, stale: true, reason: "Ultimo disponibile" };
         previous.catalogAt = at;
+        previous.pauseUntil = 0;
       } else {
-        slots.set(missing, { card: emptyCard(missing, found.reason), catalogAt: at, candleAt: null });
+        slots.set(ticker, {
+          card: emptyCard(ticker, found.reason),
+          catalogAt: at,
+          candleAt: null,
+          pauseUntil: 0,
+        });
       }
-      continue;
+      return;
     }
-    slots.set(missing, {
+    slots.set(ticker, {
       card: {
-        ticker: missing,
+        ticker,
         pair: found.pair,
         reason: previous?.card.candles.length ? null : "Candele non disponibili",
         candles: previous?.card.candles ?? [],
@@ -283,51 +260,94 @@ export async function readWhitelist(options: {
         quotedAt: previous?.card.quotedAt ?? null,
       },
       catalogAt: at,
-      // Catalog refresh must not pretend candles were just fetched.
       candleAt: previous?.candleAt ?? null,
+      pauseUntil: 0,
     });
   }
-  return snapshot();
+  const ready = slots.get(ticker);
+  if (!ready?.card.pair || !candlesDue(ready, at)) {
+    return;
+  }
+  const read = await readBody(fetchImpl, candleUrl(ready.card.pair.instrumentId), apiKey, userKey, sleep);
+  const candles = read.body === null ? null : parseCandles(read.body, at);
+  ready.candleAt = at;
+  if (candles && candles.length > 0) {
+    ready.card = {
+      ticker,
+      pair: ready.card.pair,
+      reason: null,
+      candles,
+      price: String(candles[candles.length - 1].close),
+      stale: false,
+      quotedAt: new Date(at).toISOString(),
+    };
+    ready.pauseUntil = 0;
+    return;
+  }
+  if (ready.card.candles.length > 0 && ready.card.price) {
+    ready.card = { ...ready.card, stale: true, reason: "Ultimo disponibile" };
+  } else {
+    ready.card = {
+      ...ready.card,
+      candles: [],
+      price: null,
+      stale: false,
+      reason: candles === null ? "Candele non disponibili" : "Nessuna candela",
+    };
+  }
+  ready.pauseUntil = at + (read.rateLimited ? RATE_LIMIT_MS : FAIL_COOLDOWN_MS);
 }
 
 function snapshot(): CryptoCard[] {
   return WHITELIST.map((ticker) => slots.get(ticker)?.card ?? pendingCard(ticker));
 }
 
-function nextCandleDue(at: number): string | undefined {
-  let chosen: string | undefined;
-  let chosenAt = Number.POSITIVE_INFINITY;
+function dueTickers(at: number): string[] {
+  const catalog: { ticker: string; age: number }[] = [];
+  const candles: { ticker: string; age: number }[] = [];
   for (const ticker of WHITELIST) {
     const slot = slots.get(ticker);
-    if (!slot?.card.pair) {
+    if (slot && at < slot.pauseUntil) {
       continue;
     }
-    if (slot.candleAt !== null && at - slot.candleAt < CANDLE_TTL_MS) {
+    const age = slot?.candleAt ?? slot?.catalogAt ?? Number.NEGATIVE_INFINITY;
+    if (!catalogFresh(slot, at)) {
+      catalog.push({ ticker, age });
       continue;
     }
-    const age = slot.candleAt ?? Number.NEGATIVE_INFINITY;
-    if (age < chosenAt) {
-      chosen = ticker;
-      chosenAt = age;
+    if (slot?.card.pair && candlesDue(slot, at)) {
+      candles.push({ ticker, age });
     }
   }
-  return chosen;
+  catalog.sort((left, right) => left.age - right.age);
+  candles.sort((left, right) => left.age - right.age);
+  // Alternate so catalog bootstrap and live candle refresh stay independent.
+  const mixed: string[] = [];
+  let catalogIndex = 0;
+  let candleIndex = 0;
+  while (catalogIndex < catalog.length || candleIndex < candles.length) {
+    if (catalogIndex < catalog.length) {
+      mixed.push(catalog[catalogIndex++].ticker);
+    }
+    if (candleIndex < candles.length) {
+      mixed.push(candles[candleIndex++].ticker);
+    }
+  }
+  return mixed;
+}
+
+function candlesDue(slot: Slot, at: number): boolean {
+  return slot.candleAt === null || at - slot.candleAt >= CANDLE_TTL_MS;
 }
 
 function catalogFresh(slot: Slot | undefined, at: number): boolean {
   if (!slot) {
     return false;
   }
-  const ttl = slot.card.reason === "Ricerca non disponibile" || slot.card.reason === "Catalogo incompleto" ? PAUSE_MS : CATALOG_TTL_MS;
+  const ttl = slot.card.reason === "Ricerca non disponibile" || slot.card.reason === "Catalogo incompleto"
+    ? FAIL_COOLDOWN_MS
+    : CATALOG_TTL_MS;
   return at - slot.catalogAt < ttl;
-}
-
-function rememberStale(): void {
-  for (const slot of slots.values()) {
-    if (slot.card.candles.length > 0 && slot.card.price) {
-      slot.card = { ...slot.card, stale: true, reason: "Ultimo disponibile" };
-    }
-  }
 }
 
 function pendingCard(ticker: string): CryptoCard {

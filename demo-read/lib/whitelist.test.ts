@@ -114,7 +114,7 @@ describe("whitelist", () => {
     ).performance, "non disponibile");
   });
 
-  it("reads one euro pair per window and keeps its candles when the next read fails", async () => {
+  it("refreshes several cryptos on their own and keeps candles after a failed reread", async () => {
     clearWhitelistCache();
     const calls: string[] = [];
     let now = new Date("2026-11-28T06:06:00Z");
@@ -143,18 +143,20 @@ describe("whitelist", () => {
       return json("");
     };
     const cards = await readWhitelist({ env: keys, now: () => now, fetchImpl });
+    const afterFirst = calls.length;
     assert.equal(cards.length, 20);
     assert.equal(cards[0].pair?.instrumentId, "100109");
     assert.equal(cards[0].price, "1.5");
     assert.equal(cards[0].candles.length, 1);
     assert.equal(cards[0].stale, false);
     assert.equal(cards[1].reason, "Coppia EUR assente");
-    assert.equal(calls.length, 4);
+    assert.equal(afterFirst >= 2, true);
     assert.equal(calls.some((url) => url.includes("/trading/execution")), false);
 
+    const btcCandlesBefore = calls.filter((url) => url.includes("/100109/history/candles/")).length;
     const again = await readWhitelist({ env: keys, now: () => now, fetchImpl });
     assert.equal(again[0].price, "1.5");
-    assert.equal(calls.length, 4);
+    assert.equal(calls.filter((url) => url.includes("/100109/history/candles/")).length, btcCandlesBefore);
 
     now = new Date("2026-11-28T06:07:00Z");
     failCandles = true;
@@ -166,12 +168,10 @@ describe("whitelist", () => {
     clearWhitelistCache();
   });
 
-  it("moves on to the next crypto after a candle read fails", async () => {
+  it("updates other cryptos when one candle read fails", async () => {
     clearWhitelistCache();
-    const calls: string[] = [];
     const now = new Date("2026-11-28T06:06:00Z");
     const fetchImpl = async (url: string) => {
-      calls.push(url);
       const asset = new URL(url).searchParams.get("internalSymbolFull");
       if (asset === "BTC") {
         return json(page([cryptoRow("BTCEUR", 100109)]));
@@ -199,11 +199,44 @@ describe("whitelist", () => {
     assert.equal(cards[1].pair?.instrumentId, "100110");
     assert.equal(cards[1].price, "2.5");
     assert.equal(cards[1].candles.length, 1);
-    assert.equal(calls.some((url) => url.includes("/100110/history/candles/")), true);
     clearWhitelistCache();
   });
 
-  it("does not treat a catalog refresh as a fresh candle read", async () => {
+  it("keeps updating other cryptos when one catalog search fails", async () => {
+    clearWhitelistCache();
+    const now = new Date("2026-11-28T06:06:00Z");
+    const fetchImpl = async (url: string) => {
+      const asset = new URL(url).searchParams.get("internalSymbolFull");
+      if (asset === "BTC") {
+        return json(page([cryptoRow("BTCEUR", 100109)]));
+      }
+      if (asset === "ETH") {
+        return { status: 503, headers: { get: () => null }, text: async () => "" };
+      }
+      if (asset === "BNB") {
+        return json(page([cryptoRow("BNBEUR", 100111)]));
+      }
+      if (asset) {
+        return json(page([cryptoRow(asset, 1000)]));
+      }
+      if (url.includes("/history/candles/")) {
+        const id = url.match(/instruments\/(\d+)\//)?.[1];
+        return json(JSON.stringify({
+          interval: "FiveMinutes",
+          candles: [{ candles: [{ fromDate: "2026-11-28T06:00:00Z", open: 1, high: id === "100111" ? 10 : 2, low: 0.5, close: id === "100111" ? 9 : 1.5 }] }],
+        }));
+      }
+      return json("");
+    };
+    const cards = await readWhitelist({ env: keys, now: () => now, fetchImpl });
+    assert.equal(cards[0].price, "1.5");
+    assert.equal(cards[1].reason, "Ricerca non disponibile");
+    assert.equal(cards[2].pair?.instrumentId, "100111");
+    assert.equal(cards[2].price, "9");
+    clearWhitelistCache();
+  });
+
+  it("refreshes candles again after the catalog ttl without blocking other pairs", async () => {
     clearWhitelistCache();
     let now = new Date("2026-11-28T06:06:00Z");
     let candleCalls = 0;
@@ -258,20 +291,22 @@ describe("whitelist", () => {
     assert.equal(merged[1].reason, "Lettura in corso");
   });
 
-  it("does not repeat a failed catalog read on the next poll", async () => {
+  it("does not repeat a rate-limited catalog read on the next poll", async () => {
     clearWhitelistCache();
-    let calls = 0;
+    const searched = new Map<string, number>();
     const now = new Date("2026-11-28T06:06:00Z");
-    const fetchImpl = async () => {
-      calls += 1;
+    const fetchImpl = async (url: string) => {
+      const asset = new URL(url).searchParams.get("internalSymbolFull") ?? url;
+      searched.set(asset, (searched.get(asset) ?? 0) + 1);
       return { status: 429, headers: { get: () => "30" }, text: async () => "" };
     };
     const first = await readWhitelist({ env: keys, now: () => now, fetchImpl });
+    const btcFirst = searched.get("BTC") ?? 0;
     const second = await readWhitelist({ env: keys, now: () => now, fetchImpl });
     assert.equal(first[0].reason, "Ricerca non disponibile");
     assert.equal(second[0].reason, "Ricerca non disponibile");
-    assert.equal(first[1].reason, "Lettura in corso");
-    assert.equal(calls, 1);
+    assert.equal(btcFirst, 1);
+    assert.equal(searched.get("BTC"), 1);
     clearWhitelistCache();
   });
 

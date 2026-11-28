@@ -60,7 +60,7 @@ export function WhitelistBoard({ book }: { book: ProgramBook }) {
           <p className="eyebrow">Whitelist</p>
           <h2>Le 20 crypto</h2>
         </div>
-        <p className="asof">Ogni 5 secondi{seenAt ? ` · ${rome(seenAt)}` : ""}{stale ? " · ultimo disponibile" : ""}{refreshError ? " · aggiornamento non riuscito" : ""}</p>
+        <p className="asof">Aggiornamento indipendente ogni 5 secondi{seenAt ? ` · ${rome(seenAt)}` : ""}{stale ? " · ultimo disponibile" : ""}{refreshError ? " · aggiornamento non riuscito" : ""}</p>
       </header>
       <div className="crypto-grid">
         {shown.map((card) => (
