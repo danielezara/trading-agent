@@ -312,7 +312,7 @@ object SpotPairSelection {
             return excluded(asset, exchange, pair, "paper", "stale", volumeObserved, volumeThreshold, observation.openPosition)
         }
         val age = asOf.epochSecond - quotedAt.epochSecond
-        if (age < 0 || age > config.quoteMaxAgeSeconds) {
+        if (age > config.quoteMaxAgeSeconds) {
             return excluded(asset, exchange, pair, "paper", "stale", volumeObserved, "quote_max_age_seconds=${config.quoteMaxAgeSeconds}", observation.openPosition)
         }
         val ratio = midRatio(quote.bid, quote.ask)

@@ -110,6 +110,17 @@ class SpotPairSelectionTest {
     }
 
     @Test
+    fun `a quote a few seconds newer than the cycle clock stays fresh`() {
+        val rows = select(
+            paper(),
+            SpotMode.PAPER,
+            asOf,
+            mapOf("BTC" to observation(page(eur("BTCEUR", "100109")), SpotQuote(BigDecimal("100"), BigDecimal("100.10"), asOf.plusSeconds(15)), bars(asOf, "5"))),
+        )
+        assertEquals("enabled", row(rows, "BTC").outcome)
+    }
+
+    @Test
     fun `a wide bid ask spread blocks the new entry`() {
         val rows = select(
             paper(),
