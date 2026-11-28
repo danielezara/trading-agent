@@ -178,16 +178,15 @@ class ModuleConfiguration {
             EntryLoop(
                 cycle = cycle,
                 barSeconds = barSeconds,
+                interval = EntryPace.BREAKOUT_INTERVAL,
                 onRecorded = { latest ->
                     cycle.entryLoop = if (EntryPace.finished(latest.rule.reason)) latest.rule.reason else "ON"
-                    log.info(SpotEnabledTickers.report(spotCandidates.rows))
-                    log.info("breakout_evaluated={}", spotCandidates.rows.mapNotNull { SpotEnabledTickers.instrumentId(it) }.joinToString(",").ifEmpty { "-" })
+                    logCycle(spotCandidates, cycle)
                     logEntry(latest, cycle.entryLoop)
                 },
             ).start()
         }
-        log.info(SpotEnabledTickers.report(spotCandidates.rows))
-        log.info("breakout_evaluated={}", spotCandidates.rows.mapNotNull { SpotEnabledTickers.instrumentId(it) }.joinToString(",").ifEmpty { "-" })
+        logCycle(spotCandidates, cycle)
         logEntry(recorded, cycle.entryLoop)
         return cycle
     }
@@ -198,6 +197,17 @@ class ModuleConfiguration {
         transport = JdkHttpGet(),
         sleep = { duration -> Thread.sleep(duration.toMillis()) },
     )
+
+    private fun logCycle(spotCandidates: SpotBreakoutCandidates, cycle: DecisionCycle) {
+        val evaluated = spotCandidates.rows.mapNotNull { SpotEnabledTickers.instrumentId(it) }
+        log.info(SpotEnabledTickers.report(spotCandidates.rows))
+        log.info(
+            "breakout_interval_seconds={} pairs={} signals={}",
+            EntryPace.BREAKOUT_INTERVAL.seconds,
+            evaluated.size,
+            cycle.breakoutSignals,
+        )
+    }
 
     private fun logEntry(recorded: RecordedDecision, loop: String) {
         log.info(

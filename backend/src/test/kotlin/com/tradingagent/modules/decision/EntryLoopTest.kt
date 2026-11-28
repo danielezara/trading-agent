@@ -17,6 +17,10 @@ class EntryLoopTest {
         assertEquals(304, EntryPace.wait(justAfter, 300, 5).seconds)
         val nearClose = Instant.parse("2026-11-27T21:54:59Z")
         assertEquals(6, EntryPace.wait(nearClose, 300, 5).seconds)
+        val started = Instant.parse("2026-11-28T06:00:00Z")
+        assertEquals(20, EntryPace.BREAKOUT_INTERVAL.seconds)
+        assertEquals(15, EntryPace.remaining(started, started.plusSeconds(5), EntryPace.BREAKOUT_INTERVAL).seconds)
+        assertEquals(0, EntryPace.remaining(started, started.plusSeconds(25), EntryPace.BREAKOUT_INTERVAL).seconds)
     }
 
     @Test

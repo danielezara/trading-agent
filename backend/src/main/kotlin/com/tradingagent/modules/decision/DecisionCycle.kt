@@ -81,6 +81,9 @@ class DecisionCycle(
     @Volatile
     var entryLoop: String = "OFF"
 
+    @Volatile
+    var breakoutSignals: String = "-"
+
     fun storedBars(): List<ObservedInstrumentBars> = storedBars
 
     fun latest(): RecordedDecision = recorded
@@ -161,16 +164,18 @@ class DecisionCycle(
         )
         val rule = if (breakout) {
             val enabled = candidates.filter { it.entryAllowed }.map { it.instrumentId }.toSet() + observed.blockedEntryIds
-            BreakoutLive.decide(
-                BreakoutCycleInput(
-                    candidates = book.instruments,
-                    openIds = observed.blockedEntryIds,
-                    enabledIds = enabled,
-                    parameters = configuration.parameters.breakout,
-                    entriesBlocked = entriesBlocked(),
-                    lossBlocksEntries = lossBlocksEntries,
-                ),
+            val input = BreakoutCycleInput(
+                candidates = book.instruments,
+                openIds = observed.blockedEntryIds,
+                enabledIds = enabled,
+                parameters = configuration.parameters.breakout,
+                entriesBlocked = entriesBlocked(),
+                lossBlocksEntries = lossBlocksEntries,
             )
+            breakoutSignals = BreakoutLive.signals(input)
+                .joinToString(",") { "${it.instrumentId}:${it.action}" }
+                .ifEmpty { "-" }
+            BreakoutLive.decide(input)
         } else {
             ClosedBarEvaluation.decide(
                 at,

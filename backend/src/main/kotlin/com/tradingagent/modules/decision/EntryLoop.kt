@@ -6,6 +6,13 @@ import java.time.Duration
 import java.time.Instant
 
 object EntryPace {
+    val BREAKOUT_INTERVAL: Duration = Duration.ofSeconds(20)
+
+    fun remaining(started: Instant, now: Instant, interval: Duration): Duration {
+        val left = interval.minus(Duration.between(started, now))
+        return if (left.isNegative) Duration.ZERO else left
+    }
+
     fun wait(now: Instant, barSeconds: Long, graceSeconds: Long): Duration {
         require(barSeconds > 0 && graceSeconds >= 0) { "l'attesa della barra è positiva" }
         val span = barSeconds * 1_000L
@@ -27,6 +34,7 @@ class EntryLoop(
     private val sleep: (Duration) -> Unit = { duration -> Thread.sleep(duration.toMillis()) },
     private val barSeconds: Long = 300,
     private val graceSeconds: Long = 5,
+    private val interval: Duration? = null,
     private val onRecorded: (RecordedDecision) -> Unit = {},
 ) {
     @Volatile
@@ -36,11 +44,15 @@ class EntryLoop(
     fun start() {
         accepting = true
         val worker = Thread {
+            var mark = clock()
             while (accepting) {
-                sleep(EntryPace.wait(clock(), barSeconds, graceSeconds))
+                val pause = interval?.let { EntryPace.remaining(mark, clock(), it) }
+                    ?: EntryPace.wait(clock(), barSeconds, graceSeconds)
+                sleep(pause)
                 if (!accepting) {
                     return@Thread
                 }
+                mark = clock()
                 val recorded = try {
                     cycle.record()
                 } catch (_: Exception) {
@@ -52,7 +64,7 @@ class EntryLoop(
                 }
             }
         }
-        worker.name = "five-minute-entries"
+        worker.name = if (interval == null) "five-minute-entries" else "twenty-second-entries"
         worker.isDaemon = true
         worker.start()
     }
