@@ -11,6 +11,18 @@ class SpotEnabledTickersTest {
     }
 
     @Test
+    fun `a pair without an eur market stays excluded in the report`() {
+        val enabled = row("BTC", false).copy(pair = "BTCEUR#100001")
+        val missing = row("DOGE", true).copy(reason = "quote_absent", pair = "-")
+        assertEquals("100001", SpotEnabledTickers.instrumentId(enabled))
+        assertEquals(null, SpotEnabledTickers.instrumentId(missing))
+        assertEquals(
+            "spot_evaluated=2 enabled=BTC excluded=DOGE:quote_absent",
+            SpotEnabledTickers.report(listOf(enabled, missing)),
+        )
+    }
+
+    @Test
     fun `order 397105707 blocks its instrument`() {
         val account = ObservedAccount(
             brokerCash = null,

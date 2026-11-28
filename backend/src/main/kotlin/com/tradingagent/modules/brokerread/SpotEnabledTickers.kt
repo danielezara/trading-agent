@@ -10,13 +10,35 @@ object SpotEnabledTickers {
         return (entrySymbols + enabled).distinct()
     }
 
+    fun instrumentId(row: SelectionRow): String? {
+        if (row.entryBlocked) {
+            return null
+        }
+        val id = row.pair.substringAfter('#', "")
+        return id.takeIf { it.matches(Regex("[1-9][0-9]{0,9}")) }
+    }
+
+    fun report(rows: List<SelectionRow>): String {
+        val enabled = rows.filter { !it.entryBlocked }.joinToString(",") { it.ticker }.ifEmpty { "-" }
+        val excluded = rows.filter { it.entryBlocked }.joinToString(",") { "${it.ticker}:${it.reason}" }.ifEmpty { "-" }
+        return "spot_evaluated=${rows.size} enabled=$enabled excluded=$excluded"
+    }
+
     fun load(
         config: SpotSelection,
         transport: HttpGet,
         material: DemoKeyMaterial,
         asOf: Instant,
         sleep: (Duration) -> Unit = {},
-    ): List<String> {
+    ): List<String> = selectRows(config, transport, material, asOf, sleep).filter { !it.entryBlocked }.map { it.ticker }
+
+    fun selectRows(
+        config: SpotSelection,
+        transport: HttpGet,
+        material: DemoKeyMaterial,
+        asOf: Instant,
+        sleep: (Duration) -> Unit = {},
+    ): List<SelectionRow> {
         val count = candleCount(config, asOf) ?: return emptyList()
         val observations = linkedMapOf<String, AssetObservation>()
         config.assets.forEach { asset ->
@@ -37,8 +59,6 @@ object SpotEnabledTickers {
             observations[asset] = AssetObservation(page, quote, bars, openPosition = false)
         }
         return SpotPairSelection.select(config, SpotMode.PAPER, asOf, observations)
-            .filter { !it.entryBlocked }
-            .map { it.ticker }
     }
 
     private fun candleCount(config: SpotSelection, asOf: Instant): Long? {

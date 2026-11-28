@@ -11,7 +11,7 @@ import com.tradingagent.modules.brokerread.DemoInstrumentNameRead
 import com.tradingagent.modules.brokerread.DemoMarketRatesLookup
 import com.tradingagent.modules.brokerread.ClosedTradeRead
 import com.tradingagent.modules.brokerread.DemoClosedBarRead
-import com.tradingagent.modules.brokerread.DemoEntryBarRead
+import com.tradingagent.modules.brokerread.SpotBreakoutCandidates
 import com.tradingagent.modules.brokerread.SpotEnabledTickers
 import com.tradingagent.modules.brokerread.DemoEntryDispatch
 import com.tradingagent.modules.brokerread.JdkHttpPost
@@ -138,6 +138,7 @@ class ModuleConfiguration {
         observationPrices: ObservationPrices,
         killSwitch: KillSwitch,
     ): DecisionCycle {
+        val spotCandidates = breakoutCandidates(configurationService)
         val cycle = DecisionCycle(
             strategyEngine = strategyEngine,
             ingestionPipeline = ingestionPipeline,
@@ -159,33 +160,7 @@ class ModuleConfiguration {
                 transport = JdkHttpGet(),
             ),
             entriesBlocked = { killSwitch.armed() },
-            entryCandidates = DemoEntryBarRead(
-                symbols = {
-                    val parameters = configurationService.active().parameters
-                    val entry = parameters.economic.entrySymbols
-                    val material = DemoKeyMaterial.fromEnvironment(System.getenv())
-                    val enabled = if (material == null) {
-                        emptyList()
-                    } else {
-                        try {
-                            SpotEnabledTickers.load(
-                                parameters.spotSelection,
-                                JdkHttpGet(),
-                                material,
-                                java.time.Instant.now(),
-                                { duration -> Thread.sleep(duration.toMillis()) },
-                            )
-                        } catch (_: Exception) {
-                            emptyList()
-                        }
-                    }
-                    (entry + enabled).distinct()
-                },
-                keys = { DemoKeyMaterial.fromEnvironment(System.getenv()) },
-                transport = JdkHttpGet(),
-                sleep = { duration -> Thread.sleep(duration.toMillis()) },
-                maxSymbols = 20,
-            ),
+            entryCandidates = spotCandidates,
             demoEntries = DemoEntryDispatch(
                 transport = JdkHttpPost(),
                 keys = { DemoKeyMaterial.fromEnvironment(System.getenv()) },
@@ -205,13 +180,22 @@ class ModuleConfiguration {
                 barSeconds = barSeconds,
                 onRecorded = { latest ->
                     cycle.entryLoop = if (EntryPace.finished(latest.rule.reason)) latest.rule.reason else "ON"
+                    log.info(SpotEnabledTickers.report(spotCandidates.rows))
                     logEntry(latest, cycle.entryLoop)
                 },
             ).start()
         }
+        log.info(SpotEnabledTickers.report(spotCandidates.rows))
         logEntry(recorded, cycle.entryLoop)
         return cycle
     }
+
+    private fun breakoutCandidates(configurationService: ConfigurationService) = SpotBreakoutCandidates(
+        selection = { configurationService.active().parameters.spotSelection },
+        keys = { DemoKeyMaterial.fromEnvironment(System.getenv()) },
+        transport = JdkHttpGet(),
+        sleep = { duration -> Thread.sleep(duration.toMillis()) },
+    )
 
     private fun logEntry(recorded: RecordedDecision, loop: String) {
         log.info(
