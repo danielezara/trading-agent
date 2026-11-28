@@ -179,3 +179,18 @@ spot_selection:
     - CC
     - AVAX
     - SUI
+# Breakout/1. Non è la strategia del giro acceso: quel processo resta su closed-bar-trend/1.
+# Precedenza se più coppie segnalano insieme: instrument_id in ordine lessicografico crescente.
+# Lo stop è la distanza dalla esecuzione, non dal close del segnale. Il prezzo di stop non è garantito.
+breakout:
+  strategy: breakout/1
+  timeframe: FiveMinutes
+  bar_seconds: 300
+  entry_lookback: 20
+  exit_lookback: 10
+  stop_distance_ratio: "0.02"
+  position_size_minor: 7500
+  max_position_minor: 7500
+  max_exposure_minor: 40000
+  max_positions: 4
+  priority: instrument_id

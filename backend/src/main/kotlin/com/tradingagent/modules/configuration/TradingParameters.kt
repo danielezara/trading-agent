@@ -100,6 +100,7 @@ data class TradingParameters(
     val economic: EconomicParameters,
     val technical: TechnicalParameters,
     val spotSelection: SpotSelection,
+    val breakout: BreakoutParameters,
 ) {
     fun toBudgetPolicy(): BudgetPolicy = BudgetPolicy(
         baseCurrency = economic.baseCurrency,
@@ -130,6 +131,7 @@ data class TradingParameters(
         economic.canonical(),
         technical.canonical(),
         spotSelection.canonical(),
+        breakout.canonical(),
     ).joinToString("\n")
 
     companion object {
@@ -146,7 +148,7 @@ private object Holder {
 }
 
 private object TradingParametersLoader {
-    private val topKeys = setOf("schema", "author", "reason", "economic", "technical", "spot_selection")
+    private val topKeys = setOf("schema", "author", "reason", "economic", "technical", "spot_selection", "breakout")
     private val economicKeys = setOf(
         "base_currency",
         "currency_scale",
@@ -186,6 +188,19 @@ private object TradingParametersLoader {
         "spread_model_value",
         "quote_max_age_seconds",
         "assets",
+    )
+    private val breakoutKeys = setOf(
+        "strategy",
+        "timeframe",
+        "bar_seconds",
+        "entry_lookback",
+        "exit_lookback",
+        "stop_distance_ratio",
+        "position_size_minor",
+        "max_position_minor",
+        "max_exposure_minor",
+        "max_positions",
+        "priority",
     )
     private val entrySymbol = Regex("[A-Z0-9.]{1,16}")
     private val benchmarkKeys = setOf("name", "return_basis")
@@ -297,6 +312,7 @@ private object TradingParametersLoader {
         val economic = economic(economicNode)
         val technical = technical(technicalNode)
         val spotSelection = spotSelection(mapping(root.getValue("spot_selection"), "spot_selection"))
+        val breakout = breakout(mapping(root.getValue("breakout"), "breakout"))
         require(root.getValue("schema") == "trading-parameters/1") { "unsupported parameter schema" }
         val author = requireText(root.getValue("author"), "author")
         val reason = requireText(root.getValue("reason"), "reason")
@@ -309,6 +325,48 @@ private object TradingParametersLoader {
             economic = economic,
             technical = technical,
             spotSelection = spotSelection,
+            breakout = breakout,
+        )
+    }
+
+    private fun breakout(node: Map<String, Any?>): BreakoutParameters {
+        requireExact(node, breakoutKeys, "breakout")
+        val strategy = requireText(node.getValue("strategy"), "strategy")
+        require(strategy == BreakoutParameters.STRATEGY_ID) { "breakout strategy is fixed" }
+        val timeframe = requireText(node.getValue("timeframe"), "timeframe")
+        val barSeconds = requireInt(node.getValue("bar_seconds"), "bar_seconds")
+        require(timeframe == "FiveMinutes" && barSeconds == 300) {
+            "breakout timeframe and bar_seconds must name the same five minute bar"
+        }
+        val entryLookback = requireInt(node.getValue("entry_lookback"), "entry_lookback")
+        val exitLookback = requireInt(node.getValue("exit_lookback"), "exit_lookback")
+        require(entryLookback >= 1 && exitLookback >= 1) { "breakout lookback must be at least 1" }
+        val stop = decimal(requireText(node.getValue("stop_distance_ratio"), "stop_distance_ratio"), "stop_distance_ratio")
+        require(stop > java.math.BigDecimal.ZERO && stop < java.math.BigDecimal.ONE) {
+            "stop_distance_ratio must be between 0 and 1"
+        }
+        val positionSize = requireLong(node.getValue("position_size_minor"), "position_size_minor")
+        val maxPosition = requireLong(node.getValue("max_position_minor"), "max_position_minor")
+        val maxExposure = requireLong(node.getValue("max_exposure_minor"), "max_exposure_minor")
+        val maxPositions = requireInt(node.getValue("max_positions"), "max_positions")
+        require(positionSize > 0 && maxPosition > 0 && maxExposure > 0 && maxPositions >= 1) {
+            "breakout limits must be positive"
+        }
+        require(positionSize <= maxPosition && positionSize <= maxExposure) {
+            "position size cannot exceed the position or exposure limit"
+        }
+        return BreakoutParameters(
+            strategy = strategy,
+            timeframe = timeframe,
+            barSeconds = barSeconds.toLong(),
+            entryLookback = entryLookback,
+            exitLookback = exitLookback,
+            stopDistanceRatio = stop,
+            positionSizeMinor = positionSize,
+            maxPositionMinor = maxPosition,
+            maxExposureMinor = maxExposure,
+            maxPositions = maxPositions,
+            priority = token(node, "priority", BreakoutParameters.PRIORITY),
         )
     }
 
@@ -511,6 +569,9 @@ private object TradingParametersLoader {
 
     private fun requireInt(value: Any?, key: String): Int =
         optionalInt(value, key) ?: throw IllegalArgumentException("$key is required")
+
+    private fun requireLong(value: Any?, key: String): Long =
+        optionalLong(value, key) ?: throw IllegalArgumentException("$key is required")
 
     private fun optionalInt(value: Any?, key: String): Int? = when (value) {
         null -> null

@@ -6,6 +6,7 @@ export default function RulesPage() {
       <p className="product">Agente trading</p>
       <h1>Regole</h1>
       <p>Solo quello che il programma applica. Le cifre sono quelle del config attivo.</p>
+      <p>Il giro già acceso applica ancora closed-bar-trend/1 e non ha caricato la strategia di breakout.</p>
       <nav className="nav">
         <a href="/">Portafoglio</a>
         <a href="/regole">Regole</a>

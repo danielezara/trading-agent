@@ -213,6 +213,8 @@ describe("demo read", () => {
     assert.equal(bot.includes("Confronto non disponibile"), true);
     assert.equal(page.includes("Posizioni Demo"), false);
     assert.equal(rules.includes("due chiusure al rialzo"), true);
+    assert.equal(rules.includes("closed-bar-trend/1"), true);
+    assert.equal(rules.includes("non ha caricato la strategia di breakout"), true);
     assert.equal(rules.includes("due chiusure al ribasso"), true);
     assert.equal(rules.includes("2×ATR"), true);
     assert.equal(rules.includes("390 barre"), true);
