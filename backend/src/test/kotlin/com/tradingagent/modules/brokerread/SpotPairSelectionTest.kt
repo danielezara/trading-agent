@@ -67,9 +67,7 @@ class SpotPairSelectionTest {
 
         val halted = eur("BTCEUR", "100109", exchangeOpen = false, currentlyTradable = false)
         val haltedRows = select(paper(), SpotMode.PAPER, asOf, mapOf("BTC" to observation(page(halted), quote(), bars(asOf, "5"))))
-        val inactive = row(haltedRows, "BTC")
-        assertEquals("inactive", inactive.reason)
-        assertTrue(inactive.observed.contains("isCurrentlyTradable"))
+        assertEquals("enabled", row(haltedRows, "BTC").outcome)
 
         val backtestRows = select(
             paper(model = "fixed_ratio", modelValue = "0.001"),
@@ -127,7 +125,7 @@ class SpotPairSelectionTest {
     }
 
     @Test
-    fun `missing volume blocks only the new entry`() {
+    fun `a missing candle volume does not block a quoted euro pair`() {
         val rows = select(
             paper(),
             SpotMode.PAPER,
@@ -135,9 +133,8 @@ class SpotPairSelectionTest {
             mapOf("ETH" to observation(page(eur("ETHEUR", "100110")), quote(), bars(asOf, null), openPosition = true)),
         )
         val eth = row(rows, "ETH")
-        assertEquals("volume_missing", eth.reason)
-        assertEquals("volume=", eth.observed)
-        assertTrue(eth.entryBlocked)
+        assertEquals("enabled", eth.outcome)
+        assertFalse(eth.entryBlocked)
         assertFalse(eth.exitBlocked)
     }
 

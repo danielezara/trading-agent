@@ -254,12 +254,6 @@ object SpotPairSelection {
         }
         val pair = "${identity.symbol}#${identity.instrumentId}"
         val exchange = listOf(config.exchange, identity.exchangeName).filter { it.isNotBlank() }.joinToString("/")
-        if (mode == SpotMode.PAPER) {
-            val inactive = paperInactive(identity)
-            if (inactive != null) {
-                return excluded(asset, exchange, pair, modeName, "inactive", inactive, "active=true", observation.openPosition)
-            }
-        }
         val volumeThreshold = threshold(config.minVolume, config.volumeUnit, config.volumeWindow)
         val spreadThreshold = threshold(config.maxSpread, config.spreadUnit, null)
         if (config.volumeUnit != "candle_volume" || config.volumeWindow != "one_closed_bar") {
@@ -276,10 +270,10 @@ object SpotPairSelection {
             }
         }
         val volumeBar = volumeBar(config, mode, asOf, observation.bars)
-        if (volumeBar?.volume == null) {
+        if (volumeBar?.volume == null && mode == SpotMode.BACKTEST) {
             return excluded(asset, exchange, pair, modeName, "volume_missing", "volume=", volumeThreshold, observation.openPosition)
         }
-        if (volumeBar.volume < config.minVolume) {
+        if (volumeBar?.volume != null && volumeBar.volume < config.minVolume) {
             return excluded(
                 asset,
                 exchange,
@@ -291,7 +285,7 @@ object SpotPairSelection {
                 observation.openPosition,
             )
         }
-        val volumeObserved = observed(volumeBar.volume, config.volumeUnit, config.volumeWindow)
+        val volumeObserved = volumeBar?.volume?.let { observed(it, config.volumeUnit, config.volumeWindow) }.orEmpty()
         return when (mode) {
             SpotMode.PAPER -> paperSpread(config, asOf, asset, exchange, pair, observation, volumeObserved, volumeThreshold, spreadThreshold)
             SpotMode.BACKTEST -> backtestSpread(config, asset, exchange, pair, volumeObserved, volumeThreshold, spreadThreshold, observation.openPosition)
@@ -414,24 +408,6 @@ object SpotPairSelection {
             return null
         }
         return rest
-    }
-
-    private fun paperInactive(identity: Identity): String? {
-        val flags = buildList {
-            add("isHiddenFromClient" to (identity.hidden == false))
-            add("isDelisted" to (identity.delisted == false))
-            add("isActiveInPlatform" to (identity.activeInPlatform == true))
-            add("isCurrentlyTradable" to (identity.currentlyTradable == true))
-            // Su queste crypto eToro lascia isExchangeOpen a false anche con mercato negoziabile e quotazione viva.
-            if (identity.currentlyTradable != true) {
-                add("isExchangeOpen" to (identity.exchangeOpen == true))
-            }
-        }
-        val failed = flags.filterNot { it.second }.map { it.first }
-        if (failed.isEmpty()) {
-            return null
-        }
-        return failed.joinToString(",")
     }
 
     private fun knowableEnd(config: SpotSelection, asOf: Instant): Instant {

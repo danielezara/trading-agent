@@ -11,7 +11,7 @@ object SpotEnabledTickers {
     }
 
     fun instrumentId(row: SelectionRow): String? {
-        if (row.entryBlocked && row.reason != "volume_missing") {
+        if (row.entryBlocked) {
             return null
         }
         val id = row.pair.substringAfter('#', "")
