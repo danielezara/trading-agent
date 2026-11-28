@@ -99,6 +99,7 @@ data class TradingParameters(
     val sourceSha256: String,
     val economic: EconomicParameters,
     val technical: TechnicalParameters,
+    val spotSelection: SpotSelection,
 ) {
     fun toBudgetPolicy(): BudgetPolicy = BudgetPolicy(
         baseCurrency = economic.baseCurrency,
@@ -128,6 +129,7 @@ data class TradingParameters(
         "source_sha256=$sourceSha256",
         economic.canonical(),
         technical.canonical(),
+        spotSelection.canonical(),
     ).joinToString("\n")
 
     companion object {
@@ -144,7 +146,7 @@ private object Holder {
 }
 
 private object TradingParametersLoader {
-    private val topKeys = setOf("schema", "author", "reason", "economic", "technical")
+    private val topKeys = setOf("schema", "author", "reason", "economic", "technical", "spot_selection")
     private val economicKeys = setOf(
         "base_currency",
         "currency_scale",
@@ -168,6 +170,23 @@ private object TradingParametersLoader {
         "max_holding_count",
     )
     private val allowlistKeys = setOf("universe", "direction", "leverage", "instrument_ids", "entry_symbols")
+    private val spotKeys = setOf(
+        "exchange",
+        "quote_currency",
+        "timeframe",
+        "bar_seconds",
+        "history_start",
+        "history_end",
+        "min_volume",
+        "volume_unit",
+        "volume_window",
+        "max_spread",
+        "spread_unit",
+        "spread_model",
+        "spread_model_value",
+        "quote_max_age_seconds",
+        "assets",
+    )
     private val entrySymbol = Regex("[A-Z0-9.]{1,16}")
     private val benchmarkKeys = setOf("name", "return_basis")
     private val technicalIntKeys = listOf(
@@ -277,6 +296,7 @@ private object TradingParametersLoader {
         requireExact(technicalNode, technicalIntKeys.toSet() + setOf("calibratable", "tie_break"), "technical")
         val economic = economic(economicNode)
         val technical = technical(technicalNode)
+        val spotSelection = spotSelection(mapping(root.getValue("spot_selection"), "spot_selection"))
         require(root.getValue("schema") == "trading-parameters/1") { "unsupported parameter schema" }
         val author = requireText(root.getValue("author"), "author")
         val reason = requireText(root.getValue("reason"), "reason")
@@ -288,7 +308,72 @@ private object TradingParametersLoader {
             sourceSha256 = sha256(text),
             economic = economic,
             technical = technical,
+            spotSelection = spotSelection,
         )
+    }
+
+    private fun spotSelection(node: Map<String, Any?>): SpotSelection {
+        requireExact(node, spotKeys, "spot_selection")
+        val timeframe = requireText(node.getValue("timeframe"), "timeframe")
+        val barSeconds = requireInt(node.getValue("bar_seconds"), "bar_seconds")
+        require(barSeconds > 0) { "bar_seconds must be positive" }
+        require(timeframe == "FiveMinutes" && barSeconds == 300) {
+            "timeframe and bar_seconds must name the same five minute bar"
+        }
+        val historyStart = instant(requireText(node.getValue("history_start"), "history_start"), "history_start")
+        val historyEnd = instant(requireText(node.getValue("history_end"), "history_end"), "history_end")
+        require(historyStart.isBefore(historyEnd)) { "history interval is empty" }
+        val span = historyEnd.epochSecond - historyStart.epochSecond
+        require(historyStart.epochSecond % barSeconds == 0L && span % barSeconds == 0L) {
+            "history interval must align to bar_seconds"
+        }
+        val model = requireText(node.getValue("spread_model"), "spread_model")
+        require(model == "none" || model == "fixed_ratio") { "spread_model must be none or fixed_ratio" }
+        val modelValue = optionalText(node["spread_model_value"], "spread_model_value")
+        require(model == "fixed_ratio" == (modelValue != null)) {
+            "fixed_ratio needs spread_model_value and none leaves it empty"
+        }
+        val assets = stringList(node.getValue("assets"), "assets")
+        require(assets == SpotSelection.FIXED_ASSETS) { "spot whitelist is fixed and has no substitutes" }
+        return SpotSelection(
+            exchange = requireText(node.getValue("exchange"), "exchange"),
+            quoteCurrency = currency(requireText(node.getValue("quote_currency"), "quote_currency")),
+            timeframe = timeframe,
+            barSeconds = barSeconds.toLong(),
+            historyStart = historyStart,
+            historyEnd = historyEnd,
+            minVolume = decimal(requireText(node.getValue("min_volume"), "min_volume"), "min_volume"),
+            volumeUnit = token(node, "volume_unit", "candle_volume"),
+            volumeWindow = token(node, "volume_window", "one_closed_bar"),
+            maxSpread = decimal(requireText(node.getValue("max_spread"), "max_spread"), "max_spread"),
+            spreadUnit = token(node, "spread_unit", "bid_ask_mid_ratio"),
+            spreadModel = model,
+            spreadModelValue = modelValue?.let { decimal(it, "spread_model_value") },
+            quoteMaxAgeSeconds = requireInt(node.getValue("quote_max_age_seconds"), "quote_max_age_seconds").toLong(),
+            assets = assets,
+        )
+    }
+
+    private fun token(node: Map<String, Any?>, key: String, expected: String): String {
+        val value = requireText(node.getValue(key), key)
+        require(value == expected) { "$key must be $expected" }
+        return value
+    }
+
+    private fun currency(value: String): String {
+        require(value.length == 3 && value.all { it.isLetter() }) { "quote_currency must be a 3-letter ISO code" }
+        return value
+    }
+
+    private fun instant(value: String, key: String): java.time.Instant = try {
+        java.time.Instant.parse(value)
+    } catch (_: Exception) {
+        throw IllegalArgumentException("$key must be an instant")
+    }
+
+    private fun decimal(value: String, key: String): java.math.BigDecimal {
+        require(Regex("[0-9]+(\\.[0-9]+)?").matches(value)) { "$key must be a decimal" }
+        return java.math.BigDecimal(value)
     }
 
     private fun economic(node: Map<String, Any?>): EconomicParameters {

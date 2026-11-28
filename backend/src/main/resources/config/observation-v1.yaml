@@ -139,3 +139,43 @@ technical:
   alert_ack_seconds: 60
   # Il file BCE ha solo la data. Resta usabile per 4 giorni di calendario, poi è stale e il disponibile resta assente.
   fx_reference_max_age_days: 4
+# Selezione delle coppie spot. Non sostituisce entry_symbols e non invia ordini.
+# Volume: campo volume della candela, su una sola barra chiusa del timeframe. Soglia min_volume, stessa unità nel report.
+# Spread: (ask-bid)/mid, unità bid_ask_mid_ratio. Soglia max_spread. Nessuna soglia è scritta nel codice.
+# spread_model none: senza storico bid/ask il backtest resta non verificabile. fixed_ratio usa spread_model_value e lo marca come stima.
+spot_selection:
+  exchange: etoro
+  quote_currency: EUR
+  timeframe: FiveMinutes
+  bar_seconds: 300
+  history_start: "2026-11-28T04:00:00Z"
+  history_end: "2026-11-28T05:00:00Z"
+  min_volume: "1"
+  volume_unit: candle_volume
+  volume_window: one_closed_bar
+  max_spread: "0.002"
+  spread_unit: bid_ask_mid_ratio
+  spread_model: none
+  spread_model_value: null
+  quote_max_age_seconds: 120
+  assets:
+    - BTC
+    - ETH
+    - BNB
+    - XRP
+    - SOL
+    - TRX
+    - HYPE
+    - ZEC
+    - DOGE
+    - LEO
+    - XMR
+    - LINK
+    - ADA
+    - XLM
+    - BCH
+    - NEAR
+    - LTC
+    - CC
+    - AVAX
+    - SUI

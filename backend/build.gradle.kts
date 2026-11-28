@@ -42,3 +42,11 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
+
+tasks.register<JavaExec>("spotPairReport") {
+    group = "verification"
+    description = "Print one spot-pair row per whitelist asset. Does not send orders."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.tradingagent.modules.brokerread.SpotPairReportMainKt")
+    args((project.findProperty("mode") as String?) ?: "paper")
+}
