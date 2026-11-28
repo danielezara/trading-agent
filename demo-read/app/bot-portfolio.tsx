@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { WhitelistBoard } from "./whitelist-board";
 import {
   BUDGET_EUR_MINOR,
   type ProgramBook,
@@ -76,23 +77,63 @@ export function BotPortfolio({ initial }: { initial: ProgramBook }) {
           {refreshError ? " · aggiornamento non riuscito" : ""}
         </p>
       </header>
-      {book.positions === null ? (
-        <p className="missing">Portafoglio non disponibile</p>
-      ) : (
-        <>
-          <div className="metrics">
-            <Metric label="Valore" value={formatMinor(book.valueEurMinor, "EUR")} detail={valueDetail(book)} tone={book.missingValues.length > 0 ? "flat" : toneOf(book.changeEurMinor)} />
-            <Metric label="Variazione" value={book.missingValues.length > 0 ? "non disponibile" : formatSignedMinor(book.changeEurMinor, "EUR")} detail={book.missingValues.length > 0 ? missingValueSentence(book.missingValues) ?? "non disponibile" : formatSignedMinor(book.changeUsdMinor, "USD")} tone={book.missingValues.length > 0 ? "missing" : toneOf(book.changeEurMinor)} />
-            <Metric label="Perdita sul budget" value={book.missingValues.length > 0 ? "non disponibile" : formatMinor(book.lossEurMinor, "EUR")} detail={book.missingValues.length > 0 ? missingValueSentence(book.missingValues) ?? "non disponibile" : book.lossBpsOfBudget === null ? "non disponibile" : `${formatBps(book.lossBpsOfBudget)} di ${formatMinor(BUDGET_EUR_MINOR, "EUR")}`} tone={book.missingValues.length > 0 ? "missing" : lossClass} />
-          </div>
-          {book.positions.length === 0 ? <p className="missing">Nessuna posizione del programma</p> : book.positions.map((position) => (
-            <PositionCard key={position.orderId} position={position} live={liveTicks[position.orderId] ?? null} />
-          ))}
-          <BenchmarkCard book={book} live={liveTicks.benchmark ?? null} />
-        </>
-      )}
+      <div className="metrics">
+        <Metric label="Valore" value={formatMinor(book.valueEurMinor, "EUR")} detail={valueDetail(book)} tone={book.missingValues.length > 0 ? "flat" : toneOf(book.changeEurMinor)} />
+        <Metric label="Variazione" value={book.missingValues.length > 0 ? "non disponibile" : formatSignedMinor(book.changeEurMinor, "EUR")} detail={book.missingValues.length > 0 ? missingValueSentence(book.missingValues) ?? "non disponibile" : formatSignedMinor(book.changeUsdMinor, "USD")} tone={book.missingValues.length > 0 ? "missing" : toneOf(book.changeEurMinor)} />
+        <Metric label="Perdita sul budget" value={book.missingValues.length > 0 ? "non disponibile" : formatMinor(book.lossEurMinor, "EUR")} detail={book.missingValues.length > 0 ? missingValueSentence(book.missingValues) ?? "non disponibile" : book.lossBpsOfBudget === null ? "non disponibile" : `${formatBps(book.lossBpsOfBudget)} di ${formatMinor(BUDGET_EUR_MINOR, "EUR")}`} tone={book.missingValues.length > 0 ? "missing" : lossClass} />
+      </div>
+      {book.positions === null ? <p className="missing">Portafoglio non disponibile</p> : null}
+      <Composition book={book} />
+      <BenchmarkCard book={book} live={liveTicks.benchmark ?? null} />
+      <WhitelistBoard book={book} />
+      {book.positions === null ? null : book.positions.length === 0 ? <p className="missing">Nessuna posizione del programma</p> : book.positions.map((position) => (
+        <PositionCard key={position.orderId} position={position} live={liveTicks[position.orderId] ?? null} />
+      ))}
     </section>
   );
+}
+
+function Composition({ book }: { book: ProgramBook }) {
+  if (book.positions === null) {
+    return <p className="missing">Composizione non disponibile</p>;
+  }
+  if (book.positions.length === 0) {
+    return (
+      <article className="card">
+        <p className="symbol">Composizione</p>
+        <p className="missing">Nessuna posizione del programma</p>
+      </article>
+    );
+  }
+  const sharesKnown = book.missingValues.length === 0
+    && book.valueEurMinor !== null
+    && book.valueEurMinor > 0
+    && book.positions.every((position) => position.valueEurMinor !== null);
+  return (
+    <article className="card">
+      <p className="symbol">Composizione</p>
+      <ul className="composition">
+        {book.positions.map((position) => (
+          <li key={position.orderId}>
+            <span>{position.symbol || position.name || `Strumento ${position.instrumentId}`}</span>
+            <span>{formatMinor(position.valueEurMinor, "EUR")}</span>
+            <span>{sharesKnown ? shareText(position.valueEurMinor, book.valueEurMinor) : "quota non disponibile"}</span>
+          </li>
+        ))}
+      </ul>
+    </article>
+  );
+}
+
+function shareText(part: number | null, total: number | null): string {
+  if (part === null || total === null || total <= 0) {
+    return "quota non disponibile";
+  }
+  const bps = Math.round((part / total) * 10_000);
+  if (!Number.isSafeInteger(bps)) {
+    return "quota non disponibile";
+  }
+  return formatBps(bps).replace(/^\+/, "");
 }
 
 function PositionCard({ position, live }: { position: ProgramPosition; live: Tick | null }) {
@@ -125,7 +166,7 @@ function BenchmarkCard({ book, live }: { book: ProgramBook; live: Tick | null })
     <article className="card">
       <div className="card-top">
         <div>
-          <p className="symbol">MSCI World</p>
+          <p className="symbol">Confronto ETF World</p>
           <p className="name">{benchmark.resolved ? benchmark.name ?? "Nome non disponibile" : "Confronto non disponibile"}</p>
         </div>
       </div>
@@ -139,7 +180,7 @@ function BenchmarkCard({ book, live }: { book: ProgramBook; live: Tick | null })
           </dl>
         </>
       ) : (
-        <p className="missing">Confronto non disponibile: eToro non ha risolto un ETF MSCI World.</p>
+        <p className="missing">Confronto non disponibile.</p>
       )}
     </article>
   );

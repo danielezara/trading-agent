@@ -9,7 +9,7 @@
 body { margin: 0; }
 
 main {
-  max-width: 52rem;
+  max-width: 72rem;
   margin: 0 auto;
   padding: 1.5rem;
 }
@@ -57,6 +57,16 @@ h1, h2 { margin: 0.2rem 0 0.4rem; }
 .facts dt { color: #93a0b5; font-size: 0.82rem; }
 .facts dd { margin: 0; font-variant-numeric: tabular-nums; font-size: 1.05rem; }
 
+.cryptos { margin-top: 1.2rem; }
+.crypto-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+.crypto { margin-top: 0; }
+.crypto .facts { grid-template-columns: 1fr; }
+.chart { width: 100%; height: 5.5rem; display: block; }
+.chart line { stroke: currentColor; stroke-width: 1; }
+.chart rect { fill: currentColor; }
+.composition { list-style: none; margin: 0.6rem 0 0; padding: 0; }
+.composition li { display: grid; grid-template-columns: 1fr auto auto; gap: 0.8rem; padding: 0.35rem 0; border-top: 1px solid #243044; }
+
 dl:not(.facts) { margin: 1rem 0; background: #152033; border: 1px solid #243044; border-radius: 16px; }
 dl:not(.facts) div { display: grid; grid-template-columns: 9rem 1fr; gap: 0.75rem; padding: 0.6rem 0.9rem; border-top: 1px solid #243044; }
 dl:not(.facts) div:first-child { border-top: 0; }
@@ -69,6 +79,6 @@ th, td { text-align: left; padding: 0.45rem 0.9rem; border-top: 1px solid #24304
 th { color: #93a0b5; font-weight: 650; }
 
 @media (max-width: 720px) {
-  .metrics, .facts, .bot-head { grid-template-columns: 1fr; display: grid; }
+  .metrics, .facts, .bot-head, .crypto-grid, .composition li { grid-template-columns: 1fr; display: grid; }
   .metric strong, .quote { font-size: 1.7rem; }
 }

@@ -196,12 +196,16 @@ describe("demo read", () => {
     const rules = readFileSync(new URL("../app/regole/page.tsx", import.meta.url), "utf8");
     const route = readFileSync(new URL("../app/api/overview/route.ts", import.meta.url), "utf8");
     const botRoute = readFileSync(new URL("../app/api/bot-portfolio/route.ts", import.meta.url), "utf8");
-    const source = `${page}\n${bot}\n${rules}\n${route}\n${botRoute}\n${readFileSync(new URL("./demo-read.ts", import.meta.url), "utf8")}\n${readFileSync(new URL("./program-book.ts", import.meta.url), "utf8")}`;
+    const board = readFileSync(new URL("../app/whitelist-board.tsx", import.meta.url), "utf8");
+    const whitelistRoute = readFileSync(new URL("../app/api/whitelist/route.ts", import.meta.url), "utf8");
+    const whitelist = readFileSync(new URL("./whitelist.ts", import.meta.url), "utf8");
+    const source = `${page}\n${bot}\n${rules}\n${route}\n${botRoute}\n${board}\n${whitelistRoute}\n${whitelist}\n${readFileSync(new URL("./demo-read.ts", import.meta.url), "utf8")}\n${readFileSync(new URL("./program-book.ts", import.meta.url), "utf8")}`;
     assert.equal(source.includes("VITE_"), false);
     assert.equal(source.includes("NEXT_PUBLIC_"), false);
     assert.equal(source.includes("ETORO_DEMO_API_KEY="), false);
     assert.equal(/\bPOST\b/.test(route), false);
     assert.equal(/\bPOST\b/.test(botRoute), false);
+    assert.equal(/\bPOST\b/.test(whitelistRoute), false);
     assert.equal(source.includes("market-open-orders"), false);
     assert.match(route, /export async function GET/);
     assert.match(botRoute, /export async function GET/);
@@ -211,6 +215,10 @@ describe("demo read", () => {
     assert.equal(bot.includes("Portafoglio bot"), true);
     assert.equal(bot.includes("Nessuna posizione del programma"), true);
     assert.equal(bot.includes("Confronto non disponibile"), true);
+    assert.equal(bot.includes("Composizione"), true);
+    assert.equal(board.includes("Le 20 crypto"), true);
+    assert.equal(board.includes("5_000"), true);
+    assert.match(whitelistRoute, /export async function GET/);
     assert.equal(page.includes("Posizioni Demo"), false);
     assert.equal(rules.includes("breakout/1"), true);
     assert.equal(rules.includes("ultime 20 candele"), true);

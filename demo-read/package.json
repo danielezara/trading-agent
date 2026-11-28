@@ -6,7 +6,7 @@
     "dev": "next dev --hostname 127.0.0.1 --port 3210",
     "build": "next build",
     "start": "next start --hostname 127.0.0.1 --port 3210",
-    "test": "node --test lib/demo-read.test.ts"
+    "test": "node --test lib/*.test.ts"
   },
   "dependencies": {
     "next": "^15.5.4",
