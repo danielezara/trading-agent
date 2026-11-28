@@ -181,11 +181,13 @@ class ModuleConfiguration {
                 onRecorded = { latest ->
                     cycle.entryLoop = if (EntryPace.finished(latest.rule.reason)) latest.rule.reason else "ON"
                     log.info(SpotEnabledTickers.report(spotCandidates.rows))
+                    log.info("breakout_evaluated={}", spotCandidates.rows.mapNotNull { SpotEnabledTickers.instrumentId(it) }.joinToString(",").ifEmpty { "-" })
                     logEntry(latest, cycle.entryLoop)
                 },
             ).start()
         }
         log.info(SpotEnabledTickers.report(spotCandidates.rows))
+        log.info("breakout_evaluated={}", spotCandidates.rows.mapNotNull { SpotEnabledTickers.instrumentId(it) }.joinToString(",").ifEmpty { "-" })
         logEntry(recorded, cycle.entryLoop)
         return cycle
     }

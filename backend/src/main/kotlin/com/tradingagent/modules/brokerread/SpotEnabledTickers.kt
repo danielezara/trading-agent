@@ -11,7 +11,7 @@ object SpotEnabledTickers {
     }
 
     fun instrumentId(row: SelectionRow): String? {
-        if (row.entryBlocked) {
+        if (row.entryBlocked && row.reason != "volume_missing") {
             return null
         }
         val id = row.pair.substringAfter('#', "")
@@ -20,7 +20,9 @@ object SpotEnabledTickers {
 
     fun report(rows: List<SelectionRow>): String {
         val enabled = rows.filter { !it.entryBlocked }.joinToString(",") { it.ticker }.ifEmpty { "-" }
-        val excluded = rows.filter { it.entryBlocked }.joinToString(",") { "${it.ticker}:${it.reason}" }.ifEmpty { "-" }
+        val excluded = rows.filter { it.entryBlocked }.joinToString(",") { row ->
+            if (row.observed.isBlank()) "${row.ticker}:${row.reason}" else "${row.ticker}:${row.reason}:${row.observed}"
+        }.ifEmpty { "-" }
         return "spot_evaluated=${rows.size} enabled=$enabled excluded=$excluded"
     }
 

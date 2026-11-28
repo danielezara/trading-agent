@@ -160,7 +160,7 @@ class DecisionCycle(
             rates,
         )
         val rule = if (breakout) {
-            val enabled = book.instruments.map { it.instrumentId }.toSet() + observed.blockedEntryIds
+            val enabled = candidates.filter { it.entryAllowed }.map { it.instrumentId }.toSet() + observed.blockedEntryIds
             BreakoutLive.decide(
                 BreakoutCycleInput(
                     candidates = book.instruments,

@@ -57,11 +57,19 @@ class SpotPairSelectionTest {
     }
 
     @Test
-    fun `an inactive pair is excluded in paper and the current flag is not a backtest proof`() {
+    fun `a tradable pair stays eligible when the exchange flag is closed`() {
         val closed = eur("BTCEUR", "100109", exchangeOpen = false)
         val paperRows = select(paper(), SpotMode.PAPER, asOf, mapOf("BTC" to observation(page(closed), quote(), bars(asOf, "5"))))
-        assertEquals("inactive", row(paperRows, "BTC").reason)
-        assertTrue(row(paperRows, "BTC").observed.contains("isExchangeOpen"))
+        val tradable = row(paperRows, "BTC")
+        assertEquals("enabled", tradable.outcome)
+        assertFalse(tradable.entryBlocked)
+        assertFalse(tradable.reason.contains("inactive"))
+
+        val halted = eur("BTCEUR", "100109", exchangeOpen = false, currentlyTradable = false)
+        val haltedRows = select(paper(), SpotMode.PAPER, asOf, mapOf("BTC" to observation(page(halted), quote(), bars(asOf, "5"))))
+        val inactive = row(haltedRows, "BTC")
+        assertEquals("inactive", inactive.reason)
+        assertTrue(inactive.observed.contains("isCurrentlyTradable"))
 
         val backtestRows = select(
             paper(model = "fixed_ratio", modelValue = "0.001"),
@@ -229,6 +237,7 @@ class SpotPairSelectionTest {
         symbol: String,
         id: String,
         exchangeOpen: Boolean = true,
+        currentlyTradable: Boolean = true,
     ): CatalogRow = CatalogRow(
         instrumentId = id,
         symbol = symbol,
@@ -238,7 +247,7 @@ class SpotPairSelectionTest {
         hidden = false,
         delisted = false,
         activeInPlatform = true,
-        currentlyTradable = true,
+        currentlyTradable = currentlyTradable,
         exchangeOpen = exchangeOpen,
     )
 

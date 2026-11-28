@@ -25,7 +25,7 @@ class SpotBreakoutCandidates(
         return selected.mapNotNull { row ->
             val id = SpotEnabledTickers.instrumentId(row) ?: return@mapNotNull null
             val bars = DemoClosedBars.barsFor(transport, material, id, now, sleep)
-            ObservedInstrumentBars(id, "crypto", bars, includeLeverage = false)
+            ObservedInstrumentBars(id, "crypto", bars, includeLeverage = false, entryAllowed = !row.entryBlocked)
         }
     }
 }

@@ -21,6 +21,7 @@ data class ObservedInstrumentBars(
     val assetClass: String,
     val bars: List<ObservedBar>,
     val includeLeverage: Boolean = false,
+    val entryAllowed: Boolean = true,
 )
 
 data class ObservedBars(

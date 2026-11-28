@@ -417,13 +417,16 @@ object SpotPairSelection {
     }
 
     private fun paperInactive(identity: Identity): String? {
-        val flags = listOf(
-            "isHiddenFromClient" to (identity.hidden == false),
-            "isDelisted" to (identity.delisted == false),
-            "isActiveInPlatform" to (identity.activeInPlatform == true),
-            "isCurrentlyTradable" to (identity.currentlyTradable == true),
-            "isExchangeOpen" to (identity.exchangeOpen == true),
-        )
+        val flags = buildList {
+            add("isHiddenFromClient" to (identity.hidden == false))
+            add("isDelisted" to (identity.delisted == false))
+            add("isActiveInPlatform" to (identity.activeInPlatform == true))
+            add("isCurrentlyTradable" to (identity.currentlyTradable == true))
+            // Su queste crypto eToro lascia isExchangeOpen a false anche con mercato negoziabile e quotazione viva.
+            if (identity.currentlyTradable != true) {
+                add("isExchangeOpen" to (identity.exchangeOpen == true))
+            }
+        }
         val failed = flags.filterNot { it.second }.map { it.first }
         if (failed.isEmpty()) {
             return null

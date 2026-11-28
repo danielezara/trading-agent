@@ -16,6 +16,12 @@ class SpotEnabledTickersTest {
         val missing = row("DOGE", true).copy(reason = "quote_absent", pair = "-")
         assertEquals("100001", SpotEnabledTickers.instrumentId(enabled))
         assertEquals(null, SpotEnabledTickers.instrumentId(missing))
+        val unpriced = row("BTC", true).copy(reason = "volume_missing", pair = "BTCEUR#100109", observed = "volume=")
+        assertEquals("100109", SpotEnabledTickers.instrumentId(unpriced))
+        assertEquals(
+            "spot_evaluated=1 enabled=- excluded=BTC:volume_missing:volume=",
+            SpotEnabledTickers.report(listOf(unpriced)),
+        )
         assertEquals(
             "spot_evaluated=2 enabled=BTC excluded=DOGE:quote_absent",
             SpotEnabledTickers.report(listOf(enabled, missing)),
